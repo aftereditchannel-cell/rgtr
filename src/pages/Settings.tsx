@@ -13,7 +13,7 @@ import { useFmt } from '../lib/useFmt'
 import { desktop, isDesktop } from '../lib/desktop'
 import { isMobile, mobilePlatform, mobileDataPath } from '../lib/mobile'
 import type { AppInfo } from '../lib/desktop'
-import { checkForUpdates, cmpVersion, fmtMB, fmtDate, APP_VERSION } from '../lib/updater'
+import { checkForUpdates, cmpVersion, fmtDate, APP_VERSION } from '../lib/updater'
 import type { UpdateRelease, UpdateCheckResult, DownloadProgress } from '../lib/desktop'
 import * as cloud from '../lib/cloud'
 import {
@@ -381,242 +381,6 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
       <span className="text-[var(--color-dim2)] w-24 shrink-0">{label}</span>
       <span className={`text-[var(--color-dim)] break-all ${mono ? 'ltr text-[11px]' : ''}`}>{value}</span>
     </div>
-  )
-}
-
-/* ---------- کارت بروزرسانی خودکار ---------- */
-function UpdateCard() {
-  const { t, lang } = useT()
-  const { data, setSettings, setToast } = useApp()
-  const s = data.settings
-  const auto = s.autoUpdate !== false
-
-  const [current, setCurrent] = useState<string>(APP_VERSION)
-  const [checking, setChecking] = useState(false)
-  const [result, setResult] = useState<UpdateCheckResult | null>(null)
-  const [netError, setNetError] = useState(false)
-  const [dl, setDl] = useState<DownloadProgress | null>(null)
-  const [dlBusy, setDlBusy] = useState(false)
-  const [doneFile, setDoneFile] = useState<{ path: string; name: string } | null>(null)
-  const [pickedTag, setPickedTag] = useState('')
-
-  const releases = result?.releases ?? []
-  const latest = releases[0] ?? null
-  const hasUpdate = !!(latest && cmpVersion(latest.version, current) > 0)
-
-  /* نسخه‌ی جاری — در دسکتاپ از خود برنامه */
-  useEffect(() => {
-    if (desktop) void desktop.info().then(i => setCurrent(i.version)).catch(() => {})
-  }, [])
-
-  /* رویدادهای آپدیتر: درصد دانلود + دکمه‌ی «بررسی» منو + خبر نسخه‌ی جدید */
-  useEffect(() => {
-    if (!desktop) return
-    return desktop.onUpdate((name, payload) => {
-      if (name === 'progress') setDl(payload as DownloadProgress)
-      else if (name === 'available') void runCheck(true)
-      else if (name === 'checkNow') {
-        document.getElementById('update-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        void runCheck()
-      }
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current])
-
-  /* بررسی بی‌صدا هنگام باز شدن تنظیمات */
-  useEffect(() => { void runCheck(true) /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [])
-
-  async function runCheck(silent = false) {
-    if (!silent) setChecking(true)
-    setNetError(false)
-    try {
-      const res = await checkForUpdates(current)
-      setResult(res)
-      if (!res.ok) setNetError(true)
-      // دانلود خودکار وقتی نسخه‌ی جدید هست و کاربر لغو نکرده
-      const rel = res.releases?.[0]
-      if (res.ok && rel && cmpVersion(rel.version, current) > 0 && desktop && auto && !doneFile) {
-        void startDownload(rel)
-      }
-    } catch {
-      setNetError(true)
-    } finally {
-      setChecking(false)
-    }
-  }
-
-  /** دانلود یک نسخه — دسکتاپ: استریم با درصد؛ وب: لینک مستقیم */
-  async function startDownload(rel: UpdateRelease | null) {
-    if (!rel) return
-    setDlBusy(true)
-    setDoneFile(null)
-    try {
-      if (desktop) {
-        const asset = rel.assets.setup ?? rel.assets.portable
-        if (!asset) throw new Error('no asset')
-        setDl({ received: 0, total: asset.size, percent: 0 })
-        const out = await desktop.updateDownload({ url: asset.url, filename: asset.name, size: asset.size })
-        setDoneFile({ path: out.path, name: out.name })
-        setDl(p => (p ? { ...p, percent: 100 } : p))
-        setToast(t('upd.newToast', { v: rel.version }))
-        // نصب‌کننده (Setup) → دکمه‌ی نصب نشان بده؛ پرتابل → فقط دانلود شد
-      } else {
-        // وب/اندروید: دانلود مستقیم از گیت‌هاب
-        const asset = isMobile ? (rel.assets.apk ?? rel.assets.setup) : (rel.assets.setup ?? rel.assets.portable)
-        window.open(asset?.url ?? rel.notesUrl, '_blank')
-      }
-    } catch {
-      setNetError(true)
-      setDl(null)
-    } finally {
-      setDlBusy(false)
-    }
-  }
-
-  async function installNow() {
-    if (!desktop || !doneFile) return
-    setToast(t('upd.installing'))
-    try {
-      await desktop.updateInstall(doneFile.path)
-    } catch {
-      setNetError(true)
-    }
-  }
-
-  const picked = releases.find(r => r.tag === pickedTag) ?? null
-  const downloading = dlBusy || (dl != null && !doneFile)
-
-  return (
-    <Card id="update-card">
-      <SectionTitle icon="Rocket"
-        right={<span className="text-[10.5px] text-[var(--color-dim2)] nums ltr">v{current}</span>}>
-        {t('upd.title')}
-      </SectionTitle>
-
-      {latest && (
-        <div className="space-y-1.5 text-[11.5px] mb-3">
-          <Row label={t('upd.latest')} value={`v${latest.version}${latest.publishedAt ? ' · ' + fmtDate(latest.publishedAt, lang) : ''}`} />
-          {hasUpdate && (
-            <div className="flex items-center gap-2 pt-1">
-              <Badge value="Doing" dot />
-              <span className="text-[12px] text-[var(--color-tx)]">{t('upd.available')}: v{latest.version}</span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* وضعیت‌ها */}
-      {checking && !result && (
-        <p className="text-[12px] text-[var(--color-dim)] mb-3 flex items-center gap-2">
-          <Icon name="Loader" size={14} className="animate-spin" /> {t('upd.checking')}
-        </p>
-      )}
-      {netError && (
-        <div className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2.5 mb-3">
-          <p className="text-[12px] text-red-300 flex items-center gap-2"><Icon name="CloudOff" size={14} /> {t('upd.error')}</p>
-          <p className="text-[10.5px] text-[var(--color-dim2)] mt-1 leading-relaxed">{t('upd.errorHint')}</p>
-          <Button size="sm" variant="outline" icon="RefreshCw" className="mt-2" onClick={() => void runCheck()}>{t('upd.retry')}</Button>
-        </div>
-      )}
-      {!netError && result?.ok && releases.length === 0 && !checking && (
-        <p className="text-[11.5px] text-[var(--color-dim2)] mb-3 leading-relaxed">{t('upd.noReleases')}</p>
-      )}
-      {!netError && result?.ok && releases.length > 0 && !hasUpdate && !checking && (
-        <p className="text-[12px] text-[var(--color-dim)] mb-3 flex items-center gap-2">
-          <Icon name="CheckCircle2" size={14} className="text-emerald-400" /> {t('upd.upToDate')}
-        </p>
-      )}
-
-      {/* دانلود/نصب */}
-      {downloading && dl && (
-        <div className="mb-3">
-          <div className="flex items-center justify-between text-[11px] text-[var(--color-dim)] mb-1.5">
-            <span className="flex items-center gap-1.5"><Icon name="CloudDownload" size={13} className="animate-pulse" /> {t('upd.downloading')}</span>
-            <span className="nums">{fmt.dg(dl.percent)}%{dl.total ? ` · ${fmt.dg(+(dl.received / 1024 / 1024).toFixed(1))}/${fmt.dg(+(dl.total / 1024 / 1024).toFixed(1))} MB` : ''}</span>
-          </div>
-          <div className="h-1.5 rounded-full bg-[var(--color-line)] overflow-hidden">
-            <div className="h-full rounded-full bg-[var(--color-acc)] transition-all duration-300" style={{ width: `${dl.percent}%` }} />
-          </div>
-          {desktop && dlBusy && (
-            <Button size="sm" variant="ghost" icon="X" className="mt-2" onClick={() => { void desktop.updateCancel(); setDl(null); setDlBusy(false) }}>
-              {t('upd.cancel')}
-            </Button>
-          )}
-        </div>
-      )}
-      {doneFile && (
-        <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2.5 mb-3">
-          <p className="text-[12px] text-emerald-300 flex items-center gap-2">
-            <Icon name="CheckCircle2" size={14} /> {t('upd.downloaded')} — <span className="ltr nums">{doneFile.name}</span>
-          </p>
-          <div className="flex gap-2 flex-wrap mt-2">
-            {desktop && /-setup\.exe$/i.test(doneFile.name) ? (
-              <Button size="sm" variant="primary" icon="Download" onClick={() => void installNow()}>{t('upd.install')}</Button>
-            ) : (
-              <span className="text-[10.5px] text-[var(--color-dim2)] self-center">{t('upd.portableNote')}</span>
-            )}
-            {desktop && <Button size="sm" variant="ghost" icon="FolderOpen" onClick={() => void desktop.updateOpenFolder()}>{t('upd.folder')}</Button>}
-          </div>
-        </div>
-      )}
-
-      {/* دکمه‌ها */}
-      <div className="flex gap-2 flex-wrap">
-        <Button size="sm" variant="outline" icon="RefreshCw" disabled={checking} onClick={() => void runCheck()}>
-          {t('upd.check')}
-        </Button>
-        {desktop && hasUpdate && !doneFile && !downloading && (
-          <Button size="sm" variant="primary" icon="CloudDownload" onClick={() => void startDownload(latest)}>
-            {t('upd.downloadInstall')}
-          </Button>
-        )}
-        {!desktop && latest && (
-          <Button size="sm" variant="primary" icon="ExternalLink" onClick={() => void startDownload(latest)}>
-            {t('upd.downloadOpen')}
-          </Button>
-        )}
-      </div>
-      {!desktop && (
-        <p className="text-[10.5px] text-[var(--color-dim2)] mt-2 leading-relaxed">{t('upd.installFirst')}</p>
-      )}
-
-      {/* انتخاب هر نسخه */}
-      {releases.length > 0 && (
-        <div className="mt-4 pt-3 border-t border-[var(--color-line)]">
-          <div className="text-[12px] mb-1">{t('upd.anyVersion')}</div>
-          <p className="text-[10.5px] text-[var(--color-dim2)] mb-2">{t('upd.anyVersionHint')}</p>
-          <div className="flex gap-2 flex-wrap">
-            <select value={pickedTag} onChange={e => setPickedTag(e.target.value)}
-              className="flex-1 min-w-[160px] rounded-lg border border-[var(--color-line2)] bg-[var(--color-bg)] px-2.5 py-1.5 text-[12px] cursor-pointer">
-              <option value="">{t('upd.pick')}</option>
-              {releases.map(r => (
-                <option key={r.tag} value={r.tag}>v{r.version} — {fmtDate(r.publishedAt, lang)}</option>
-              ))}
-            </select>
-            <Button size="sm" variant="outline" icon="Download" disabled={!picked}
-              onClick={() => void startDownload(picked)}>
-              {t('upd.get')}
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* سوییچ بروزرسانی خودکار — فقط دسکتاپ */}
-      {desktop && (
-        <div className="mt-4 pt-3 border-t border-[var(--color-line)] flex items-center gap-3 flex-wrap">
-          <div className="w-40 shrink-0">
-            <Toggle
-              value={auto ? 'on' : 'off'}
-              options={[{ v: 'on', l: t('common.on') }, { v: 'off', l: t('common.off') }]}
-              onChange={v => setSettings({ autoUpdate: v === 'on' })}
-            />
-          </div>
-          <span className="text-[10.5px] text-[var(--color-dim2)] flex-1 min-w-[180px] leading-relaxed">
-            <span className="text-[var(--color-dim)]">{t('upd.auto')}</span> — {t('upd.autoHint')}
-          </span>
-        </div>
-      )}
-    </Card>
   )
 }
 
@@ -1238,5 +1002,242 @@ function ModuleEditor({ module, onClose, onSave }: { module: ModuleDef; onClose:
         {t('set.newField')}
       </Button>
     </Modal>
+  )
+}
+
+/* ---------- کارت بروزرسانی خودکار ---------- */
+function UpdateCard() {
+  const { t, lang } = useT()
+  const fmt = useFmt()
+  const { data, setSettings, setToast } = useApp()
+  const s = data.settings
+  const auto = s.autoUpdate !== false
+
+  const [current, setCurrent] = useState<string>(APP_VERSION)
+  const [checking, setChecking] = useState(false)
+  const [result, setResult] = useState<UpdateCheckResult | null>(null)
+  const [netError, setNetError] = useState(false)
+  const [dl, setDl] = useState<DownloadProgress | null>(null)
+  const [dlBusy, setDlBusy] = useState(false)
+  const [doneFile, setDoneFile] = useState<{ path: string; name: string } | null>(null)
+  const [pickedTag, setPickedTag] = useState('')
+
+  const releases = result?.releases ?? []
+  const latest = releases[0] ?? null
+  const hasUpdate = !!(latest && cmpVersion(latest.version, current) > 0)
+
+  /* نسخه‌ی جاری — در دسکتاپ از خود برنامه */
+  useEffect(() => {
+    if (desktop) void desktop.info().then(i => setCurrent(i.version)).catch(() => {})
+  }, [])
+
+  /* رویدادهای آپدیتر: درصد دانلود + دکمه‌ی «بررسی» منو + خبر نسخه‌ی جدید */
+  useEffect(() => {
+    if (!desktop) return
+    return desktop.onUpdate((name, payload) => {
+      if (name === 'progress') setDl(payload as DownloadProgress)
+      else if (name === 'available') void runCheck(true)
+      else if (name === 'checkNow') {
+        document.getElementById('update-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        void runCheck()
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current])
+
+  /* بررسی بی‌صدا هنگام باز شدن تنظیمات */
+  useEffect(() => { void runCheck(true) /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [])
+
+  async function runCheck(silent = false) {
+    if (!silent) setChecking(true)
+    setNetError(false)
+    try {
+      const res = await checkForUpdates(current)
+      setResult(res)
+      if (!res.ok) setNetError(true)
+      // دانلود خودکار وقتی نسخه‌ی جدید هست و کاربر لغو نکرده
+      const rel = res.releases?.[0]
+      if (res.ok && rel && cmpVersion(rel.version, current) > 0 && desktop && auto && !doneFile) {
+        void startDownload(rel)
+      }
+    } catch {
+      setNetError(true)
+    } finally {
+      setChecking(false)
+    }
+  }
+
+  /** دانلود یک نسخه — دسکتاپ: استریم با درصد؛ وب: لینک مستقیم */
+  async function startDownload(rel: UpdateRelease | null) {
+    if (!rel) return
+    setDlBusy(true)
+    setDoneFile(null)
+    try {
+      if (desktop) {
+        const asset = rel.assets.setup ?? rel.assets.portable
+        if (!asset) throw new Error('no asset')
+        setDl({ received: 0, total: asset.size, percent: 0 })
+        const out = await desktop.updateDownload({ url: asset.url, filename: asset.name, size: asset.size })
+        setDoneFile({ path: out.path, name: out.name })
+        setDl(p => (p ? { ...p, percent: 100 } : p))
+        setToast(t('upd.newToast', { v: rel.version }))
+        // نصب‌کننده (Setup) → دکمه‌ی نصب نشان بده؛ پرتابل → فقط دانلود شد
+      } else {
+        // وب/اندروید: دانلود مستقیم از گیت‌هاب
+        const asset = isMobile ? (rel.assets.apk ?? rel.assets.setup) : (rel.assets.setup ?? rel.assets.portable)
+        window.open(asset?.url ?? rel.notesUrl, '_blank')
+      }
+    } catch {
+      setNetError(true)
+      setDl(null)
+    } finally {
+      setDlBusy(false)
+    }
+  }
+
+  async function installNow() {
+    if (!desktop || !doneFile) return
+    setToast(t('upd.installing'))
+    try {
+      await desktop.updateInstall(doneFile.path)
+    } catch {
+      setNetError(true)
+    }
+  }
+
+  const picked = releases.find(r => r.tag === pickedTag) ?? null
+  const downloading = dlBusy || (dl != null && !doneFile)
+
+  return (
+    <Card id="update-card">
+      <SectionTitle icon="Rocket"
+        right={<span className="text-[10.5px] text-[var(--color-dim2)] nums ltr">v{current}</span>}>
+        {t('upd.title')}
+      </SectionTitle>
+
+      {latest && (
+        <div className="space-y-1.5 text-[11.5px] mb-3">
+          <Row label={t('upd.latest')} value={`v${latest.version}${latest.publishedAt ? ' · ' + fmtDate(latest.publishedAt, lang) : ''}`} />
+          {hasUpdate && (
+            <div className="flex items-center gap-2 pt-1">
+              <Badge value="Doing" dot />
+              <span className="text-[12px] text-[var(--color-tx)]">{t('upd.available')}: v{latest.version}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* وضعیت‌ها */}
+      {checking && !result && (
+        <p className="text-[12px] text-[var(--color-dim)] mb-3 flex items-center gap-2">
+          <Icon name="Loader" size={14} className="animate-spin" /> {t('upd.checking')}
+        </p>
+      )}
+      {netError && (
+        <div className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2.5 mb-3">
+          <p className="text-[12px] text-red-300 flex items-center gap-2"><Icon name="CloudOff" size={14} /> {t('upd.error')}</p>
+          <p className="text-[10.5px] text-[var(--color-dim2)] mt-1 leading-relaxed">{t('upd.errorHint')}</p>
+          <Button size="sm" variant="outline" icon="RefreshCw" className="mt-2" onClick={() => void runCheck()}>{t('upd.retry')}</Button>
+        </div>
+      )}
+      {!netError && result?.ok && releases.length === 0 && !checking && (
+        <p className="text-[11.5px] text-[var(--color-dim2)] mb-3 leading-relaxed">{t('upd.noReleases')}</p>
+      )}
+      {!netError && result?.ok && releases.length > 0 && !hasUpdate && !checking && (
+        <p className="text-[12px] text-[var(--color-dim)] mb-3 flex items-center gap-2">
+          <Icon name="CheckCircle2" size={14} className="text-emerald-400" /> {t('upd.upToDate')}
+        </p>
+      )}
+
+      {/* دانلود/نصب */}
+      {downloading && dl && (
+        <div className="mb-3">
+          <div className="flex items-center justify-between text-[11px] text-[var(--color-dim)] mb-1.5">
+            <span className="flex items-center gap-1.5"><Icon name="CloudDownload" size={13} className="animate-pulse" /> {t('upd.downloading')}</span>
+            <span className="nums">{fmt.dg(dl.percent)}%{dl.total ? ` · ${fmt.dg(+(dl.received / 1024 / 1024).toFixed(1))}/${fmt.dg(+(dl.total / 1024 / 1024).toFixed(1))} MB` : ''}</span>
+          </div>
+          <div className="h-1.5 rounded-full bg-[var(--color-line)] overflow-hidden">
+            <div className="h-full rounded-full bg-[var(--color-acc)] transition-all duration-300" style={{ width: `${dl.percent}%` }} />
+          </div>
+          {desktop && dlBusy && (
+            <Button size="sm" variant="ghost" icon="X" className="mt-2" onClick={() => { void desktop!.updateCancel(); setDl(null); setDlBusy(false) }}>
+              {t('upd.cancel')}
+            </Button>
+          )}
+        </div>
+      )}
+      {doneFile && (
+        <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2.5 mb-3">
+          <p className="text-[12px] text-emerald-300 flex items-center gap-2">
+            <Icon name="CheckCircle2" size={14} /> {t('upd.downloaded')} — <span className="ltr nums">{doneFile.name}</span>
+          </p>
+          <div className="flex gap-2 flex-wrap mt-2">
+            {desktop && /-setup\.exe$/i.test(doneFile.name) ? (
+              <Button size="sm" variant="primary" icon="Download" onClick={() => void installNow()}>{t('upd.install')}</Button>
+            ) : (
+              <span className="text-[10.5px] text-[var(--color-dim2)] self-center">{t('upd.portableNote')}</span>
+            )}
+            {desktop && <Button size="sm" variant="ghost" icon="FolderOpen" onClick={() => void desktop!.updateOpenFolder()}>{t('upd.folder')}</Button>}
+          </div>
+        </div>
+      )}
+
+      {/* دکمه‌ها */}
+      <div className="flex gap-2 flex-wrap">
+        <Button size="sm" variant="outline" icon="RefreshCw" disabled={checking} onClick={() => void runCheck()}>
+          {t('upd.check')}
+        </Button>
+        {desktop && hasUpdate && !doneFile && !downloading && (
+          <Button size="sm" variant="primary" icon="CloudDownload" onClick={() => void startDownload(latest)}>
+            {t('upd.downloadInstall')}
+          </Button>
+        )}
+        {!desktop && latest && (
+          <Button size="sm" variant="primary" icon="ExternalLink" onClick={() => void startDownload(latest)}>
+            {t('upd.downloadOpen')}
+          </Button>
+        )}
+      </div>
+      {!desktop && (
+        <p className="text-[10.5px] text-[var(--color-dim2)] mt-2 leading-relaxed">{t('upd.installFirst')}</p>
+      )}
+
+      {/* انتخاب هر نسخه */}
+      {releases.length > 0 && (
+        <div className="mt-4 pt-3 border-t border-[var(--color-line)]">
+          <div className="text-[12px] mb-1">{t('upd.anyVersion')}</div>
+          <p className="text-[10.5px] text-[var(--color-dim2)] mb-2">{t('upd.anyVersionHint')}</p>
+          <div className="flex gap-2 flex-wrap">
+            <select value={pickedTag} onChange={e => setPickedTag(e.target.value)}
+              className="flex-1 min-w-[160px] rounded-lg border border-[var(--color-line2)] bg-[var(--color-bg)] px-2.5 py-1.5 text-[12px] cursor-pointer">
+              <option value="">{t('upd.pick')}</option>
+              {releases.map(r => (
+                <option key={r.tag} value={r.tag}>v{r.version} — {fmtDate(r.publishedAt, lang)}</option>
+              ))}
+            </select>
+            <Button size="sm" variant="outline" icon="Download" disabled={!picked}
+              onClick={() => void startDownload(picked)}>
+              {t('upd.get')}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* سوییچ بروزرسانی خودکار — فقط دسکتاپ */}
+      {desktop && (
+        <div className="mt-4 pt-3 border-t border-[var(--color-line)] flex items-center gap-3 flex-wrap">
+          <div className="w-40 shrink-0">
+            <Toggle
+              value={auto ? 'on' : 'off'}
+              options={[{ v: 'on', l: t('common.on') }, { v: 'off', l: t('common.off') }]}
+              onChange={v => setSettings({ autoUpdate: v === 'on' })}
+            />
+          </div>
+          <span className="text-[10.5px] text-[var(--color-dim2)] flex-1 min-w-[180px] leading-relaxed">
+            <span className="text-[var(--color-dim)]">{t('upd.auto')}</span> — {t('upd.autoHint')}
+          </span>
+        </div>
+      )}
+    </Card>
   )
 }
