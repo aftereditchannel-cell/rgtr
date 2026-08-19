@@ -5,7 +5,7 @@ import { listSnapshots, getSnapshot, storageBackend, saveDoc } from '../lib/db'
 import type { Snapshot } from '../store/types'
 import { makeCustomModule, CORE_MODULES } from '../domain/schema'
 import type { ModuleDef, FieldDef, FieldType } from '../domain/schema'
-import { Card, SectionTitle, Button, Field, TextInput, Select, Icon, Modal, Badge, Empty } from '../components/ui/Primitives'
+import { Card, SectionTitle, Button, Field, TextInput, Icon, Modal, Badge, Empty } from '../components/ui/Primitives'
 import { Dropdown } from '../components/ui/Dropdown'
 import { ICON_NAMES } from '../components/ui/icons'
 import { useT, cloudError } from '../i18n'
@@ -83,10 +83,12 @@ export function Settings() {
             <TextInput value={s.orgName} onChange={e => setSettings({ orgName: e.target.value })} />
           </Field>
           <Field label={t('set.currency')}>
-            <Select options={['$', '€', '£', '﷼', 'T']} value={s.currency} onChange={e => setSettings({ currency: e.target.value })} />
+            <Dropdown value={s.currency} onChange={v => setSettings({ currency: v })}
+              options={['$', '€', '£', '﷼', 'T'].map(o => ({ value: o, label: o }))} />
           </Field>
           <Field label={t('set.focusCount')} help={t('set.focusCountHint')}>
-            <Select options={['1', '2', '3', '4', '5']} value={String(s.focusCount)} onChange={e => setSettings({ focusCount: Number(e.target.value) })} />
+            <Dropdown value={String(s.focusCount)} onChange={v => setSettings({ focusCount: Number(v) })}
+              options={['1', '2', '3', '4', '5'].map(o => ({ value: o, label: o }))} />
           </Field>
         </div>
         <div className="mt-4">
@@ -959,8 +961,9 @@ function ModuleEditor({ module, onClose, onSave }: { module: ModuleDef; onClose:
           </>
         </Field>
         <Field label={t('set.modGroup')}>
-          <Select options={['core', 'media', 'business', 'ops']} value={group}
-            onChange={e => setGroup(e.target.value as ModuleDef['group'])} />
+          <Dropdown value={group}
+            onChange={v => setGroup(v as ModuleDef['group'])}
+            options={['core', 'media', 'business', 'ops'].map(o => ({ value: o, label: o }))} />
         </Field>
       </div>
 
@@ -973,10 +976,9 @@ function ModuleEditor({ module, onClose, onSave }: { module: ModuleDef; onClose:
             <TextInput value={f.label} className="py-1 text-[12px] flex-1 ltr" onChange={e => upd(i, { label: e.target.value })} />
             <TextInput value={f.labelFa ?? ''} placeholder={fl(f)} className="py-1 text-[12px] flex-1"
               onChange={e => upd(i, { labelFa: e.target.value || undefined })} />
-            <select value={f.type} onChange={e => upd(i, { type: e.target.value as FieldType })}
-              className="rounded-lg bg-[var(--color-bg)] border border-[var(--color-line2)] px-2 py-1 text-[11.5px] cursor-pointer ltr">
-              {FIELD_TYPES.map(ty => <option key={ty} value={ty}>{ty}</option>)}
-            </select>
+            <Dropdown value={f.type} onChange={v => upd(i, { type: v as FieldType })}
+              className="w-32 shrink-0"
+              options={FIELD_TYPES.map(ty => ({ value: ty, label: ty }))} />
             {f.type === 'select' && (
               <TextInput value={(f.options ?? []).join(',')} placeholder="options,csv" className="py-1 text-[11px] w-32 ltr"
                 onChange={e => upd(i, { options: e.target.value.split(',').map(x => x.trim()).filter(Boolean) })} />
