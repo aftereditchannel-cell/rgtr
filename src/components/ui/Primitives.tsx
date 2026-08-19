@@ -125,19 +125,19 @@ export function Modal({ open, onClose, title, children, wide = false, footer }: 
 }) {
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:p-8"
-      style={{ background: 'rgba(4,5,8,.72)', backdropFilter: 'blur(4px)' }}
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto p-3 sm:p-8"
+      style={{ background: 'rgba(4,5,8,.72)', backdropFilter: 'blur(4px)', paddingBottom: 'max(0.75rem, var(--sab))' }}
       onClick={onClose}>
-      <div className={`anim w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} rounded-2xl border border-[var(--color-line2)] bg-[var(--color-bg2)] shadow-2xl my-auto`}
+      <div className={`anim w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} rounded-2xl border border-[var(--color-line2)] bg-[var(--color-bg2)] shadow-2xl my-auto flex flex-col max-h-[calc(100dvh-1.5rem)]`}
         onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--color-line)]">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--color-line)] shrink-0">
           <h3 className="text-[14px] font-semibold">{title}</h3>
           <button onClick={onClose} className="text-[var(--color-dim2)] hover:text-[var(--color-tx)] transition-colors p-1 rounded-md hover:bg-white/5">
             <Icon name="X" size={17} />
           </button>
         </div>
-        <div className="px-5 py-4">{children}</div>
-        {footer && <div className="px-5 py-3.5 border-t border-[var(--color-line)] flex justify-end gap-2">{footer}</div>}
+        <div className="px-5 py-4 overflow-y-auto min-h-0 overscroll-contain">{children}</div>
+        {footer && <div className="px-5 py-3.5 border-t border-[var(--color-line)] flex justify-end gap-2 shrink-0">{footer}</div>}
       </div>
     </div>
   )

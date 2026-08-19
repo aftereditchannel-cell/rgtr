@@ -284,3 +284,18 @@ html[data-glass='on'] .rounded-xl.border {
 @media (prefers-reduced-motion: reduce) {
   html[data-glass='on'] * { backdrop-filter: none !important; }
 }
+
+
+/* ---------- ریسپانسیو فرم‌ها/صفحات (موبایل و دسکتاپ) ---------- */
+@media (max-width: 640px) {
+  /* شیت‌های پایین صفحه بالای نوار سیستمی بمانند */
+  .anim-sheet { padding-bottom: calc(1rem + var(--sab)); }
+  /* فرم‌های رکورد: ارتفاع کامل در دسترس و اسکرول داخلی */
+  form { max-width: 100%; }
+  /* ورودی‌ها حداقل ۴۴px لمس */
+  input, select, textarea, button { min-height: 0; }
+  body { overflow: hidden; }
+  #root { height: 100dvh; }
+}
+/* اسکرول نرم صفحات */
+main.scroll-y, .scroll-y { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }

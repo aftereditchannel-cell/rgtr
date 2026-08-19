@@ -5,6 +5,12 @@ import { useT } from '../../i18n'
 import { verifyPin } from '../../lib/lock'
 import { isMobile } from '../../lib/mobile'
 
+type NativeBio = { bioAvailable?: () => boolean; authenticate?: () => void }
+const nativeBio = (typeof window !== 'undefined' ? (window as unknown as { NexusNative?: NativeBio }).NexusNative : undefined)
+const canNativeBio = (() => {
+  try { return !!nativeBio?.bioAvailable?.() } catch { return false }
+})()
+
 /**
  * صفحه‌ی قفل — تمام‌صفحه، بالای كل برنامه.
  * ورود با PIN (کیپد لمسی + کیبورد فیزیکی) و در موبایل با اثر انگشت.
@@ -26,9 +32,9 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
     onUnlock()
   }
 
-  /* اثر انگشت: فقط اگر دستگاه پشتیبانی کند دکمه را نشان بده */
+  /* اثر انگشت: پل بومی (اپ کلاسیک اندروید) یا Capacitor */
   useEffect(() => {
-    if (!isMobile) return
+    if (!isMobile && !canNativeBio) return
     let off = false
     void (async () => {
       try {
@@ -47,9 +53,17 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
     if (busy) return
     setBusy(true)
     try {
-      const { BiometricAuth } = await import('@aparajita/capacitor-biometric-auth')
-      await BiometricAuth.authenticate({ reason: t('lock.title') })
-      succeed()
+      if (canNativeBio) {
+        // درخواست قفل دستگاه (اثر انگشت/PIN سیستم) از پل بومی
+        ;(window as unknown as { __nxBioResult?: (ok: boolean) => void }).__nxBioResult = ok => {
+          if (ok) succeed()
+        }
+        nativeBio?.authenticate?.()
+      } else {
+        const { BiometricAuth } = await import('@aparajita/capacitor-biometric-auth')
+        await BiometricAuth.authenticate({ reason: t('lock.title') })
+        succeed()
+      }
     } catch { /* کاربر لغو کرد */ }
     setBusy(false)
   }
@@ -119,7 +133,7 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
           </button>
         </div>
 
-        {bio && (
+        {(bio || canNativeBio) && (
           <button onClick={() => void tryBio()} disabled={busy}
             className="flex items-center gap-2 text-[12px] text-[var(--color-dim)] hover:text-[var(--color-tx)] glass rounded-full px-4 py-2 transition-colors">
             <Icon name="Fingerprint" size={16} />

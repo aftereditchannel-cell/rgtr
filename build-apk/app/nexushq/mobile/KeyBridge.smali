@@ -100,6 +100,62 @@
     return-void
 .end method
 
+# ---------- اثر انگشت / قفل سیستمی ----------
+.method public bioAvailable()Z
+    .locals 2
+    .annotation runtime Landroid/webkit/JavascriptInterface;
+    .end annotation
+
+    iget-object v0, p0, Lapp/nexushq/mobile/KeyBridge;->act:Landroid/app/Activity;
+
+    const-string v1, "keyguard"
+
+    invoke-virtual {v0, v1}, Landroid/app/Activity;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;
+
+    move-result-object v0
+
+    check-cast v0, Landroid/app/KeyguardManager;
+
+    invoke-virtual {v0}, Landroid/app/KeyguardManager;->isKeyguardSecure()Z
+
+    move-result v0
+
+    return v0
+.end method
+
+.method public authenticate()V
+    .locals 4
+    .annotation runtime Landroid/webkit/JavascriptInterface;
+    .end annotation
+
+    iget-object v0, p0, Lapp/nexushq/mobile/KeyBridge;->act:Landroid/app/Activity;
+
+    const-string v1, "keyguard"
+
+    invoke-virtual {v0, v1}, Landroid/app/Activity;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;
+
+    move-result-object v1
+
+    check-cast v1, Landroid/app/KeyguardManager;
+
+    const-string v2, "NEXUS HQ"
+
+    const-string v3, "\u0642\u0641\u0644 \u0628\u0631\u0646\u0627\u0645\u0647"
+
+    invoke-virtual {v1, v3, v2}, Landroid/app/KeyguardManager;->createConfirmDeviceCredentialIntent(Ljava/lang/CharSequence;Ljava/lang/CharSequence;)Landroid/content/Intent;
+
+    move-result-object v1
+
+    if-eqz v1, :no_intent
+
+    const/16 v2, 0x1b59
+
+    invoke-virtual {v0, v1, v2}, Landroid/app/Activity;->startActivityForResult(Landroid/content/Intent;I)V
+
+    :no_intent
+    return-void
+.end method
+
 .method public setTitle(Ljava/lang/String;)V
     .locals 3
     .annotation runtime Landroid/webkit/JavascriptInterface;

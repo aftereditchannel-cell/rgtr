@@ -74,6 +74,62 @@
     return-void
 .end method
 
+# نتیجه‌ی احراز قفل دستگاه (اثر انگشت/PIN) به صفحه‌ی وب برمی‌گردد
+.method protected onActivityResult(IILandroid/content/Intent;)V
+    .locals 4
+
+    const/16 v0, 0x1b59
+
+    if-ne p1, v0, :not_bio
+
+    iget-object v0, p0, Lapp/nexushq/mobile/MainActivity;->wv:Landroid/webkit/WebView;
+
+    new-instance v1, Ljava/lang/StringBuilder;
+
+    invoke-direct {v1}, Ljava/lang/StringBuilder;-><init>()V
+
+    const-string v2, "window.__nxBioResult&&window.__nxBioResult("
+
+    invoke-virtual {v1, v2}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    move-result-object v1
+
+    const/4 v2, -0x1
+
+    if-ne p2, v2, :failed
+
+    const-string v2, "true"
+
+    goto :append
+
+    :failed
+    const-string v2, "false"
+
+    :append
+    invoke-virtual {v1, v2}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    move-result-object v1
+
+    const-string v2, ")"
+
+    invoke-virtual {v1, v2}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;
+
+    move-result-object v1
+
+    invoke-virtual {v1}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
+
+    move-result-object v1
+
+    const/4 v2, 0x0
+
+    invoke-virtual {v0, v1, v2}, Landroid/webkit/WebView;->evaluateJavascript(Ljava/lang/String;Landroid/webkit/ValueCallback;)V
+
+    :not_bio
+    invoke-super {p0, p1, p2, p3}, Landroid/app/Activity;->onActivityResult(IILandroid/content/Intent;)V
+
+    return-void
+.end method
+
 .method public onBackPressed()V
     .locals 1
 

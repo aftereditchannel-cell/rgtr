@@ -54,7 +54,7 @@ const mimeOf = (p: string) => MIME[p.slice(p.lastIndexOf('.')).toLowerCase()] ??
 async function runApp() {
   // پورت آزاد پیدا می‌کنیم تا تداخل با برنامه‌های دیگر پیش نیاید
   let server: ReturnType<typeof serve> | undefined
-  for (let port = 8765; port <= 8780; port++) {
+  for (let port = 8787; port <= 8800; port++) {
     try {
       server = serve({
         port,
@@ -75,7 +75,7 @@ async function runApp() {
       break
     } catch { /* پورت اشغال است — بعدی */ }
   }
-  if (!server) throw new Error('no free port in 8765..8780')
+  if (!server) throw new Error('no free port in 8787..8800')
   const url = `http://127.0.0.1:${server.port}/`
 
   console.log('┌──────────────────────────────────────────────────┐')
