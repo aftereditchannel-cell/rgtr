@@ -34,6 +34,8 @@ export interface Settings {
   calendar: 'jalali' | 'gregorian'
   /** ارقام فارسی یا لاتین */
   digits: 'fa' | 'latn'
+  /** بررسی و دانلود خودکار بروزرسانی (پیش‌فرض روشن) */
+  autoUpdate?: boolean
   cloud: CloudSettings
 }
 

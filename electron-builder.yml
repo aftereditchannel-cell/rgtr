@@ -18,7 +18,7 @@ files:
 compression: maximum
 asar: true
 removePackageScripts: true
-buildVersion: "1.0.0"
+# شماره نسخه از package.json خوانده می‌شود — اینجا هاردکد نکنیم تا آپدیتر درست مقایسه کند
 
 win:
   icon: electron/icons/icon.ico

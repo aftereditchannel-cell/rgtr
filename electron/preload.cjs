@@ -26,6 +26,26 @@ contextBridge.exposeInMainWorld('hq', {
   openDataDir: () => ipcRenderer.invoke('app:openDataDir'),
   confirm: (opts) => ipcRenderer.invoke('app:confirm', opts),
 
+  // بروزرسانی خودکار
+  updateCheck: () => ipcRenderer.invoke('update:check'),
+  updateDownload: (opts) => ipcRenderer.invoke('update:download', opts),
+  updateCancel: () => ipcRenderer.invoke('update:cancel'),
+  updateInstall: (filePath) => ipcRenderer.invoke('update:install', filePath),
+  updateOpenFolder: () => ipcRenderer.invoke('update:openFolder'),
+  /** رویدادهای آپدیت: available (نسخه‌ی جدید پیدا شد)، progress (درصد دانلود)، menu (دکمه‌ی منو) */
+  onUpdate: (handler) => {
+    const chans = {
+      'update:available': (e, p) => handler('available', p),
+      'update:progress': (e, p) => handler('progress', p),
+      'menu:updateCheck': () => handler('checkNow'),
+    }
+    const subs = Object.entries(chans).map(([ch, fn]) => {
+      ipcRenderer.on(ch, fn)
+      return () => ipcRenderer.removeListener(ch, fn)
+    })
+    return () => subs.forEach(un => un())
+  },
+
   // جریان خروج: صفحه پس از تصمیم کاربر یکی از این دو را صدا می‌زند
   exitNow: () => ipcRenderer.invoke('app:exitNow'),
   cancelExit: () => ipcRenderer.invoke('app:cancelExit'),

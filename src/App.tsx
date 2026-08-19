@@ -25,6 +25,18 @@ function DesktopMenuBridge() {
   const nav = useNavigate()
   useEffect(() => {
     if (!desktop) return
+    // خبر نسخه‌ی جدید که آپدیترِ پس‌زمینه پیدا کرد → toast + رفتن به تنظیمات
+    const unSubUpdate = desktop.onUpdate((name, payload) => {
+      if (name !== 'available') return
+      const st = useApp.getState()
+      const lang = st.data.settings.lang ?? 'fa'
+      const v = (payload as { version?: string } | undefined)?.version ?? ''
+      st.setToast(tr(lang, 'upd.foundToast', { v }))
+    })
+    return () => { unSubUpdate() }
+  }, [])
+  useEffect(() => {
+    if (!desktop) return
     return desktop.onMenu(async (name, payload) => {
       const st = useApp.getState()
       const lang = st.data.settings.lang ?? 'fa'

@@ -18,6 +18,28 @@ export type AppInfo = {
   dataDir: string
 }
 
+/** یک نسخه‌ی منتشرشده در GitHub Releases — شکل مشترک دسکتاپ و وب */
+export type UpdateAsset = { name: string; url: string; size: number }
+export type UpdateRelease = {
+  tag: string
+  version: string
+  name: string
+  prerelease: boolean
+  publishedAt: string
+  notesUrl: string
+  notes: string
+  assets: { setup: UpdateAsset | null; portable: UpdateAsset | null; apk: UpdateAsset | null; other: UpdateAsset[] }
+}
+export type UpdateCheckResult = {
+  ok: boolean
+  source?: 'api' | 'redirect' | 'web'
+  error?: string
+  releases?: UpdateRelease[]
+  current?: string
+  hasUpdate?: boolean
+}
+export type DownloadProgress = { received: number; total: number; percent: number }
+
 export type SaveFilter = { name: string; extensions: string[] }
 
 export interface DesktopAPI {
@@ -37,6 +59,15 @@ export interface DesktopAPI {
   info(): Promise<AppInfo>
   openDataDir(): Promise<void>
   confirm(opts: { title?: string; message: string; detail?: string }): Promise<boolean>
+
+  /** بروزرسانی خودکار — بررسی، دانلود، نصب */
+  updateCheck(): Promise<UpdateCheckResult>
+  updateDownload(opts: { url: string; filename: string; size?: number }): Promise<{ ok: boolean; path: string; size: number; name: string }>
+  updateCancel(): Promise<boolean>
+  updateInstall(filePath: string): Promise<{ ok: boolean; launched: boolean }>
+  updateOpenFolder(): Promise<void>
+  /** اشتراک در رویدادهای بروزرسانی (نسخه‌ی جدید / درصد دانلود / درخواست بررسی از منو) */
+  onUpdate(handler: (name: 'available' | 'progress' | 'checkNow', payload?: unknown) => void): () => void
 
   /** پس از تصمیم کاربر در دیالوگ خروج، بستن واقعی پنجره */
   exitNow(): Promise<void>

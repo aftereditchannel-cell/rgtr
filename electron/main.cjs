@@ -6,10 +6,15 @@
  * بلکه در یک فایل JSON واقعی کنار برنامه است:
  *   %APPDATA%\NexusHQ\data\nexus-hq.json
  */
-const { app, BrowserWindow, ipcMain, dialog, shell, Menu, nativeTheme } = require('electron')
+const { app, BrowserWindow, ipcMain, dialog, shell, Menu, nativeTheme, net } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs')
 const fsp = require('node:fs/promises')
+const { createUpdater, cmpVersion } = require('./updater.cjs')
+const { spawn } = require('node:child_process')
+
+// مخزن انتشار نسخه‌ها — با متغیر محیطی می‌شود عوض کرد (برای تست)
+const UPDATE_REPO = process.env.NEXUS_UPDATE_REPO || 'aftereditchannel-cell/rgtr'
 
 // NEXUS_PROD=1 اجازه می‌دهد نسخه‌ی build شده بدون بسته‌بندی هم تست شود
 const isDev = !app.isPackaged && process.env.NEXUS_PROD !== '1'
@@ -21,6 +26,8 @@ const DOC_FILE = path.join(DATA_DIR, 'nexus-hq.json')
 const TMP_FILE = path.join(DATA_DIR, 'nexus-hq.json.tmp')
 const SNAP_DIR = path.join(DATA_DIR, 'snapshots')
 const WIN_FILE = path.join(app.getPath('userData'), 'window-state.json')
+const UPDATE_DIR = path.join(app.getPath('userData'), 'updates')
+const UPDATE_STATE_FILE = path.join(app.getPath('userData'), 'update-state.json')
 const MAX_SNAPSHOTS = 20
 
 fs.mkdirSync(DATA_DIR, { recursive: true })
@@ -192,6 +199,14 @@ function buildMenu() {
           }),
         },
         { label: 'پوشه‌ی نقاط بازیابی', click: () => shell.openPath(SNAP_DIR) },
+        { type: 'separator' },
+        {
+          label: 'بررسی بروزرسانی…',
+          click: () => {
+            go('/settings')
+            mainWindow?.webContents.send('menu:updateCheck')
+          },
+        },
       ],
     },
   ]
@@ -310,8 +325,88 @@ ipcMain.handle('app:exitNow', () => {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.close()
 })
 
-/** کاربر خروج را لغو کرد؛ اجازه بده دفعه‌ی بعد دوباره پرسیده شود */
 ipcMain.handle('app:cancelExit', () => { exitAsked = false })
+
+/* ---------------- IPC: بروزرسانی خودکار ----------------
+ * همه‌ی کارهای شبکه این‌جا در فرآیند اصلی انجام می‌شود (بدون CORS).
+ * صفحه فقط نتیجه و درصد پیشرفت را می‌بیند.
+ */
+const updater = createUpdater({
+  repo: UPDATE_REPO,
+  fetchImpl: (u, o) => net.fetch(u, o),
+  downloadDir: UPDATE_DIR,
+  fs, path,
+  ensureDir: async (p) => fs.mkdirSync(p, { recursive: true }),
+})
+
+let lastCheckResult = null
+
+ipcMain.handle('update:check', async () => {
+  const res = await updater.check(app.getVersion())
+  if (res.ok) {
+    const latest = res.releases[0] || null
+    lastCheckResult = {
+      ...res,
+      current: app.getVersion(),
+      hasUpdate: !!(latest && cmpVersion(latest.version, app.getVersion()) > 0),
+    }
+  }
+  return lastCheckResult ?? res
+})
+
+ipcMain.handle('update:download', async (_e, { url, filename, size }) => {
+  if (typeof url !== 'string' || !/^https:\/\//.test(url)) throw new Error('bad url')
+  if (typeof filename !== 'string' || !filename) throw new Error('bad filename')
+  return updater.download(
+    { url, filename, expectedSize: size || 0 },
+    (p) => mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents.send('update:progress', p),
+  )
+})
+
+ipcMain.handle('update:cancel', () => updater.cancel())
+
+/** نصب: نصب‌کننده را جدا از برنامه اجرا می‌کنیم و بعد برنامه را می‌بندیم */
+ipcMain.handle('update:install', async (_e, filePath) => {
+  const full = path.resolve(String(filePath || ''))
+  // امنیت: فقط فایل‌های داخل پوشه‌ی updates خودمان
+  if (!full.startsWith(path.resolve(UPDATE_DIR))) throw new Error('forbidden path')
+  await fsp.access(full).catch(() => { throw new Error('file missing') })
+
+  const isSetup = /-setup\.exe$/i.test(full)
+  if (process.platform === 'win32' && isSetup) {
+    // NSIS ویزارد نصب را نشان می‌دهد؛ باید برنامه‌ی فعلی بسته باشد تا فایل‌ها جایگزین شوند
+    spawn(full, [], { detached: true, stdio: 'ignore' }).unref()
+    allowClose = true
+    setTimeout(() => app.quit(), 400)
+    return { ok: true, launched: true }
+  }
+  // پرتابل یا پلتفرم دیگر: پوشه را باز می‌کنیم تا کاربر خودش جابجا کند
+  shell.showItemInFolder(full)
+  return { ok: true, launched: false }
+})
+
+ipcMain.handle('update:openFolder', () => shell.openPath(UPDATE_DIR))
+
+/* --------- بررسی خودکار در شروع (حداکثر هر ۲۴ ساعت یک‌بار) --------- */
+async function autoCheckOnLaunch() {
+  try {
+    const st = JSON.parse(fs.readFileSync(UPDATE_STATE_FILE, 'utf8'))
+    if (Date.now() - (st.lastAutoCheck || 0) < 24 * 3600 * 1000) return
+  } catch { /* اولین بار */ }
+  try { fs.writeFileSync(UPDATE_STATE_FILE, JSON.stringify({ lastAutoCheck: Date.now() })) } catch { /* ignore */ }
+
+  const res = await updater.check(app.getVersion())
+  if (!res.ok) return
+  const latest = res.releases[0]
+  if (latest && cmpVersion(latest.version, app.getVersion()) > 0) {
+    lastCheckResult = { ...res, current: app.getVersion(), hasUpdate: true }
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('update:available', {
+        version: latest.version, tag: latest.tag, notesUrl: latest.notesUrl,
+      })
+    }
+  }
+}
 ipcMain.handle('app:confirm', async (_e, { title, message, detail }) => {
   const { response } = await dialog.showMessageBox(mainWindow, {
     type: 'warning', title: title || 'تأیید', message, detail,
@@ -336,6 +431,8 @@ if (!app.requestSingleInstanceLock()) {
     nativeTheme.themeSource = 'dark'
     createWindow()
     buildMenu()
+    // چند ثانیه بعد از باز شدن، بی‌صدا دنبال نسخه‌ی جدید بگرد
+    setTimeout(() => autoCheckOnLaunch().catch(() => {}), 5000)
     app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWindow() })
   })
 
