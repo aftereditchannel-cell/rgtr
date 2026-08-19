@@ -1,0 +1,2 @@
+ec37e0d2667c1b52d77eba195c7a41084b2dd8e801f6cf0d1e77508e4cb0c552  NEXUS-HQ-1.0.0-android.apk
+bdc94c43ca673eae81f2dc50b33be2187c77c4f4c27dd60bf748def1b14d9e7a  NEXUS-HQ-1.0.0-windows.exe
