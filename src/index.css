@@ -214,7 +214,7 @@ html[data-theme='light'] { --cal-invert: 0; }
 .anim-sheet { animation: sheetUp .24s cubic-bezier(.16,1,.3,1) both; }
 
 @media (prefers-reduced-motion: reduce) {
-  .anim, .anim-sheet, .pulse { animation: none !important; }
+  .anim, .anim-sheet, .pulse, .lock-shake { animation: none !important; }
   * { transition-duration: .01ms !important; }
 }
 

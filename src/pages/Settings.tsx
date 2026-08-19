@@ -11,6 +11,7 @@ import { useT, cloudError } from '../i18n'
 import { useFmt } from '../lib/useFmt'
 import { desktop, isDesktop } from '../lib/desktop'
 import { isMobile, mobilePlatform, mobileDataPath } from '../lib/mobile'
+import { readLock, writeLock, clearLock, hashPin, LOCK_DEFAULTS } from '../lib/lock'
 import type { AppInfo } from '../lib/desktop'
 import * as cloud from '../lib/cloud'
 import type { Lang } from '../store/types'
@@ -97,7 +98,7 @@ export function Settings() {
       {/* ---------- language / display ---------- */}
       <Card>
         <SectionTitle icon="Languages">{t('set.appearance')}</SectionTitle>
-        <div className="grid sm:grid-cols-3 gap-4">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Field label={t('set.language')} help={t('set.languageHint')}>
             <Toggle
               value={s.lang}
@@ -119,8 +120,18 @@ export function Settings() {
               onChange={v => setSettings({ digits: v as 'fa' | 'latn' })}
             />
           </Field>
+          <Field label={t('set.theme')} help={t('set.themeHint')}>
+            <Toggle
+              value={s.theme}
+              options={[{ v: 'auto', l: t('set.themeAuto') }, { v: 'dark', l: t('set.themeDark') }, { v: 'light', l: t('set.themeLight') }]}
+              onChange={v => setSettings({ theme: v as 'auto' | 'dark' | 'light' })}
+            />
+          </Field>
         </div>
       </Card>
+
+      {/* ---------- security ---------- */}
+      <SecurityCard onSaved={msg => setToast(msg)} />
 
       {/* ---------- cloud ---------- */}
       <CloudCard />
@@ -273,6 +284,71 @@ function Toggle({ value, options, onChange }: { value: string; options: { v: str
 }
 
 /* ---------- کارت نسخه‌ی دسکتاپ ---------- */
+/** بخش قفل برنامه — PIN محلی + قفل خودکار */
+function SecurityCard({ onSaved }: { onSaved: (msg: string) => void }) {
+  const { t } = useT()
+  const [cfg, setCfg] = useState(() => readLock())
+  const [pin, setPin] = useState('')
+  const enabled = cfg.enabled && !!cfg.pinHash
+
+  const save = async () => {
+    const clean = pin.trim()
+    if (!/^\d{4,8}$/.test(clean)) { onSaved(t('set.lockBadPin')); return }
+    const pinHash = await hashPin(clean)
+    const next = { ...cfg, enabled: true, pinHash }
+    writeLock(next)
+    setCfg(next)
+    setPin('')
+    onSaved(t('set.lockSaved'))
+  }
+
+  const disable = () => {
+    clearLock()
+    setCfg({ ...LOCK_DEFAULTS })
+    setPin('')
+    onSaved(t('set.lockRemoved'))
+  }
+
+  const setAuto = (min: number) => {
+    const next = { ...cfg, autoLockMin: min }
+    writeLock(next)
+    setCfg(next)
+  }
+
+  const autoOptions = [
+    { v: '-1', l: t('set.lockAutoOpen') },
+    { v: '0', l: t('set.lockAutoNow') },
+    ...[1, 5, 15, 30].map(n => ({ v: String(n), l: t('set.lockAutoMin', { n }) })),
+  ]
+
+  return (
+    <Card>
+      <SectionTitle icon="Lock" right={<span className={`w-1.5 h-1.5 rounded-full ${enabled ? 'bg-emerald-500' : 'bg-[var(--color-dim2)]'}`} />}>
+        {t('set.security')}
+      </SectionTitle>
+      <p className="text-[12px] text-[var(--color-dim)] leading-relaxed mb-3">{t('set.securityNote')}</p>
+
+      <div className="grid sm:grid-cols-2 gap-4 items-start">
+        <Field label={t('set.lockPin')}>
+          <div className="flex gap-2">
+            <TextInput value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))} placeholder="••••" />
+            <Button size="sm" variant="primary" icon="KeyRound" onClick={() => void save()}>{t('set.lockSave')}</Button>
+          </div>
+        </Field>
+        <Field label={t('set.lockAuto')}>
+          <Toggle value={String(cfg.autoLockMin)} options={autoOptions} onChange={v => setAuto(Number(v))} />
+        </Field>
+      </div>
+
+      <div className="flex gap-2 flex-wrap mt-3">
+        <Button size="sm" variant="outline" icon="Lock" disabled={!enabled}
+          onClick={() => window.dispatchEvent(new Event('nexus:lock'))}>{t('set.lockNow')}</Button>
+        {enabled && <Button size="sm" variant="ghost" icon="Trash2" onClick={disable}>{t('set.lockDisable')}</Button>}
+      </div>
+    </Card>
+  )
+}
+
 function DesktopCard({ onSaved }: { onSaved: () => void }) {
   const { t } = useT()
   const [info, setInfo] = useState<AppInfo | null>(null)

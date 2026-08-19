@@ -1,0 +1,24 @@
+# --- node / web ---
+node_modules/
+dist/
+
+# --- خروجی electron-builder (فایل‌های نهایی .exe عمداً نگه داشته می‌شوند تا از طریق git قابل دریافت باشند) ---
+release/*.blockmap
+release/builder-debug.yml
+release/builder-effective-config.yaml
+release/win-unpacked/
+release/linux-unpacked/
+
+# --- android ---
+android/.gradle/
+android/build/
+android/app/build/
+android/.idea/
+android/*.iml
+android/local.properties
+# این پوشه هر بار با «npm run cap:sync» ساخته می‌شود
+android/app/src/main/assets/public/
+
+# --- متفرقه ---
+.DS_Store
+*.log

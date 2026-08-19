@@ -41,6 +41,7 @@ export const UI: Record<string, Pair> = {
   'nav.analytics':      { fa: 'تحلیل و آمار', en: 'Analytics' },
   'nav.settings':       { fa: 'تنظیمات', en: 'Settings' },
   'nav.newModule':      { fa: 'دپارتمان جدید', en: 'New department' },
+  'nav.more':           { fa: 'بیشتر', en: 'More' },
   'nav.saving':         { fa: 'در حال ذخیره', en: 'saving' },
   'nav.synced':         { fa: 'محلی · ذخیره شد', en: 'local · synced' },
 

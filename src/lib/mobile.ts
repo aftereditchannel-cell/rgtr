@@ -221,3 +221,38 @@ export async function initMobileChrome(): Promise<void> {
     await StatusBar.setOverlaysWebView({ overlay: false })
   } catch { /* بعضی دستگاه‌ها پشتیبانی نمی‌کنند */ }
 }
+
+/**
+ * هماهنگ‌کردن نوار وضعیت با پوسته‌ی مؤثر برنامه.
+ * بعد از هر تغییر پوسته (یا در حالت auto، تغییر پوسته‌ی سیستم) صدا زده می‌شود.
+ */
+export async function syncMobileChrome(theme: 'dark' | 'light'): Promise<void> {
+  if (!isMobile) return
+  try {
+    const { StatusBar, Style } = await import('@capacitor/status-bar')
+    await StatusBar.setStyle({ style: theme === 'dark' ? Style.Dark : Style.Light })
+    if (isAndroid) {
+      await StatusBar.setBackgroundColor({ color: theme === 'dark' ? '#08090c' : '#eef1f7' })
+    }
+  } catch { /* بعضی دستگاه‌ها پشتیبانی نمی‌کنند */ }
+}
+
+/**
+ * برگشتن برنامه از پس‌زمینه (resume).
+ * برخلاف سایر رویدادها، تابع لغوِ همگام برمی‌گرداند چون در cleanup اِفکت
+ * بدون await استفاده می‌شود.
+ */
+export function onMobileResume(handler: () => void): () => void {
+  if (!isMobile) return () => {}
+  let off = () => {}
+  let dead = false
+  void (async () => {
+    try {
+      const { App } = await import('@capacitor/app')
+      const sub = await App.addListener('resume', handler)
+      if (dead) void sub.remove()
+      else off = () => void sub.remove()
+    } catch { /* بدون افزونه — رویداد visibilitychange در App.tsx پوشش می‌دهد */ }
+  })()
+  return () => { dead = true; off() }
+}
