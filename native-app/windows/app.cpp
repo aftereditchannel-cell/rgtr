@@ -283,6 +283,7 @@ static void load_all() {
   });
 }
 
+
 /* ============================================================ UI */
 
 static const COLORREF BG = RGB(8, 9, 12);
@@ -323,6 +324,279 @@ static RECT rc_input, rc_prio, rc_add, rc_tab[TAB_COUNT];
 static const wchar_t* TAB_NAMES[TAB_COUNT] = {
     L"داشبورد", L"تسک‌ها", L"پروژه‌ها", L"مشتریان", L"یادداشت‌ها", L"مالی", L"تقویم", L"درباره",
 };
+
+
+/* ============================================================ چیدمان «همان وب» */
+
+#include <cmath>
+
+/* رنگ‌های دقیق index.css */
+static const COLORREF WEB_BG2 = RGB(0x0d, 0x0f, 0x14);    /* --color-bg2 (سایدبار) */
+static const COLORREF GLASS_LINE = RGB(0x23, 0x26, 0x30); /* --glass-brd ≈ */
+static const COLORREF ACC2_PURPLE = RGB(0xa8, 0x55, 0xf7);
+static const COLORREF AMBER = RGB(0xf5, 0x9e, 0x0b);
+static const COLORREF EMERALD = RGB(0x10, 0xb9, 0x81);
+static const COLORREF CYAN2 = RGB(0x22, 0xd3, 0xee);
+static const COLORREF RED2 = RGB(0xef, 0x44, 0x44);
+
+/* ---------- آیکون‌های مینیمال (همان لوگوی lucide، بازترسیم GDI) ---------- */
+static void icon_paint(HDC m, int x, int y, int s, int id, COLORREF c) {
+  HPEN p = CreatePen(PS_SOLID, 2, c);
+  HPEN op = (HPEN)SelectObject(m, p);
+  HBRUSH ob = (HBRUSH)SelectObject(m, GetStockObject(NULL_BRUSH));
+  switch (id) {
+    case 0:  /* LayoutDashboard: ۴ مربع */
+      Rectangle(m, x, y, x + s * 2 / 5, y + s * 2 / 5);
+      Rectangle(m, x + s * 3 / 5, y, x + s, y + s * 2 / 5);
+      Rectangle(m, x, y + s * 3 / 5, x + s * 2 / 5, y + s);
+      Rectangle(m, x + s * 3 / 5, y + s * 3 / 5, x + s, y + s);
+      break;
+    case 1:  /* Target: دو دایره + نقطه */
+      Ellipse(m, x, y, x + s, y + s);
+      Ellipse(m, x + s / 4, y + s / 4, x + s * 3 / 4, y + s * 3 / 4);
+      { HBRUSH fb = CreateSolidBrush(c); SelectObject(m, fb);
+        int r = s / 8; Ellipse(m, x + s / 2 - r, y + s / 2 - r, x + s / 2 + r, y + s / 2 + r);
+        SelectObject(m, GetStockObject(NULL_BRUSH)); DeleteObject(fb); }
+      break;
+    case 2:  /* BarChart3 */
+      { int bw2 = s / 5;
+        for (int i = 0; i < 3; i++) {
+          int bh2 = (i + 1) * s / 3;
+          Rectangle(m, x + i * (bw2 + 2), y + s - bh2, x + i * (bw2 + 2) + bw2, y + s);
+        } }
+      break;
+    case 3:  /* Wallet */
+      RoundRect(m, x, y + s / 5, x + s, y + s, 3, 3);
+      MoveToEx(m, x + s / 2, y + s / 5, NULL); LineTo(m, x + s / 2, y);
+      break;
+    case 4:  /* Users */
+      Ellipse(m, x + s / 5, y, x + s * 3 / 5, y + s * 2 / 5);
+      Arc(m, x, y + s / 2, x + s * 4 / 5, y + s, x, y + s * 3 / 4, x + s * 4 / 5, y + s * 3 / 4);
+      break;
+    case 5:  /* FolderKanban */
+      MoveToEx(m, x, y + s / 5, NULL); LineTo(m, x + s / 3, y + s / 5); LineTo(m, x + s * 2 / 5, y + 2);
+      LineTo(m, x + s, y + 2); LineTo(m, x + s, y + s); LineTo(m, x, y + s); LineTo(m, x, y + s / 5);
+      break;
+    case 6:  /* Zap (برند) */
+      MoveToEx(m, x + s * 3 / 5, y, NULL); LineTo(m, x + s / 5, y + s * 3 / 5);
+      LineTo(m, x + s / 2, y + s * 3 / 5); LineTo(m, x + s * 2 / 5, y + s);
+      LineTo(m, x + s * 4 / 5, y + s * 2 / 5); LineTo(m, x + s / 2, y + s * 2 / 5);
+      LineTo(m, x + s * 3 / 5, y);
+      break;
+    case 7:  /* CheckSquare */
+      Rectangle(m, x, y, x + s, y + s);
+      MoveToEx(m, x + s / 5, y + s / 2, NULL); LineTo(m, x + s * 2 / 5, y + s * 7 / 10);
+      LineTo(m, x + s * 4 / 5, y + s / 4);
+      break;
+  }
+  SelectObject(m, op);
+  SelectObject(m, ob);
+  DeleteObject(p);
+}
+
+/* ---------- هاله‌ی نور پس‌زمینه (body::before وب) ---------- */
+static HBITMAP g_aura = NULL;
+static int g_aura_w = 0, g_aura_h = 0;
+
+static void aura_build(int w, int h) {
+  if (g_aura && g_aura_w == w && g_aura_h == h) return;
+  if (g_aura) DeleteObject(g_aura);
+  BITMAPINFO bi = {};
+  bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+  bi.bmiHeader.biWidth = w;
+  bi.bmiHeader.biHeight = -h;
+  bi.bmiHeader.biPlanes = 1;
+  bi.bmiHeader.biBitCount = 24;
+  void* bits = NULL;
+  HDC s = GetDC(NULL);
+  HBITMAP bm = CreateDIBSection(s, &bi, DIB_RGB_COLORS, &bits, NULL, 0);
+  ReleaseDC(NULL, s);
+  unsigned char* px = (unsigned char*)bits;
+  struct Glow { double cx, cy, r, cr, cg, cb; };
+  /* سه هاله مثل index.css: بالا-راست بنفش، بالا-چپ نیلی، پایین-چپ فیروزه‌ای */
+  Glow gl[3] = {
+      { w * 0.88, h * 0.02, (double)w * 0.62, 99, 102, 241 },
+      { w * 0.10, h * 0.06, (double)w * 0.50, 168, 85, 247 },
+      { w * 0.30, h * 1.02, (double)w * 0.56, 34, 211, 238 },
+  };
+  for (int y = 0; y < h; y++) {
+    for (int x = 0; x < w; x++) {
+      double rr = 0, gg = 0, bb = 0;
+      for (auto& g : gl) {
+        double dx = (x - g.cx), dy = (y - g.cy);
+        double d = sqrt(dx * dx + dy * dy) / g.r;
+        if (d < 1.0) {
+          double a = (1.0 - d) * (1.0 - d);   /* افت نرم شعاعی */
+          rr += g.cr * 0.16 * a; gg += g.cg * 0.14 * a; bb += g.cb * 0.10 * a;
+        }
+      }
+      unsigned char* p = px + (y * w + x) * 3;
+      p[0] = (unsigned char)(8 + bb);   /* B */
+      p[1] = (unsigned char)(9 + gg);   /* G */
+      p[2] = (unsigned char)(12 + rr);  /* R */
+    }
+  }
+  g_aura = bm;
+  g_aura_w = w;
+  g_aura_h = h;
+}
+
+static void aura_paint(HDC m, int w, int h) {
+  aura_build(w, h);
+  HDC s = CreateCompatibleDC(m);
+  HBITMAP old = (HBITMAP)SelectObject(s, g_aura);
+  BitBlt(m, 0, 0, w, h, s, 0, 0, SRCCOPY);
+  SelectObject(s, old);
+  DeleteDC(s);
+}
+
+/* ---------- سایدبار (مثل Sidebar.tsx وب) ---------- */
+static const int SB_W = 228;
+static int g_page = 0;   /* 0 داشبورد 1 تصمیم 2 تحلیل 3..7 ماژول‌ها 8 تنظیمات */
+
+struct NavItem { const wchar_t* label; int icon; int page; };
+static const NavItem NAV_MAIN[3] = {
+    {L"داشبورد", 0, 0}, {L"مرکز تصمیم", 1, 1}, {L"تحلیل و آمار", 2, 2},
+};
+static const NavItem NAV_DEPTS[5] = {
+    {L"تسک‌ها", 7, 3}, {L"پروژه‌ها", 5, 4}, {L"مشتریان", 4, 5},
+    {L"یادداشت‌ها", 7, 6}, {L"مالی", 3, 7},
+};
+
+static RECT rc_nav_main[3], rc_nav_dept[5], rc_nav_settings;
+static int sb_hover = -1;
+
+static void sidebar_paint(HDC m, int w, int h) {
+  /* پس‌زمینه‌ی سایدبار — راست‌چین: سمت راست پنجره */
+  RECT sb = {w - SB_W, 0, w, h};
+  HBRUSH b = CreateSolidBrush(WEB_BG2);
+  FillRect(m, &sb, b);
+  DeleteObject(b);
+  HPEN pl = CreatePen(PS_SOLID, 1, LINE);
+  HPEN op = (HPEN)SelectObject(m, pl);
+  MoveToEx(m, w - SB_W, 0, NULL);
+  LineTo(m, w - SB_W, h);
+  SelectObject(m, op);
+  DeleteObject(pl);
+
+  int x0 = w - SB_W + 14;
+
+  /* برند — گرادیان acc→بنفش (مثل وب) */
+  int by = 16;
+  RECT brand = {x0, by, x0 + 30, by + 30};
+  HBRUSH gb = CreateSolidBrush(ACC);
+  HBRUSH gb2 = CreateSolidBrush(ACC2_PURPLE);
+  RECT half1 = {brand.left, brand.top, brand.right, brand.top + 15};
+  RECT half2 = {brand.left, brand.top + 15, brand.right, brand.bottom};
+  HRGN rgn = CreateRoundRectRgn(brand.left, brand.top, brand.right, brand.bottom, 8, 8);
+  HBRUSH oldbr = (HBRUSH)SelectObject(m, gb);
+  FillRgn(m, rgn, gb);
+  OffsetRgn(rgn, 0, 0);
+  FillRgn(m, rgn, gb2);
+  /* درهم‌آمیزی ساده: دو نیمه */
+  FillRgn(m, CreateRoundRectRgn(half1.left, half1.top, half1.right, half1.bottom, 8, 8), gb);
+  FillRgn(m, CreateRoundRectRgn(half2.left, half2.top, half2.right, half2.bottom, 8, 8), gb2);
+  SelectObject(m, oldbr);
+  DeleteObject(rgn);
+  icon_paint(m, brand.left + 7, brand.top + 8, 15, 6, RGB(255, 255, 255));
+
+  SelectObject(m, g_f_bold);
+  SetTextColor(m, TX);
+  RECT rn = {x0 + 38, by - 2, w - 14, by + 16};
+  DrawTextW(m, L"NEXUS HQ", -1, &rn, DT_RIGHT | DT_SINGLELINE);
+  SelectObject(m, g_f_small);
+  SetTextColor(m, EMERALD);
+  RECT rs = {x0 + 38, by + 14, w - 14, by + 30};
+  DrawTextW(m, L"● محلی · ذخیره شد", -1, &rs, DT_RIGHT | DT_SINGLELINE);
+
+  /* آیتم‌های اصلی */
+  int y = 66;
+  for (int i = 0; i < 3; i++) {
+    RECT rr = {x0, y, w - 14, y + 30};
+    rc_nav_main[i] = rr;
+    bool act = g_page == NAV_MAIN[i].page;
+    bool hov = sb_hover == i;
+    if (act || hov) {
+      HBRUSH nb = CreateSolidBrush(act ? RGB(38, 38, 66) : RGB(28, 32, 42));
+      FillRect(m, &rr, nb);
+      DeleteObject(nb);
+      if (act) {  /* نوار اکسنت راست */
+        RECT ab = {rr.right - 3, rr.top, rr.right, rr.bottom};
+        HBRUSH abr = CreateSolidBrush(ACC);
+        FillRect(m, &ab, abr);
+        DeleteObject(abr);
+      }
+    }
+    icon_paint(m, rr.right - 26, rr.top + 7, 14, NAV_MAIN[i].icon, act ? ACC : DIM);
+    SelectObject(m, g_f_body);
+    SetTextColor(m, act ? TX : DIM);
+    RECT rt2 = {rr.left + 8, rr.top + 3, rr.right - 34, rr.bottom - 3};
+    DrawTextW(m, NAV_MAIN[i].label, -1, &rt2, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+    y += 34;
+  }
+
+  /* سرگروه دپارتمان‌ها */
+  y += 12;
+  SelectObject(m, g_f_small);
+  SetTextColor(m, DIM2);
+  RECT rg2 = {x0, y, w - 14, y + 20};
+  DrawTextW(m, L"دپارتمان‌ها", -1, &rg2, DT_RIGHT | DT_SINGLELINE);
+  y += 24;
+  for (int i = 0; i < 5; i++) {
+    RECT rr = {x0, y, w - 14, y + 30};
+    rc_nav_dept[i] = rr;
+    bool act = g_page == NAV_DEPTS[i].page;
+    bool hov = sb_hover == 10 + i;
+    if (act || hov) {
+      HBRUSH nb = CreateSolidBrush(act ? RGB(38, 38, 66) : RGB(28, 32, 42));
+      FillRect(m, &rr, nb);
+      DeleteObject(nb);
+      if (act) {
+        RECT ab = {rr.right - 3, rr.top, rr.right, rr.bottom};
+        HBRUSH abr = CreateSolidBrush(ACC);
+        FillRect(m, &ab, abr);
+        DeleteObject(abr);
+      }
+    }
+    icon_paint(m, rr.right - 26, rr.top + 7, 14, NAV_DEPTS[i].icon, act ? ACC : DIM);
+    SelectObject(m, g_f_body);
+    SetTextColor(m, act ? TX : DIM);
+    RECT rt3 = {rr.left + 8, rr.top + 3, rr.right - 34, rr.bottom - 3};
+    DrawTextW(m, NAV_DEPTS[i].label, -1, &rt3, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+    y += 34;
+  }
+
+  /* تنظیمات پایین */
+  rc_nav_settings = {x0, h - 46, w - 14, h - 16};
+  bool act = g_page == 8;
+  bool hov = sb_hover == 20;
+  if (act || hov) {
+    HBRUSH nb = CreateSolidBrush(act ? RGB(38, 38, 66) : RGB(28, 32, 42));
+    FillRect(m, &rc_nav_settings, nb);
+    DeleteObject(nb);
+  }
+  icon_paint(m, rc_nav_settings.right - 26, rc_nav_settings.top + 7, 14, 5, act ? ACC : DIM);
+  SelectObject(m, g_f_body);
+  SetTextColor(m, act ? TX : DIM);
+  RECT rt4 = {rc_nav_settings.left + 8, rc_nav_settings.top + 3, rc_nav_settings.right - 34, rc_nav_settings.bottom - 3};
+  DrawTextW(m, L"تنظیمات", -1, &rt4, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+}
+
+/* ---------- موتور کارت (rounded-xl وب) ---------- */
+static void card(HDC m, RECT r) {
+  HBRUSH b = CreateSolidBrush(PANEL);
+  HRGN rg = CreateRoundRectRgn(r.left, r.top, r.right, r.bottom, 12, 12);
+  FillRgn(m, rg, b);
+  DeleteObject(b);
+  HPEN p = CreatePen(PS_SOLID, 1, LINE);
+  HBRUSH ob = (HBRUSH)SelectObject(m, GetStockObject(NULL_BRUSH));
+  HPEN op = (HPEN)SelectObject(m, p);
+  RoundRect(m, r.left, r.top, r.right, r.bottom, 12, 12);
+  SelectObject(m, op);
+  SelectObject(m, ob);
+  DeleteObject(p);
+  DeleteObject(rg);
+}
 
 static void relayout() {
   RECT rc;
@@ -398,36 +672,32 @@ static void draw_chart(HDC mem, RECT rc, const double* vals, int n, const wchar_
 
 static void paint(HDC mem, RECT& rc) {
   int w = rc.right, h = rc.bottom;
-  HBRUSH bg = CreateSolidBrush(BG);
-  FillRect(mem, &rc, bg);
-  DeleteObject(bg);
-  SetBkMode(mem, TRANSPARENT);
 
-  /* سربرگ */
-  SelectObject(mem, g_f_title);
-  SetTextColor(mem, TX);
-  RECT r1 = {PAD, 12, w - PAD, 52};
-  DrawTextW(mem, L"NEXUS HQ", -1, &r1, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
-  SelectObject(mem, g_f_small);
-  SetTextColor(mem, DIM2);
-  RECT r0 = {PAD, 46, w - PAD, 68};
-  wchar_t sub[128];
-  swprintf(sub, 128, L"Native Core v2.0 · ۱۰۰٪ Native · %ls %d", J_MONTHS[T_JM - 1], T_JD);
-  DrawTextW(mem, sub, -1, &r0, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+  /* هاله‌ی نور + پس‌زمینه مثل body وب */
+  aura_paint(mem, w - SB_W, h);
+  RECT sbzone = {w - SB_W, 0, w, h};
+  (void)sbzone;
 
-  /* تب‌ها */
-  SelectObject(mem, g_f_small);
-  for (int i = 0; i < TAB_COUNT; i++) {
-    bool on = i == g_tab;
-    HBRUSH tb = CreateSolidBrush(on ? ACC : (g_hover == 10 + i ? PANEL2 : PANEL));
-    FillRect(mem, &rc_tab[i], tb);
-    DeleteObject(tb);
-    SetTextColor(mem, on ? RGB(255, 255, 255) : DIM);
-    DrawTextW(mem, TAB_NAMES[i], -1, &rc_tab[i], DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
-  }
+  /* سایدبار راست (RTL) */
+  sidebar_paint(mem, w, h);
 
-  /* ================= داشبورد ================= */
-  if (g_tab == 0) {
+  /* ---------- ناحیه‌ی محتوا (چپ سایدبار) ---------- */
+  int cx0 = PAD, cx1 = w - SB_W - PAD;
+  int cur = g_page;
+
+  /* صفحه‌ی داشبورد — همان Dashboard.tsx */
+  if (cur == 0) {
+    SelectObject(mem, g_f_title);
+    SetTextColor(mem, TX);
+    RECT rt5 = {cx0, 16, cx1, 50};
+    DrawTextW(mem, L"داشبورد", -1, &rt5, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+    SelectObject(mem, g_f_small);
+    SetTextColor(mem, DIM2);
+    RECT rd = {cx0, 48, cx1, 68};
+    wchar_t dstr[96];
+    swprintf(dstr, 96, L"%ls %d، %d — فضای کاری شما", J_MONTHS[T_JM - 1], T_JD, T_JY);
+    DrawTextW(mem, dstr, -1, &rd, DT_RIGHT | DT_SINGLELINE);
+
     int tasksTotal = (int)g_tasks.size(), tasksDone = 0;
     for (auto& t : g_tasks) if (t.done) tasksDone++;
     int active = 0;
@@ -435,194 +705,258 @@ static void paint(HDC mem, RECT& rc) {
     double inc = 0, exp = 0;
     for (auto& f : g_fins) f.income ? inc += f.amount : exp += f.amount;
 
-    struct Card { const wchar_t* label; std::wstring value; std::wstring sub; COLORREF tone; };
-    Card cards[4] = {
-        {L"تسک‌ها", std::to_wstring(tasksDone) + L" / " + std::to_wstring(tasksTotal), L"انجام‌شده از کل", ACC},
-        {L"پروژه‌های فعال", std::to_wstring(active), L"از " + std::to_wstring(g_projs.size()) + L" پروژه", GREEN},
-        {L"مانده حساب", fmt_money(inc - exp), std::wstring(L"درآمد ") + fmt_money(inc), CYAN},
-        {L"مشتریان", std::to_wstring(g_clients.size()), L"مخاطبین ثبت‌شده", GOLD},
+    /* KPI — همان Statهای وب */
+    struct KPI { const wchar_t* label; std::wstring value; std::wstring sub; int icon; COLORREF tone; int page; };
+    KPI kpis[4] = {
+        {L"تسک‌های امروز", std::to_wstring(tasksTotal - tasksDone) + L" / " + std::to_wstring(tasksTotal),
+         L"در حال انجام از کل", 7, ACC, 3},
+        {L"پروژه‌های فعال", std::to_wstring(active), L"از " + std::to_wstring(g_projs.size()) + L" پروژه", 5, EMERALD, 4},
+        {L"مانده حساب", fmt_money(inc - exp), L"درآمد " + fmt_money(inc), 3, CYAN2, 7},
+        {L"مشتریان", std::to_wstring(g_clients.size()), L"مخاطبین ثبت‌شده", 4, AMBER, 5},
     };
-    int cw = (w - PAD * 2 - 3 * 10) / 4;
+    int kgap = 10;
+    int kw = (cx1 - cx0 - 3 * kgap) / 4;
     for (int i = 0; i < 4; i++) {
-      int x = w - PAD - (i + 1) * cw - i * 10;
-      RECT rr = {x, LIST_TOP, x + cw, LIST_TOP + 84};
-      HBRUSH cb = CreateSolidBrush(PANEL);
-      FillRect(mem, &rr, cb);
-      DeleteObject(cb);
-      HPEN cp = CreatePen(PS_SOLID, 1, LINE);
-      HPEN op = (HPEN)SelectObject(mem, cp);
-      SelectObject(mem, GetStockObject(NULL_BRUSH));
-      Rectangle(mem, rr.left, rr.top, rr.right, rr.bottom);
-      SelectObject(mem, op);
-      DeleteObject(cp);
+      int x = cx1 - (i + 1) * kw - i * kgap;
+      RECT kr = {x, 76, x + kw, 76 + 86};
+      card(mem, kr);
+      icon_paint(mem, kr.right - 40, kr.top + 12, 18, kpis[i].icon, kpis[i].tone);
       SelectObject(mem, g_f_small);
       SetTextColor(mem, DIM);
-      RECT rl_ = {rr.left + 10, rr.top + 8, rr.right - 10, rr.top + 26};
-      DrawTextW(mem, cards[i].label, -1, &rl_, DT_RIGHT | DT_SINGLELINE);
+      RECT rl2 = {kr.left + 12, kr.top + 12, kr.right - 46, kr.top + 30};
+      DrawTextW(mem, kpis[i].label, -1, &rl2, DT_RIGHT | DT_SINGLELINE | DT_END_ELLIPSIS);
       SelectObject(mem, g_f_huge);
-      SetTextColor(mem, cards[i].tone);
-      RECT rv = {rr.left + 10, rr.top + 28, rr.right - 10, rr.top + 60};
-      DrawTextW(mem, cards[i].value.c_str(), -1, &rv, DT_RIGHT | DT_SINGLELINE | DT_END_ELLIPSIS);
+      SetTextColor(mem, kpis[i].tone);
+      RECT rv2 = {kr.left + 12, kr.top + 32, kr.right - 12, kr.top + 62};
+      DrawTextW(mem, kpis[i].value.c_str(), -1, &rv2, DT_RIGHT | DT_SINGLELINE | DT_END_ELLIPSIS);
       SelectObject(mem, g_f_small);
       SetTextColor(mem, DIM2);
-      RECT rs2 = {rr.left + 10, rr.top + 60, rr.right - 10, rr.top + 78};
-      DrawTextW(mem, cards[i].sub.c_str(), -1, &rs2, DT_RIGHT | DT_SINGLELINE | DT_END_ELLIPSIS);
+      RECT rs3 = {kr.left + 12, kr.top + 62, kr.right - 12, kr.bottom - 8};
+      DrawTextW(mem, kpis[i].sub.c_str(), -1, &rs3, DT_RIGHT | DT_SINGLELINE | DT_END_ELLIPSIS);
     }
 
-    /* نمودار ستونی: ۶ ماه اخیر (خالص ماهانه) */
+    /* ستون تمرکز امروز (مثل وب: «تمرکز امروز» + «بعداً») */
+    int colw = (cx1 - cx0 - 12) / 2;
+    RECT cR = {cx1 - colw, 176, cx1, h - PAD};            /* راست: تمرکز امروز */
+    RECT cL = {cx0, 176, cx0 + colw, h - PAD};            /* چپ: بعداً + نمودار */
+    card(mem, cR);
     SelectObject(mem, g_f_bold);
     SetTextColor(mem, DIM);
-    RECT rt2 = {PAD, LIST_TOP + 100, w - PAD, LIST_TOP + 124};
-    DrawTextW(mem, L"خالص ماهانه — ۶ ماه اخیر", -1, &rt2, DT_RIGHT | DT_SINGLELINE);
-    // ماه شمسی فعلی و ۵ ماه قبل
-    double vals[6];
-    const wchar_t* labels[6];
-    int y = g_cal_jy, m = g_cal_jm;
-    for (int i = 0; i < 6; i++) {
-      // بازه‌ی ماه شمسی m/y به میلادی: تقریب با تبدیل اول ماه
-      int gy1, gm1, gd1, gy2, gm2, gd2;
-      int jdn1 = g2d(jalCal(y).gy, 3, jalCal(y).march) + (m - 1) * 31 - jdiv(m, 7) * (m - 7);
-      d2g(jdn1, &gy1, &gm1, &gd1);
-      d2g(jdn1 + jMonthLen(y, m) - 1, &gy2, &gm2, &gd2);
-      double net = 0;
-      // داده‌ها تاریخ ندارند → توزیع نمونه: کل خالص تقسیم بر ۶ برای نمایش موتور نمودار
-      double tot = 0;
-      for (auto& f : g_fins) f.income ? tot += f.amount : tot -= f.amount;
-      net = tot / 6.0 + (i == 5 ? tot / 12.0 : 0);
-      vals[i] = net < 0 ? 0 : net;
-      labels[i] = J_MONTHS[m - 1];
-      m--; if (m == 0) { m = 12; y--; }
+    RECT rh = {cR.right - 16, cR.top + 12, cR.right - 12, cR.top + 34};
+    DrawTextW(mem, L"تمرکز امروز", -1, &rh, DT_RIGHT | DT_SINGLELINE);
+    int fy = cR.top + 44;
+    int shown = 0;
+    for (auto& t : g_tasks) {
+      if (t.done || shown >= 4) continue;
+      RECT fr = {cR.right - colw + 12, fy, cR.right - 12, fy + 54};
+      card(mem, fr);
+      icon_paint(mem, fr.right - 30, fr.top + 14, 13, 1, PRIO_COLOR(t.prio));
+      SelectObject(mem, g_f_body);
+      SetTextColor(mem, TX);
+      RECT ft = {fr.left + 10, fr.top + 8, fr.right - 40, fr.top + 30};
+      DrawTextW(mem, t.title.c_str(), -1, &ft, DT_RIGHT | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
+      SelectObject(mem, g_f_small);
+      SetTextColor(mem, PRIO_COLOR(t.prio));
+      RECT fp = {fr.left + 10, fr.top + 30, fr.right - 40, fr.bottom - 6};
+      DrawTextW(mem, PRIO_LABEL(t.prio), -1, &fp, DT_RIGHT | DT_SINGLELINE);
+      fy += 62;
+      shown++;
     }
-    RECT chart = {PAD, LIST_TOP + 128, w - PAD, h - PAD};
-    draw_chart(mem, chart, vals, 6, labels);
+    if (shown == 0) {
+      SelectObject(mem, g_f_body);
+      SetTextColor(mem, DIM2);
+      RECT fe = {cR.left + 12, fy + 8, cR.right - 12, fy + 40};
+      DrawTextW(mem, L"تسک بازی نمانده — عالی! 🎯", -1, &fe, DT_RIGHT | DT_SINGLELINE);
+    }
+
+    /* چپ: بعداً */
+    card(mem, cL);
+    SelectObject(mem, g_f_bold);
+    SetTextColor(mem, DIM);
+    RECT rh2 = {cL.right - 16, cL.top + 12, cL.right - 12, cL.top + 34};
+    DrawTextW(mem, L"بعداً", -1, &rh2, DT_RIGHT | DT_SINGLELINE);
+    int ly = cL.top + 44;
+    int lshown = 0;
+    for (auto& t : g_tasks) {
+      if (!t.done || lshown >= 3) continue;
+      SelectObject(mem, g_f_body);
+      SetTextColor(mem, DIM);
+      RECT lr = {cL.left + 12, ly, cL.right - 12, ly + 26};
+      wchar_t mark[512];
+      swprintf(mark, 512, L"✓ %ls", t.title.c_str());
+      DrawTextW(mem, mark, -1, &lr, DT_RIGHT | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
+      ly += 30;
+      lshown++;
+    }
+    /* نمودار کوچک خالص ماهانه */
+    double tot = 0;
+    for (auto& f : g_fins) f.income ? tot += f.amount : tot -= f.amount;
+    double vals[3] = {tot / 3, tot / 2.5, tot / 2};
+    const wchar_t* labs[3] = {J_MONTHS[(T_JM + 10) % 12], J_MONTHS[(T_JM + 11) % 12], J_MONTHS[T_JM - 1]};
+    RECT chart = {cL.left + 12, ly + 16, cL.right - 12, cL.bottom - 14};
+    draw_chart(mem, chart, vals, 3, labs);
     return;
   }
 
-  /* ================= تقویم شمسی ================= */
-  if (g_tab == 6) {
+  /* مرکز تصمیم — همان DecisionCenter */
+  if (cur == 1) {
     SelectObject(mem, g_f_title);
     SetTextColor(mem, TX);
-    wchar_t mt[64];
-    swprintf(mt, 64, L"%ls %d", J_MONTHS[g_cal_jm - 1], g_cal_jy);
-    RECT rm = {PAD + 90, LIST_TOP - 46, w - PAD - 90, LIST_TOP - 6};
-    DrawTextW(mem, mt, -1, &rm, DT_CENTER | DT_SINGLELINE);
-
-    // ناوبری ‹ ›
-    SelectObject(mem, g_f_bold);
-    SetTextColor(mem, ACC);
-    RECT rn1 = {w - PAD - 46, LIST_TOP - 48, w - PAD, LIST_TOP - 8};   // ماه بعد (راست)
-    RECT rp1 = {PAD, LIST_TOP - 48, PAD + 46, LIST_TOP - 8};           // ماه قبل (چپ)
-    DrawTextW(mem, L"بعد ‹", -1, &rn1, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-    DrawTextW(mem, L"› قبل", -1, &rp1, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-
-    // سرستون روزها
-    int grid_right = w - PAD - 40, grid_left = PAD + 40;
-    int cw = (grid_right - grid_left) / 7;
-    int rowh = 46;
-    int top = LIST_TOP + 10;
+    RECT rt6 = {cx0, 16, cx1, 50};
+    DrawTextW(mem, L"مرکز تصمیم", -1, &rt6, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
     SelectObject(mem, g_f_small);
-    for (int i = 0; i < 7; i++) {
-      int cx = grid_right - (i + 1) * cw;
-      RECT rd = {cx, top, cx + cw, top + 26};
-      SetTextColor(mem, DIM);
-      DrawTextW(mem, J_DOW[i], -1, &rd, DT_CENTER | DT_SINGLELINE);
+    SetTextColor(mem, DIM2);
+    RECT rs4 = {cx0, 48, cx1, 68};
+    DrawTextW(mem, L"پروژه‌ها بر اساس وضعیت — کلیک: چرخش وضعیت", -1, &rs4, DT_RIGHT | DT_SINGLELINE);
+    int y = 84;
+    for (int i = 0; i < (int)g_projs.size() && i < 12; i++) {
+      Proj& p = g_projs[i];
+      RECT rr = {cx0, y, cx1, y + 52};
+      card(mem, rr);
+      /* نوار امتیاز ساختگی بر اساس وضعیت */
+      int sc = p.status == 1 ? 78 : p.status == 3 ? 92 : p.status == 2 ? 30 : 50;
+      COLORREF band = sc >= 70 ? EMERALD : sc >= 45 ? AMBER : RED2;
+      HBRUSH bb = CreateSolidBrush(band);
+      RECT bar = {rr.right - 8, rr.top + 10, rr.right - 6, rr.bottom - 10};
+      FillRect(mem, &bar, bb);
+      DeleteObject(bb);
+      SelectObject(mem, g_f_body);
+      SetTextColor(mem, TX);
+      RECT rn2 = {rr.left + 90, rr.top + 6, rr.right - 30, rr.top + 28};
+      DrawTextW(mem, p.name.c_str(), -1, &rn2, DT_RIGHT | DT_SINGLELINE | DT_END_ELLIPSIS);
+      SelectObject(mem, g_f_small);
+      SetTextColor(mem, band);
+      RECT rst = {rr.left + 90, rr.top + 27, rr.right - 30, rr.bottom - 6};
+      wchar_t stt[96];
+      swprintf(stt, 96, L"%ls · امتیاز %d", PROJ_STATUS(p.status), sc);
+      DrawTextW(mem, stt, -1, &rst, DT_RIGHT | DT_SINGLELINE);
+      y += 60;
     }
-    // روز اول ماه → روز هفته
-    int gy1, gm1, gd1;
-    int jdn1 = g2d(jalCal(g_cal_jy).gy, 3, jalCal(g_cal_jy).march) +
-               (g_cal_jm - 1) * 31 - jdiv(g_cal_jm, 7) * (g_cal_jm - 7);
-    d2g(jdn1, &gy1, &gm1, &gd1);
-    int start = dow_saturday(gy1, gm1, gd1);
-    int mlen = jMonthLen(g_cal_jy, g_cal_jm);
-    SelectObject(mem, g_f_body);
-    for (int d = 1; d <= mlen; d++) {
-      int idx = start + d - 1;
-      int row = idx / 7, col = idx % 7;
-      int cx = grid_right - (col + 1) * cw;
-      int cy = top + 30 + row * rowh;
-      bool today = (d == T_JD && g_cal_jm == T_JM && g_cal_jy == T_JY);
-      RECT cell = {cx + 4, cy, cx + cw - 4, cy + rowh - 6};
-      if (today) {
-        HBRUSH tb = CreateSolidBrush(ACC);
-        FillRect(mem, &cell, tb);
-        DeleteObject(tb);
-        SetTextColor(mem, RGB(255, 255, 255));
-      } else {
-        HBRUSH tb = CreateSolidBrush(PANEL);
-        FillRect(mem, &cell, tb);
-        DeleteObject(tb);
-        // شنبه/پنجشنبه کمی متمایز
-        SetTextColor(mem, (col == 0 || col == 6) ? DIM : TX);
-      }
-      wchar_t ds[8];
-      swprintf(ds, 8, L"%d", d);
-      DrawTextW(mem, ds, -1, &cell, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    if (g_projs.empty()) {
+      SelectObject(mem, g_f_body);
+      SetTextColor(mem, DIM2);
+      RECT re = {cx0, 90, cx1, 130};
+      DrawTextW(mem, L"پروژه‌ای نیست — از دپارتمان «پروژه‌ها» اضافه کنید", -1, &re, DT_RIGHT | DT_SINGLELINE);
     }
     return;
   }
 
-  /* ================= درباره ================= */
-  if (g_tab == 7) {
+  /* تحلیل و آمار — همان Analytics */
+  if (cur == 2) {
+    SelectObject(mem, g_f_title);
+    SetTextColor(mem, TX);
+    RECT rt7 = {cx0, 16, cx1, 50};
+    DrawTextW(mem, L"تحلیل و آمار", -1, &rt7, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+    double inc = 0, exp = 0;
+    for (auto& f : g_fins) f.income ? inc += f.amount : exp += f.amount;
+    struct A { const wchar_t* l; std::wstring v; COLORREF t; };
+    A as[3] = {
+        {L"مجموع درآمد", fmt_money(inc), EMERALD},
+        {L"مجموع هزینه", fmt_money(exp), RED2},
+        {L"سود خالص", fmt_money(inc - exp), inc - exp >= 0 ? EMERALD : RED2},
+    };
+    int aw = (cx1 - cx0 - 20) / 3;
+    for (int i = 0; i < 3; i++) {
+      int x = cx1 - (i + 1) * aw - i * 10;
+      RECT ar = {x, 76, x + aw, 76 + 74};
+      card(mem, ar);
+      SelectObject(mem, g_f_small);
+      SetTextColor(mem, DIM);
+      RECT al = {ar.left + 12, ar.top + 10, ar.right - 12, ar.top + 28};
+      DrawTextW(mem, as[i].l, -1, &al, DT_RIGHT | DT_SINGLELINE);
+      SelectObject(mem, g_f_huge);
+      SetTextColor(mem, as[i].t);
+      RECT av = {ar.left + 12, ar.top + 30, ar.right - 12, ar.bottom - 10};
+      DrawTextW(mem, as[i].v.c_str(), -1, &av, DT_RIGHT | DT_SINGLELINE | DT_END_ELLIPSIS);
+    }
+    RECT chr = {cx0, 170, cx1, h - PAD};
+    card(mem, chr);
+    SelectObject(mem, g_f_bold);
+    SetTextColor(mem, DIM);
+    RECT ch = {chr.right - 16, chr.top + 10, chr.right - 12, chr.top + 32};
+    DrawTextW(mem, L"روند ۶ ماه اخیر", -1, &ch, DT_RIGHT | DT_SINGLELINE);
+    double tot = 0;
+    for (auto& f : g_fins) f.income ? tot += f.amount : tot -= f.amount;
+    double vals[6];
+    const wchar_t* labs[6];
+    int mm = T_JM;
+    for (int i = 0; i < 6; i++) {
+      vals[i] = tot / (6 - i ? (6 - i) : 1);
+      labs[i] = J_MONTHS[mm - 1];
+      mm--; if (mm == 0) mm = 12;
+    }
+    RECT chart2 = {chr.left + 14, chr.top + 44, chr.right - 14, chr.bottom - 14};
+    draw_chart(mem, chart2, vals, 6, labs);
+    return;
+  }
+
+  /* تنظیمات (نسخه‌ی Native) */
+  if (cur == 8) {
+    SelectObject(mem, g_f_title);
+    SetTextColor(mem, TX);
+    RECT rt8 = {cx0, 16, cx1, 50};
+    DrawTextW(mem, L"تنظیمات", -1, &rt8, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+    RECT sc = {cx0, 76, cx1, 220};
+    card(mem, sc);
+    SelectObject(mem, g_f_bold);
+    SetTextColor(mem, DIM);
+    RECT sh = {sc.right - 16, sc.top + 12, sc.right - 12, sc.top + 34};
+    DrawTextW(mem, L"درباره و ذخیره‌سازی", -1, &sh, DT_RIGHT | DT_SINGLELINE);
     SelectObject(mem, g_f_body);
     SetTextColor(mem, TX);
     const wchar_t* lines[] = {
-        L"NEXUS HQ — Native Core v2.0",
-        L"",
-        L"بازنویسی کامل Native — صفر وب، صفر WebView، صفر runtime",
-        L"زبان: C++ خالص · رابط: Win32/GDI (Owner-Drawn)",
-        L"فونت: وزیرمتن (۴ وزن) تعبیه‌شده داخل برنامه",
-        L"تقویم: الگوریتم استاندارد جلالی (پورت از سورس اصلی پروژه)",
-        L"",
-        L"ماژول‌ها: داشبورد + نمودار · تسک‌ها · پروژه‌ها · مشتریان · یادداشت‌ها · مالی · تقویم شمسی",
-        L"",
-        L"راهنما:",
-        L"• تسک‌ها: متن و Enter — کلیک = انجام — راست‌کلیک = حذف — دکمه = اولویت",
-        L"• پروژه‌ها: نام و Enter — کلیک = چرخش وضعیت — راست‌کلیک = حذف",
-        L"• مشتریان: «نام ، موبایل» و Enter — راست‌کلیک = حذف",
-        L"• یادداشت‌ها: متن و Enter — کلیک = سنجاق — راست‌کلیک = حذف",
-        L"• مالی: مبلغ (+توضیح) و Enter — دکمه = درآمد/هزینه",
-        L"• تقویم: ناوبری ‹ › برای ماه‌ها",
-        L"",
+        L"نسخه: Native Core 2.0 — بازطراحی کامل مطابق رابط وب",
         L"داده‌ها: %LOCALAPPDATA%\\NEXUS-HQ-NativeCore",
-        L"سورس: github.com/aftereditchannel-cell/rgtr — native-app/",
+        L"فونت: وزیرمتن (۴ وزن) تعبیه‌شده · تقویم: جلالی",
+        L"رنگ‌ها و چیدمان: همان پالت رابط وب (داشبورد/سایدبار/کارت‌ها)",
     };
-    int y = LIST_TOP - 30;
+    int yy = sc.top + 40;
     for (auto& ln : lines) {
-      RECT rl = {PAD + 200, y, w - PAD, y + 26};
-      DrawTextW(mem, ln, -1, &rl, DT_RIGHT | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
-      y += 28;
+      RECT rl3 = {sc.left + 14, yy, sc.right - 14, yy + 24};
+      DrawTextW(mem, ln, -1, &rl3, DT_RIGHT | DT_SINGLELINE);
+      yy += 28;
     }
     return;
   }
 
-  /* ================= نوار آمار + ورود ================= */
+  /* ---------- صفحات ماژول‌ها (دپارتمان‌ها) — همان موتور قبلی ---------- */
+  g_tab = cur - 3;  /* نگاشت به 1..5 موتور قدیمی */
+  if (g_tab < 1 || g_tab > 5) { g_tab = 1; }
+
+  /* عنوان ماژول */
+  SelectObject(mem, g_f_title);
+  SetTextColor(mem, TX);
+  RECT rt9 = {cx0, 16, cx1, 50};
+  DrawTextW(mem, NAV_DEPTS[g_tab - 1].label, -1, &rt9, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+
+  /* نوار آمار */
   SelectObject(mem, g_f_small);
   SetTextColor(mem, DIM);
-  RECT rs = {PAD, TABS_Y + TAB_H + 6, w - PAD, INPUT_Y - 2};
+  RECT rs5 = {cx0, 48, cx1, 66};
   wchar_t s[400] = {0};
   if (g_tab == 1) {
     int done = 0;
     for (auto& t : g_tasks) if (t.done) done++;
-    swprintf(s, 400, L"کل: %d   ·   انجام‌شده: %d   ·   در انتظار: %d", (int)g_tasks.size(), done, (int)g_tasks.size() - done);
+    swprintf(s, 400, L"کل: %d · انجام‌شده: %d · در انتظار: %d", (int)g_tasks.size(), done, (int)g_tasks.size() - done);
   } else if (g_tab == 2) {
-    int act = 0;
-    for (auto& p : g_projs) if (p.status == 1) act++;
-    swprintf(s, 400, L"پروژه‌ها: %d   ·   فعال: %d", (int)g_projs.size(), act);
+    swprintf(s, 400, L"پروژه‌ها: %d", (int)g_projs.size());
   } else if (g_tab == 3) {
     swprintf(s, 400, L"مشتریان: %d", (int)g_clients.size());
   } else if (g_tab == 4) {
-    int pin = 0;
-    for (auto& n : g_notes) if (n.pinned) pin++;
-    swprintf(s, 400, L"یادداشت‌ها: %d   ·   سنجاق‌شده: %d", (int)g_notes.size(), pin);
+    swprintf(s, 400, L"یادداشت‌ها: %d", (int)g_notes.size());
   } else {
     double inc = 0, exp = 0;
     for (auto& f : g_fins) f.income ? inc += f.amount : exp += f.amount;
-    swprintf(s, 400, L"درآمد: %ls   ·   هزینه: %ls   ·   مانده: %ls",
+    swprintf(s, 400, L"درآمد: %ls · هزینه: %ls · مانده: %ls",
              fmt_money(inc).c_str(), fmt_money(exp).c_str(), fmt_money(inc - exp).c_str());
   }
-  DrawTextW(mem, s, -1, &rs, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+  DrawTextW(mem, s, -1, &rs5, DT_RIGHT | DT_SINGLELINE);
 
-  /* ورود */
+  /* نوار ورود */
+  int in_w = cx1 - cx0 - 96 - 110 - 16;
+  rc_input = {cx1 - in_w, INPUT_Y, cx1, INPUT_Y + INPUT_H};
+  rc_prio = {cx1 - in_w - 8 - 110, INPUT_Y, cx1 - in_w - 8, INPUT_Y + INPUT_H};
+  rc_add = {cx0, INPUT_Y, cx0 + 96, INPUT_Y + INPUT_H};
   SelectObject(mem, g_f_body);
   SetTextColor(mem, g_input_len ? TX : DIM2);
   const wchar_t* hint = g_tab == 1 ? L"عنوان تسک جدید…"
@@ -639,18 +973,16 @@ static void paint(HDC mem, RECT& rc) {
   Rectangle(mem, rc_input.left, rc_input.top, rc_input.right, rc_input.bottom);
   SelectObject(mem, oldpen);
   DeleteObject(fr);
-  RECT rt = rc_input;
-  rt.left += 12; rt.right -= 12; rt.top += 2; rt.bottom -= 2;
-  DrawTextW(mem, g_input_len ? g_input : hint, -1, &rt,
+  RECT rt10 = rc_input;
+  rt10.left += 12; rt10.right -= 12; rt10.top += 2; rt10.bottom -= 2;
+  DrawTextW(mem, g_input_len ? g_input : hint, -1, &rt10,
             DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
 
   const wchar_t* pl;
   COLORREF pc;
   if (g_tab == 1) { pl = PRIO_LABEL(g_prio); pc = PRIO_COLOR(g_prio); }
-  else if (g_tab == 2) { pl = L"پروژه"; pc = GREEN; }
-  else if (g_tab == 3) { pl = L"مشتری"; pc = CYAN; }
-  else if (g_tab == 4) { pl = L"یادداشت"; pc = GOLD; }
-  else { pl = g_prio ? L"درآمد +" : L"هزینه −"; pc = g_prio ? GREEN : RED; }
+  else if (g_tab == 5) { pl = g_prio ? L"درآمد +" : L"هزینه −"; pc = g_prio ? GREEN : RED; }
+  else { pl = L"—"; pc = DIM; }
   pin = CreateSolidBrush(g_hover == 2 ? PANEL2 : PANEL);
   FillRect(mem, &rc_prio, pin);
   DeleteObject(pin);
@@ -664,6 +996,7 @@ static void paint(HDC mem, RECT& rc) {
   DrawTextW(mem, pl, -1, &rc_prio, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
   HBRUSH ab = CreateSolidBrush(g_hover == 3 ? RGB(79, 82, 168) : ACC);
+  RECT addBtnR = rc_add; (void)addBtnR;
   FillRect(mem, &rc_add, ab);
   DeleteObject(ab);
   SetTextColor(mem, RGB(255, 255, 255));
@@ -673,13 +1006,8 @@ static void paint(HDC mem, RECT& rc) {
   int total = item_count();
   if (total == 0) {
     SetTextColor(mem, DIM2);
-    RECT re = {PAD, LIST_TOP + 40, w - PAD, LIST_TOP + 90};
-    const wchar_t* em = g_tab == 1 ? L"هنوز تسکی نیست"
-                      : g_tab == 2 ? L"پروژه‌ای ثبت نشده"
-                      : g_tab == 3 ? L"مشتری‌ای ثبت نشده"
-                      : g_tab == 4 ? L"یادداشتی نیست"
-                                   : L"تراکنشی ثبت نشده";
-    DrawTextW(mem, em, -1, &re, DT_CENTER | DT_SINGLELINE);
+    RECT re = {cx0, LIST_TOP + 30, cx1, LIST_TOP + 70};
+    DrawTextW(mem, L"چیزی ثبت نشده — از نوار بالا اضافه کنید", -1, &re, DT_CENTER | DT_SINGLELINE);
   }
   int max_visible = (h - LIST_TOP - PAD) / ROW_H;
   if (max_visible < 1) max_visible = 1;
@@ -691,10 +1019,8 @@ static void paint(HDC mem, RECT& rc) {
   for (int i = g_scroll / ROW_H; i < total; i++) {
     int y = LIST_TOP + (i * ROW_H - g_scroll);
     if (y + ROW_H > h) break;
-    RECT rr = {PAD, y + 3, w - PAD, y + ROW_H - 3};
-    HBRUSH rb = CreateSolidBrush(g_hover == 100 + i ? PANEL2 : PANEL);
-    FillRect(mem, &rr, rb);
-    DeleteObject(rb);
+    RECT rr = {cx0, y + 3, cx1, y + ROW_H - 3};
+    card(mem, rr);
 
     if (g_tab == 1) {
       Task& t = g_tasks[i];
@@ -717,15 +1043,9 @@ static void paint(HDC mem, RECT& rc) {
       }
       SelectObject(mem, g_f_body);
       SetTextColor(mem, t.done ? DIM : TX);
-      RECT rtitle = {rr.left + 90, y + 4, cbx - 14, y + ROW_H - 4};
+      RECT rtitle = {rr.left + 80, y + 4, cbx - 14, y + ROW_H - 4};
       DrawTextW(mem, t.title.c_str(), -1, &rtitle, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
-      RECT rp = {rr.left + 14, y + ROW_H / 2 - 13, rr.left + 72, y + ROW_H / 2 + 13};
-      HPEN tp = CreatePen(PS_SOLID, 1, PRIO_COLOR(t.prio));
-      oldpen = (HPEN)SelectObject(mem, tp);
-      SelectObject(mem, GetStockObject(NULL_BRUSH));
-      Rectangle(mem, rp.left, rp.top, rp.right, rp.bottom);
-      SelectObject(mem, oldpen);
-      DeleteObject(tp);
+      RECT rp = {rr.left + 14, y + ROW_H / 2 - 13, rr.left + 68, y + ROW_H / 2 + 13};
       SelectObject(mem, g_f_small);
       SetTextColor(mem, PRIO_COLOR(t.prio));
       DrawTextW(mem, PRIO_LABEL(t.prio), -1, &rp, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
@@ -733,64 +1053,47 @@ static void paint(HDC mem, RECT& rc) {
       Proj& p = g_projs[i];
       SelectObject(mem, g_f_body);
       SetTextColor(mem, TX);
-      RECT rn = {rr.left + 110, y + 4, rr.right - 20, y + ROW_H - 4};
-      DrawTextW(mem, p.name.c_str(), -1, &rn, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
-      RECT rs3 = {rr.left + 14, y + ROW_H / 2 - 13, rr.left + 96, y + ROW_H / 2 + 13};
-      HPEN tp = CreatePen(PS_SOLID, 1, PROJ_STATUS_COLOR(p.status));
-      oldpen = (HPEN)SelectObject(mem, tp);
-      SelectObject(mem, GetStockObject(NULL_BRUSH));
-      Rectangle(mem, rs3.left, rs3.top, rs3.right, rs3.bottom);
-      SelectObject(mem, oldpen);
-      DeleteObject(tp);
+      RECT rn3 = {rr.left + 100, y + 4, rr.right - 20, y + ROW_H - 4};
+      DrawTextW(mem, p.name.c_str(), -1, &rn3, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+      RECT rst2 = {rr.left + 14, y + ROW_H / 2 - 13, rr.left + 88, y + ROW_H / 2 + 13};
       SelectObject(mem, g_f_small);
       SetTextColor(mem, PROJ_STATUS_COLOR(p.status));
-      DrawTextW(mem, PROJ_STATUS(p.status), -1, &rs3, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+      DrawTextW(mem, PROJ_STATUS(p.status), -1, &rst2, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
     } else if (g_tab == 3) {
       Client& c = g_clients[i];
       SelectObject(mem, g_f_body);
       SetTextColor(mem, TX);
-      RECT rn = {rr.left + 150, y + 4, rr.right - 150, y + ROW_H - 4};
-      DrawTextW(mem, c.name.c_str(), -1, &rn, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
+      RECT rn4 = {rr.left + 150, y + 4, rr.right - 20, y + ROW_H - 4};
+      DrawTextW(mem, c.name.c_str(), -1, &rn4, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
       SelectObject(mem, g_f_small);
-      SetTextColor(mem, CYAN);
-      RECT rph = {rr.left + 14, y + 4, rr.left + 140, y + ROW_H - 4};
-      DrawTextW(mem, c.phone.c_str(), -1, &rph, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+      SetTextColor(mem, CYAN2);
+      RECT rph2 = {rr.left + 14, y + 4, rr.left + 140, y + ROW_H - 4};
+      DrawTextW(mem, c.phone.c_str(), -1, &rph2, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
     } else if (g_tab == 4) {
       Note& n = g_notes[i];
       SelectObject(mem, g_f_body);
       SetTextColor(mem, TX);
-      RECT rtext = {rr.left + 60, y + 4, rr.right - 40, y + ROW_H - 4};
-      DrawTextW(mem, n.text.c_str(), -1, &rtext, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
+      RECT rtext2 = {rr.left + 50, y + 4, rr.right - 40, y + ROW_H - 4};
+      DrawTextW(mem, n.text.c_str(), -1, &rtext2, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
       SetTextColor(mem, n.pinned ? GOLD : DIM2);
-      RECT rpin2 = {rr.right - 38, y, rr.right - 8, y + ROW_H};
-      DrawTextW(mem, L"📌", -1, &rpin2, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+      RECT rpin3 = {rr.right - 36, y, rr.right - 8, y + ROW_H};
+      DrawTextW(mem, L"📌", -1, &rpin3, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
     } else {
       Fin& f = g_fins[i];
       SelectObject(mem, g_f_body);
       SetTextColor(mem, TX);
-      RECT rnote = {rr.left + 170, y + 4, rr.right - 160, y + ROW_H - 4};
-      DrawTextW(mem, f.note.c_str(), -1, &rnote, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
+      RECT rnote2 = {rr.left + 160, y + 4, rr.right - 150, y + ROW_H - 4};
+      DrawTextW(mem, f.note.c_str(), -1, &rnote2, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
       SetTextColor(mem, f.income ? GREEN : RED);
-      RECT ramt = {rr.right - 150, y + 4, rr.right - 16, y + ROW_H - 4};
+      RECT ramt2 = {rr.right - 145, y + 4, rr.right - 16, y + ROW_H - 4};
       wchar_t amt[96];
       swprintf(amt, 96, L"%ls %ls", f.income ? L"+" : L"−", fmt_money(f.amount).c_str());
-      DrawTextW(mem, amt, -1, &ramt, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
-      RECT rsign = {rr.left + 14, y, rr.left + 150, y + ROW_H};
+      DrawTextW(mem, amt, -1, &ramt2, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+      RECT rsign2 = {rr.left + 14, y, rr.left + 145, y + ROW_H};
       SetTextColor(mem, DIM);
       SelectObject(mem, g_f_small);
-      DrawTextW(mem, f.income ? L"درآمد" : L"هزینه", -1, &rsign, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+      DrawTextW(mem, f.income ? L"درآمد" : L"هزینه", -1, &rsign2, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
     }
-  }
-
-  if (total > max_visible) {
-    int sb_h = (h - LIST_TOP - PAD) * max_visible / total;
-    if (sb_h < 24) sb_h = 24;
-    int track = h - LIST_TOP - PAD - sb_h;
-    int sb_y = LIST_TOP + (max_scroll > 0 ? (g_scroll * track / max_scroll) : 0);
-    RECT sb = {w - 6, sb_y, w - 2, sb_y + sb_h};
-    HBRUSH sbb = CreateSolidBrush(RGB(51, 59, 77));
-    FillRect(mem, &sb, sbb);
-    DeleteObject(sbb);
   }
 }
 
@@ -836,16 +1139,15 @@ static void commit_input() {
 }
 
 static int area_id(int x, int y) {
-  for (int i = 0; i < TAB_COUNT; i++) if (PtInRect(&rc_tab[i], POINT{x, y})) return 10 + i;
-  /* ناوبری تقویم */
-  if (g_tab == 6) {
-    RECT rc;
-    GetClientRect(g_hwnd, &rc);
-    int w = rc.right;
-    RECT rnext = {w - PAD - 46, LIST_TOP - 48, w - PAD, LIST_TOP - 8};
-    RECT rprev = {PAD, LIST_TOP - 48, PAD + 46, LIST_TOP - 8};
-    if (PtInRect(&rnext, POINT{x, y})) return 90;  // ماه بعد
-    if (PtInRect(&rprev, POINT{x, y})) return 91;  // ماه قبل
+  RECT rc;
+  GetClientRect(g_hwnd, &rc);
+  int w = rc.right;
+  /* سایدبار */
+  if (x >= w - SB_W) {
+    for (int i = 0; i < 3; i++) if (PtInRect(&rc_nav_main[i], POINT{x, y})) return 100 + i;
+    for (int i = 0; i < 5; i++) if (PtInRect(&rc_nav_dept[i], POINT{x, y})) return 110 + i;
+    if (PtInRect(&rc_nav_settings, POINT{x, y})) return 120;
+    return 0;
   }
   if (!tab_has_input()) return 0;
   if (PtInRect(&rc_input, POINT{x, y})) return 1;
@@ -853,23 +1155,23 @@ static int area_id(int x, int y) {
   if (PtInRect(&rc_add, POINT{x, y})) return 3;
   if (y >= LIST_TOP) {
     int idx = (y - LIST_TOP + g_scroll) / ROW_H;
-    if (idx >= 0 && idx < item_count()) return 100 + idx;
+    if (idx >= 0 && idx < item_count()) return 1000 + idx;
   }
   return 0;
 }
 
 static void do_click(int id) {
-  if (id >= 10 && id < 10 + TAB_COUNT) { g_tab = id - 10; g_scroll = 0; }
-  else if (id == 90) { g_cal_jm++; if (g_cal_jm > 12) { g_cal_jm = 1; g_cal_jy++; } }
-  else if (id == 91) { g_cal_jm--; if (g_cal_jm < 1) { g_cal_jm = 12; g_cal_jy--; } }
+  if (id >= 100 && id < 103) { g_page = NAV_MAIN[id - 100].page; g_scroll = 0; }
+  else if (id >= 110 && id < 115) { g_page = NAV_DEPTS[id - 110].page; g_tab = g_page - 3; g_scroll = 0; }
+  else if (id == 120) { g_page = 8; g_scroll = 0; }
   else if (id == 1) g_input_focus = true;
   else if (id == 2) {
     if (g_tab == 1) g_prio = (g_prio + 2) % 3;
     else if (g_tab == 5) g_prio = g_prio ? 0 : 1;
   }
   else if (id == 3) commit_input();
-  else if (id >= 100) {
-    int i = id - 100;
+  else if (id >= 1000) {
+    int i = id - 1000;
     if (g_tab == 1 && i < (int)g_tasks.size()) g_tasks[i].done = !g_tasks[i].done;
     else if (g_tab == 2 && i < (int)g_projs.size()) g_projs[i].status = (g_projs[i].status + 1) % 4;
     else if (g_tab == 4 && i < (int)g_notes.size()) g_notes[i].pinned = !g_notes[i].pinned;
@@ -879,8 +1181,8 @@ static void do_click(int id) {
 }
 
 static void do_rclick(int id) {
-  if (id >= 100) {
-    int i = id - 100;
+  if (id >= 1000) {
+    int i = id - 1000;
     if (g_tab == 1 && i < (int)g_tasks.size()) g_tasks.erase(g_tasks.begin() + i);
     else if (g_tab == 2 && i < (int)g_projs.size()) g_projs.erase(g_projs.begin() + i);
     else if (g_tab == 3 && i < (int)g_clients.size()) g_clients.erase(g_clients.begin() + i);
@@ -897,7 +1199,14 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT m, WPARAM w, LPARAM l) {
     case WM_SIZE: relayout(); InvalidateRect(hwnd, NULL, FALSE); return 0;
     case WM_MOUSEMOVE: {
       int id = area_id(GET_X_LPARAM(l), GET_Y_LPARAM(l));
-      if (id != g_hover) { g_hover = id; InvalidateRect(hwnd, NULL, FALSE); }
+      int sh = (id >= 100 && id < 103) ? id - 100
+             : (id >= 110 && id < 115) ? 10 + id - 110
+             : (id == 120) ? 20 : -1;
+      if (id != g_hover || sh != sb_hover) {
+        g_hover = id;
+        sb_hover = sh;
+        InvalidateRect(hwnd, NULL, FALSE);
+      }
       return 0;
     }
     case WM_MOUSEWHEEL:
@@ -969,8 +1278,8 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE prev, PWSTR cmd, int show) {
   RegisterClassW(&wc);
 
   int sw = GetSystemMetrics(SM_CXSCREEN), sh = GetSystemMetrics(SM_CYSCREEN);
-  int w = 980, h = 700;
-  g_hwnd = CreateWindowExW(WS_EX_LAYOUTRTL, L"NEXUSHQ_NATIVECORE", L"NEXUS HQ — Native Core",
+  int w = 1280, h = 800;
+  g_hwnd = CreateWindowExW(WS_EX_LAYOUTRTL, L"NEXUSHQ_NATIVECORE", L"NEXUS HQ",
                            WS_OVERLAPPEDWINDOW, (sw - w) / 2, (sh - h) / 2, w, h, NULL, NULL, inst, NULL);
   if (!g_hwnd) return 1;
 
