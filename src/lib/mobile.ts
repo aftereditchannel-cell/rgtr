@@ -221,3 +221,30 @@ export async function initMobileChrome(): Promise<void> {
     await StatusBar.setOverlaysWebView({ overlay: false })
   } catch { /* بعضی دستگاه‌ها پشتیبانی نمی‌کنند */ }
 }
+
+/** هماهنگ‌کردن نوار وضعیت با پوسته‌ی مؤثر */
+export async function syncMobileChrome(theme: 'dark' | 'light'): Promise<void> {
+  if (!isMobile) return
+  try {
+    const { StatusBar, Style } = await import('@capacitor/status-bar')
+    await StatusBar.setStyle({ style: theme === 'light' ? Style.Light : Style.Dark })
+    if (isAndroid) await StatusBar.setBackgroundColor({ color: theme === 'light' ? '#eef1f7' : '#08090c' })
+    const meta = document.querySelector('meta[name="theme-color"]')
+    if (meta) meta.setAttribute('content', theme === 'light' ? '#eef1f7' : '#08090c')
+  } catch { /* بعضی دستگاه‌ها پشتیبانی نمی‌کنند */ }
+}
+
+/**
+ * وقتی برنامه از پس‌زمینه برمی‌گردد (اندروید resume).
+ * هم‌زمان برمی‌گرداند تا در useEffect تمیز جمع شود.
+ */
+export function onMobileResume(handler: () => void): () => void {
+  if (!isMobile) return () => {}
+  let remove = () => {}
+  void import('@capacitor/app').then(({ App }) => {
+    void App.addListener('resume', handler).then(sub => {
+      remove = () => { void sub.remove() }
+    })
+  })
+  return () => { remove() }
+}

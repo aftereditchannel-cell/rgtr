@@ -54,7 +54,7 @@ export function ModulePage() {
   return (
     <div className="anim">
       {/* header */}
-      <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
+      <div className="flex items-start justify-between gap-3 mb-4 flex-wrap min-w-0">
         <div className="flex items-start gap-3">
           <div className="w-9 h-9 rounded-lg grid place-items-center bg-[var(--color-acc)]/12 border border-[var(--color-acc)]/25 shrink-0">
             <Icon name={module.icon} size={17} style={{ color: 'var(--color-acc)' }} />

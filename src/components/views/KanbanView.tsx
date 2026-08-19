@@ -41,7 +41,7 @@ export function KanbanView({ module, rows, data, currency, onOpen }: {
             onDragOver={e => { e.preventDefault(); setOverCol(col) }}
             onDragLeave={() => setOverCol(c => (c === col ? null : c))}
             onDrop={() => drop(col)}
-            className={`shrink-0 w-[268px] rounded-xl border border-[var(--color-line)] bg-[var(--color-bg2)]/60 flex flex-col max-h-[calc(100vh-215px)] ${overCol === col ? 'drag-over' : ''}`}>
+            className={`shrink-0 w-[min(268px,82vw)] rounded-xl border border-[var(--color-line)] bg-[var(--color-bg2)]/60 flex flex-col max-h-[calc(100dvh-13rem-var(--tabbar-h,0px))] ${overCol === col ? 'drag-over' : ''}`}>
             <div className="flex items-center justify-between px-3 py-2.5 border-b border-[var(--color-line)] sticky top-0">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: c }} />

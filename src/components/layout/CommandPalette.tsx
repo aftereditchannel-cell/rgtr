@@ -55,9 +55,9 @@ export function CommandPalette() {
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center pt-[14vh] px-4"
-      style={{ background: 'rgba(4,5,8,.7)', backdropFilter: 'blur(4px)' }} onClick={() => setOpen(false)}>
-      <div className="anim w-full max-w-lg rounded-2xl border border-[var(--color-line2)] bg-[var(--color-bg2)] shadow-2xl overflow-hidden"
+    <div className="fixed inset-0 z-[60] flex items-start sm:items-center justify-center pt-[8vh] sm:pt-0 px-3 sm:px-4"
+      style={{ background: 'var(--scrim)', backdropFilter: 'blur(4px)' }} onClick={() => setOpen(false)}>
+      <div className="anim w-full max-w-lg max-h-[min(80dvh,640px)] rounded-2xl border border-[var(--color-line2)] bg-[var(--color-bg2)] shadow-2xl overflow-hidden flex flex-col"
         onClick={e => e.stopPropagation()}>
         <div className="flex items-center gap-2.5 px-4 py-3 border-b border-[var(--color-line)]">
           <Icon name="Search" size={16} className="text-[var(--color-dim2)]" />
@@ -71,7 +71,7 @@ export function CommandPalette() {
             className="flex-1 bg-transparent text-[14px] outline-none placeholder:text-[var(--color-dim2)]" />
           <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-white/[.06] text-[var(--color-dim2)]">ESC</kbd>
         </div>
-        <div className="max-h-[52vh] overflow-y-auto py-1.5">
+        <div className="scroll-y flex-1 min-h-0 py-1.5">
           {results.map((c, i) => (
             <button key={c.id} onClick={() => { c.run(); setOpen(false) }} onMouseEnter={() => setSel(i)}
               className={`w-full flex items-center gap-3 px-4 py-2 text-start transition-colors ${i === sel ? 'bg-white/[.06]' : ''}`}>

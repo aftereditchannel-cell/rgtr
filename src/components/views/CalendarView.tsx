@@ -53,8 +53,8 @@ export function CalendarView({ module, rows, onOpen }: {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-1.5">
+      <div className="flex items-center justify-between gap-2 mb-3 flex-wrap min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
           <Button size="sm" variant="ghost" icon="ChevronRight" onClick={() => move(-1)} className="flip-rtl" />
           <span className="text-[13px] font-medium min-w-[140px] text-center">{fmt.monthTitle(cur.year, cur.month)}</span>
           <Button size="sm" variant="ghost" icon="ChevronLeft" onClick={() => move(1)} className="flip-rtl" />

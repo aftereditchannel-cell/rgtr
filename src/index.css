@@ -188,7 +188,9 @@ body.is-mobile .glass-strong { backdrop-filter: blur(16px) saturate(150%); -webk
   --sar: env(safe-area-inset-right, 0px);
   /* ارتفاع نوار ناوبری پایین اندروید */
   --tabbar-h: 58px;
+  --toast-lift: 0px;
 }
+body.is-mobile { --toast-lift: calc(var(--tabbar-h) + 10px); }
 .pt-safe { padding-top: var(--sat); }
 .pb-safe { padding-bottom: var(--sab); }
 

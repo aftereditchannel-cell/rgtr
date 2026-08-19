@@ -84,8 +84,8 @@ function Shell() {
           <span className="text-[13px] font-semibold flex-1 truncate">NEXUS HQ</span>
         </div>
 
-        <main className="flex-1 scroll-y">
-          <div className="max-w-[1400px] mx-auto px-3 sm:px-5 lg:px-6 py-4 sm:py-6">
+        <main className="flex-1 scroll-y min-w-0">
+          <div className="max-w-[1400px] mx-auto px-3 sm:px-5 lg:px-6 py-4 sm:py-6 min-w-0">
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/decision" element={<DecisionCenter />} />
@@ -142,18 +142,28 @@ function Root() {
     const evts = ['pointerdown', 'keydown', 'wheel', 'touchstart'] as const
     for (const e of evts) window.addEventListener(e, mark, { passive: true })
 
-    const shouldLock = () => {
+    const idleLock = () => {
       const mins = readLock().autoLockMin
-      if (mins < 0) return false // «فقط هنگام باز شدن برنامه»
+      if (mins <= 0) return false
+      return Date.now() - lastActive.current >= mins * 60_000
+    }
+    const backgroundLock = () => {
+      const mins = readLock().autoLockMin
+      if (mins < 0) return false
       if (mins === 0) return true
       return Date.now() - lastActive.current >= mins * 60_000
     }
-    const tick = setInterval(() => { if (shouldLock()) setLocked(true) }, 20_000)
+    const tick = setInterval(() => { if (idleLock()) setLocked(true) }, 20_000)
 
     // رفتن به پس‌زمینه (تعویض برنامه در اندروید / کوچک کردن پنجره)
-    const onHide = () => { if (document.visibilityState === 'hidden') lastActive.current = Date.now() }
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') {
+        lastActive.current = Date.now()
+        if (backgroundLock()) setLocked(true)
+      }
+    }
     document.addEventListener('visibilitychange', onHide)
-    const offResume = onMobileResume(() => { if (shouldLock()) setLocked(true) })
+    const offResume = onMobileResume(() => { if (backgroundLock()) setLocked(true) })
 
     return () => {
       for (const e of evts) window.removeEventListener(e, mark)

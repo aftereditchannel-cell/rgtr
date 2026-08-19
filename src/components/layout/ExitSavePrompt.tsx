@@ -111,7 +111,7 @@ export function ExitSavePrompt() {
           </div>
         </div>
 
-        <div className="px-5 py-3.5 flex items-center justify-end gap-2">
+        <div className="px-5 py-3.5 flex flex-wrap items-center justify-end gap-2">
           {phase === 'saving' ? (
             <span className="text-[12.5px] text-[var(--color-dim)] flex items-center gap-2">
               <Icon name="Loader" size={14} className="animate-spin" />

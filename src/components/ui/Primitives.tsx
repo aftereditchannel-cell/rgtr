@@ -13,7 +13,7 @@ export function Icon({ name, size = 16, className = '', style }: { name: string;
 export function Card({ children, className = '', pad = true, style, id }: { children: ReactNode; className?: string; pad?: boolean; style?: CSSProperties; id?: string }) {
   return (
     <div style={style} id={id}
-      className={`rounded-xl border border-[var(--color-line)] bg-[var(--color-panel)] ${pad ? 'p-4' : ''} ${className}`}>
+      className={`rounded-xl border border-[var(--color-line)] bg-[var(--color-panel)] min-w-0 ${pad ? 'p-4' : ''} ${className}`}>
       {children}
     </div>
   )
@@ -21,12 +21,12 @@ export function Card({ children, className = '', pad = true, style, id }: { chil
 
 export function SectionTitle({ children, right, icon }: { children: ReactNode; right?: ReactNode; icon?: string }) {
   return (
-    <div className="flex items-center justify-between mb-3">
-      <div className="flex items-center gap-2">
-        {icon && <Icon name={icon} size={15} className="text-[var(--color-dim2)]" />}
-        <h2 className="text-[12px] font-semibold tracking-[.14em] uppercase text-[var(--color-dim)]">{children}</h2>
+    <div className="flex items-center justify-between gap-2 mb-3 min-w-0">
+      <div className="flex items-center gap-2 min-w-0">
+        {icon && <Icon name={icon} size={15} className="text-[var(--color-dim2)] shrink-0" />}
+        <h2 className="text-[12px] font-semibold tracking-[.14em] uppercase text-[var(--color-dim)] truncate">{children}</h2>
       </div>
-      {right}
+      {right && <div className="shrink-0">{right}</div>}
     </div>
   )
 }
@@ -124,19 +124,28 @@ export function Modal({ open, onClose, title, children, wide = false, footer }: 
 }) {
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:p-8"
-      style={{ background: 'rgba(4,5,8,.72)', backdropFilter: 'blur(4px)' }}
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      style={{ background: 'var(--scrim)', backdropFilter: 'blur(4px)' }}
       onClick={onClose}>
-      <div className={`anim w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} rounded-2xl border border-[var(--color-line2)] bg-[var(--color-bg2)] shadow-2xl my-auto`}
+      <div role="dialog" aria-modal="true"
+        className={`anim-sheet w-full ${wide ? 'sm:max-w-3xl' : 'sm:max-w-lg'} max-h-[100dvh] sm:max-h-[calc(100dvh-2rem)]
+          rounded-t-2xl sm:rounded-2xl border border-[var(--color-line2)] bg-[var(--color-bg2)] shadow-2xl
+          flex flex-col min-h-0 overflow-hidden`}
         onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--color-line)]">
-          <h3 className="text-[14px] font-semibold">{title}</h3>
-          <button onClick={onClose} className="text-[var(--color-dim2)] hover:text-[var(--color-tx)] transition-colors p-1 rounded-md hover:bg-white/5">
+        <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3.5 border-b border-[var(--color-line)] shrink-0 min-w-0">
+          <h3 className="text-[14px] font-semibold truncate min-w-0">{title}</h3>
+          <button type="button" aria-label="close" onClick={onClose}
+            className="text-[var(--color-dim2)] hover:text-[var(--color-tx)] transition-colors p-1 rounded-md hover:bg-[var(--hover)] shrink-0">
             <Icon name="X" size={17} />
           </button>
         </div>
-        <div className="px-5 py-4">{children}</div>
-        {footer && <div className="px-5 py-3.5 border-t border-[var(--color-line)] flex justify-end gap-2">{footer}</div>}
+        <div className="px-4 sm:px-5 py-4 scroll-y flex-1 min-h-0">{children}</div>
+        {footer && (
+          <div className="px-4 sm:px-5 py-3.5 border-t border-[var(--color-line)] flex flex-wrap justify-end gap-2 shrink-0"
+            style={{ paddingBottom: 'calc(0.875rem + var(--sab))' }}>
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   )

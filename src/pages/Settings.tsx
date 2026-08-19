@@ -14,6 +14,10 @@ import { isMobile, mobilePlatform, mobileDataPath } from '../lib/mobile'
 import type { AppInfo } from '../lib/desktop'
 import * as cloud from '../lib/cloud'
 import type { Lang } from '../store/types'
+import {
+  isLockEnabled, readLock, setPasscode, clearLock, updateLock, requestLock, normalizePin,
+} from '../lib/lock'
+import type { ThemePref } from '../lib/theme'
 
 const ACCENTS = ['#6366f1', '#8b5cf6', '#06b6d4', '#22c55e', '#f59e0b', '#ef4444', '#ec4899', '#f97316']
 const FIELD_TYPES: FieldType[] = ['text', 'textarea', 'number', 'money', 'date', 'select', 'ref', 'url', 'progress', 'checklist', 'tags']
@@ -55,7 +59,7 @@ export function Settings() {
   const missingCore = CORE_MODULES.filter(c => !data.modules.some(m => m.key === c.key)).length
 
   return (
-    <div className="anim space-y-5 max-w-4xl">
+    <div className="anim space-y-5 max-w-4xl min-w-0 w-full overflow-x-hidden">
       <div>
         <h1 className="text-[21px] font-semibold tracking-tight">{t('set.title')}</h1>
         <p className="text-[12px] text-[var(--color-dim2)] mt-1">
@@ -97,7 +101,7 @@ export function Settings() {
       {/* ---------- language / display ---------- */}
       <Card>
         <SectionTitle icon="Languages">{t('set.appearance')}</SectionTitle>
-        <div className="grid sm:grid-cols-3 gap-4">
+        <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
           <Field label={t('set.language')} help={t('set.languageHint')}>
             <Toggle
               value={s.lang}
@@ -120,7 +124,22 @@ export function Settings() {
             />
           </Field>
         </div>
+        <div className="mt-4">
+          <Field label={t('set.theme')} help={t('set.themeHint')}>
+            <Toggle
+              value={s.theme || 'dark'}
+              options={[
+                { v: 'auto', l: t('set.themeAuto') },
+                { v: 'dark', l: t('set.themeDark') },
+                { v: 'light', l: t('set.themeLight') },
+              ]}
+              onChange={v => setSettings({ theme: v as ThemePref })}
+            />
+          </Field>
+        </div>
       </Card>
+
+      <LockCard />
 
       {/* ---------- cloud ---------- */}
       <CloudCard />
@@ -144,9 +163,9 @@ export function Settings() {
             <div className="text-[11px] text-[var(--color-dim2)] mb-2">{t('set.snapshots')}</div>
             <div className="space-y-1.5">
               {snaps.map(sn => (
-                <div key={sn.id} className="flex items-center gap-3 text-[12px] px-3 py-2 rounded-lg border border-[var(--color-line)]">
-                  <Icon name="History" size={13} className="text-[var(--color-dim2)]" />
-                  <span className="flex-1">{fmt.relTime(sn.at)}</span>
+                <div key={sn.id} className="flex items-center gap-2 sm:gap-3 text-[12px] px-3 py-2 rounded-lg border border-[var(--color-line)] min-w-0">
+                  <Icon name="History" size={13} className="text-[var(--color-dim2)] shrink-0" />
+                  <span className="flex-1 min-w-0 truncate">{fmt.relTime(sn.at)}</span>
                   <span className="text-[10.5px] text-[var(--color-dim2)] nums">{fmt.dg(Math.round(sn.size / 1024))} KB</span>
                   <Button size="sm" variant="ghost" onClick={() => sn.id && restore(Number(sn.id))}>{t('common.restore')}</Button>
                 </div>
@@ -166,8 +185,8 @@ export function Settings() {
         </SectionTitle>
         <p className="text-[12px] text-[var(--color-dim)] mb-3 leading-relaxed">{t('set.modulesNote')}</p>
 
-        <div className="flex gap-2 mb-4">
-          <TextInput value={newMod} placeholder={t('set.newModuleName')} className="py-1.5 text-[12.5px]"
+        <div className="flex gap-2 mb-4 min-w-0">
+          <TextInput value={newMod} placeholder={t('set.newModuleName')} className="py-1.5 text-[12.5px] min-w-0 flex-1"
             onChange={e => setNewMod(e.target.value)}
             onKeyDown={e => {
               if (e.key === 'Enter' && newMod.trim()) { addModule(makeCustomModule(newMod.trim())); setNewMod(''); setToast(t('set.moduleCreated')) }
@@ -182,17 +201,19 @@ export function Settings() {
           {data.modules.map(m => {
             const n = (data.records[m.key] ?? []).length
             return (
-              <div key={m.key} className="flex items-center gap-3 px-3 py-2 rounded-lg border border-[var(--color-line)] hover:border-[var(--color-line2)] transition-colors">
+              <div key={m.key} className="flex items-center gap-2 sm:gap-3 px-3 py-2 rounded-lg border border-[var(--color-line)] hover:border-[var(--color-line2)] transition-colors min-w-0">
                 <Icon name={m.icon} size={14} className="text-[var(--color-dim2)] shrink-0" />
-                <span className="text-[12.5px] flex-1 truncate">{ml(m)}</span>
-                <span className="text-[10px] text-[var(--color-dim2)] hidden sm:block">{g(m.group)}</span>
-                <span className="text-[10.5px] text-[var(--color-dim2)] nums w-8 text-end">{fmt.dg(n)}</span>
+                <span className="text-[12.5px] flex-1 truncate min-w-0">{ml(m)}</span>
+                <span className="text-[10px] text-[var(--color-dim2)] hidden sm:block shrink-0">{g(m.group)}</span>
+                <span className="text-[10.5px] text-[var(--color-dim2)] nums w-8 text-end shrink-0">{fmt.dg(n)}</span>
                 {m.custom && <Badge value="custom" />}
-                <Button size="sm" variant="ghost" icon="Settings2" title={t('common.edit')} onClick={() => setEditMod(m)} />
-                <Button size="sm" variant="ghost" icon="Trash2" title={t('common.delete')}
-                  onClick={() => {
-                    if (confirm(t('set.confirmDelMod', { m: ml(m), n: fmt.dg(n) }))) { removeModule(m.key); setToast(t('set.moduleDeleted')) }
-                  }} />
+                <div className="flex items-center shrink-0">
+                  <Button size="sm" variant="ghost" icon="Settings2" title={t('common.edit')} onClick={() => setEditMod(m)} />
+                  <Button size="sm" variant="ghost" icon="Trash2" title={t('common.delete')}
+                    onClick={() => {
+                      if (confirm(t('set.confirmDelMod', { m: ml(m), n: fmt.dg(n) }))) { removeModule(m.key); setToast(t('set.moduleDeleted')) }
+                    }} />
+                </div>
               </div>
             )
           })}
@@ -206,7 +227,7 @@ export function Settings() {
             }}>
             {t('set.restoreDefaults')}
           </Button>
-          <span className="text-[10.5px] text-[var(--color-dim2)] flex-1 min-w-[180px]">
+          <span className="text-[10.5px] text-[var(--color-dim2)] flex-1 min-w-0">
             {t('set.restoreDefHint')}{missingCore > 0 ? ` (${fmt.dg(missingCore)})` : ''}
           </span>
         </div>
@@ -259,16 +280,132 @@ export function Settings() {
 /* ---------- سوییچ چندگزینه‌ای ---------- */
 function Toggle({ value, options, onChange }: { value: string; options: { v: string; l: string }[]; onChange: (v: string) => void }) {
   return (
-    <div className="inline-flex rounded-lg border border-[var(--color-line2)] p-0.5 bg-[var(--color-bg)] w-full">
+    <div className="flex flex-wrap rounded-lg border border-[var(--color-line2)] p-0.5 bg-[var(--color-bg)] w-full gap-0.5">
       {options.map(o => (
-        <button key={o.v} onClick={() => onChange(o.v)}
-          className={`flex-1 px-2.5 py-1.5 rounded-[7px] text-[12px] transition-all ${
+        <button key={o.v} type="button" onClick={() => onChange(o.v)}
+          className={`flex-1 min-w-[4.75rem] px-2 py-1.5 rounded-[7px] text-[12px] transition-all whitespace-nowrap ${
             value === o.v ? 'bg-[var(--color-acc)] text-white font-medium' : 'text-[var(--color-dim)] hover:text-[var(--color-tx)]'
           }`}>
           {o.l}
         </button>
       ))}
     </div>
+  )
+}
+
+const AUTO_LOCK = [-1, 0, 1, 5, 15, 30] as const
+
+function LockCard() {
+  const { t } = useT()
+  const fmt = useFmt()
+  const { setToast } = useApp()
+  const [on, setOn] = useState(() => isLockEnabled())
+  const [auto, setAuto] = useState(() => readLock().autoLockMin)
+  const [open, setOpen] = useState(false)
+  const [pin, setPin] = useState('')
+  const [pin2, setPin2] = useState('')
+  const [hint, setHint] = useState('')
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const refresh = () => {
+    setOn(isLockEnabled())
+    setAuto(readLock().autoLockMin)
+  }
+
+  const save = async () => {
+    const a = normalizePin(pin)
+    const b = normalizePin(pin2)
+    if (a.length < 4) { setErr(t('set.lockTooShort')); return }
+    if (a !== b) { setErr(t('set.lockMismatch')); return }
+    setBusy(true)
+    try {
+      await setPasscode(a, hint)
+      setOpen(false)
+      setPin(''); setPin2(''); setHint(''); setErr('')
+      refresh()
+      setToast(t('set.lockSaved'))
+    } finally { setBusy(false) }
+  }
+
+  const remove = () => {
+    if (!confirm(t('set.lockConfirmRemove'))) return
+    clearLock()
+    refresh()
+    setToast(t('set.lockRemoved'))
+  }
+
+  const setAutoMin = (n: number) => {
+    updateLock({ autoLockMin: n })
+    setAuto(n)
+  }
+
+  const autoLabel = (n: number) => {
+    if (n < 0) return t('set.lockAutoOpen')
+    if (n === 0) return t('set.lockAutoNow')
+    return t('set.lockAutoMin', { n: fmt.dg(n) })
+  }
+
+  return (
+    <Card>
+      <SectionTitle icon="Shield"
+        right={<span className={`text-[10.5px] ${on ? 'text-emerald-400' : 'text-[var(--color-dim2)]'}`}>
+          {on ? t('set.lockOn') : t('set.lockOff')}
+        </span>}>
+        {t('set.security')}
+      </SectionTitle>
+      <p className="text-[12px] text-[var(--color-dim)] leading-relaxed mb-3">{t('set.securityNote')}</p>
+
+      <div className="flex gap-2 flex-wrap">
+        <Button size="sm" variant={on ? 'outline' : 'primary'} icon="Lock"
+          onClick={() => { setErr(''); setOpen(true) }}>
+          {on ? t('set.lockChange') : t('set.lockPin')}
+        </Button>
+        <Button size="sm" variant="outline" icon="Lock" disabled={!on} onClick={() => requestLock()}>
+          {t('set.lockNow')}
+        </Button>
+        {on && (
+          <Button size="sm" variant="ghost" icon="Trash2" onClick={remove}>
+            {t('set.lockRemove')}
+          </Button>
+        )}
+      </div>
+
+      <div className={`mt-4 ${on ? '' : 'opacity-50 pointer-events-none'}`}>
+        <Field label={t('set.lockAuto')}>
+          <Toggle
+            value={String(auto)}
+            options={AUTO_LOCK.map(n => ({ v: String(n), l: autoLabel(n) }))}
+            onChange={v => setAutoMin(Number(v))}
+          />
+        </Field>
+      </div>
+
+      {open && (
+        <Modal open onClose={() => setOpen(false)} title={on ? t('set.lockChange') : t('set.lockPin')}
+          footer={<>
+            <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>{t('common.cancel')}</Button>
+            <Button variant="primary" size="sm" icon="Check" disabled={busy} onClick={() => void save()}>
+              {t('set.lockSave')}
+            </Button>
+          </>}>
+          <div className="space-y-3">
+            <Field label={t('set.lockNew')} help={t('set.lockPinHint')}>
+              <TextInput type="password" inputMode="numeric" autoComplete="new-password" maxLength={8}
+                value={pin} className="ltr nums" onChange={e => setPin(e.target.value)} />
+            </Field>
+            <Field label={t('set.lockConfirm')}>
+              <TextInput type="password" inputMode="numeric" autoComplete="new-password" maxLength={8}
+                value={pin2} className="ltr nums" onChange={e => setPin2(e.target.value)} />
+            </Field>
+            <Field label={t('set.lockHint')}>
+              <TextInput value={hint} onChange={e => setHint(e.target.value)} placeholder={t('common.optional')} />
+            </Field>
+            {err && <p className="text-[12px] text-red-400">{err}</p>}
+          </div>
+        </Modal>
+      )}
+    </Card>
   )
 }
 
@@ -512,11 +649,13 @@ function CloudCard() {
         <Row label={t('set.cloudSize')} value={`${fmt.dg((size / 1024).toFixed(1))} KB`} />
       </div>
 
-      <label className="mt-3 flex items-center gap-2 cursor-pointer">
-        <input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={c.askOnExit}
+      <label className="mt-3 flex items-start gap-2 cursor-pointer min-w-0">
+        <input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5 mt-0.5 shrink-0" checked={c.askOnExit}
           onChange={e => setSettings({ cloud: { ...c, askOnExit: e.target.checked } })} />
-        <span className="text-[12px]">{t('set.cloudAuto')}</span>
-        <span className="text-[10.5px] text-[var(--color-dim2)]">— {t('set.cloudAutoHint')}</span>
+        <span className="min-w-0">
+          <span className="block text-[12px]">{t('set.cloudAuto')}</span>
+          <span className="block text-[10.5px] text-[var(--color-dim2)]">{t('set.cloudAutoHint')}</span>
+        </span>
       </label>
 
       <p className="text-[10.5px] text-[var(--color-dim2)] mt-3 leading-relaxed">
@@ -565,18 +704,18 @@ function ModuleEditor({ module, onClose, onSave }: { module: ModuleDef; onClose:
       <div className="text-[11px] font-medium text-[var(--color-dim)] mb-2">
         {t('set.fields')} (<span className="nums">{fmt.dg(fields.length)}</span>)
       </div>
-      <div className="space-y-1.5 max-h-[38vh] overflow-y-auto pe-1">
+      <div className="space-y-1.5">
         {fields.map((f, i) => (
-          <div key={i} className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-[var(--color-line)]">
-            <TextInput value={f.label} className="py-1 text-[12px] flex-1 ltr" onChange={e => upd(i, { label: e.target.value })} />
-            <TextInput value={f.labelFa ?? ''} placeholder={fl(f)} className="py-1 text-[12px] flex-1"
+          <div key={i} className="flex flex-col sm:flex-row sm:items-center gap-2 px-2 py-1.5 rounded-lg border border-[var(--color-line)] min-w-0">
+            <TextInput value={f.label} className="py-1 text-[12px] flex-1 min-w-0 ltr" onChange={e => upd(i, { label: e.target.value })} />
+            <TextInput value={f.labelFa ?? ''} placeholder={fl(f)} className="py-1 text-[12px] flex-1 min-w-0"
               onChange={e => upd(i, { labelFa: e.target.value || undefined })} />
             <select value={f.type} onChange={e => upd(i, { type: e.target.value as FieldType })}
-              className="rounded-lg bg-[var(--color-bg)] border border-[var(--color-line2)] px-2 py-1 text-[11.5px] cursor-pointer ltr">
+              className="rounded-lg bg-[var(--color-bg)] border border-[var(--color-line2)] px-2 py-1 text-[11.5px] cursor-pointer ltr shrink-0">
               {FIELD_TYPES.map(ty => <option key={ty} value={ty}>{ty}</option>)}
             </select>
             {f.type === 'select' && (
-              <TextInput value={(f.options ?? []).join(',')} placeholder="options,csv" className="py-1 text-[11px] w-32 ltr"
+              <TextInput value={(f.options ?? []).join(',')} placeholder="options,csv" className="py-1 text-[11px] w-full sm:w-32 min-w-0 ltr"
                 onChange={e => upd(i, { options: e.target.value.split(',').map(x => x.trim()).filter(Boolean) })} />
             )}
             <button onClick={() => upd(i, { col: !f.col })} title={t('set.showInTable')}

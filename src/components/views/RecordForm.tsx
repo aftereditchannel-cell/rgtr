@@ -111,7 +111,7 @@ export function RecordForm({ module, row, open, onClose }: Props) {
           <Button variant="primary" size="sm" icon="Check" onClick={save}>{t('common.save')}</Button>
         </>
       }>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3.5 max-h-[62vh] overflow-y-auto pe-1">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3.5">
         {module.fields.map(f => (
           <div key={f.key} className={isWide(f) ? 'sm:col-span-2' : ''}>
             <Field label={fl(f)} help={lang === 'fa' ? f.help : (f.helpEn ?? f.help)}>{renderField(f)}</Field>
