@@ -18,6 +18,27 @@ export interface CloudSettings {
   lastSync: string
   /** هنگام خروج از برنامه بپرسد */
   askOnExit: boolean
+  /** ذخیره‌ی خودکار روی ابر بعد از هر تغییر (debounced) */
+  autoSync: boolean
+  /** دریافت خودکار از ابر هنگام باز شدن/بازگشت برنامه */
+  autoPull: boolean
+}
+
+/** تنظیمات هوش مصنوعی — کلید API جدا (در localStorage) ذخیره می‌شود */
+export interface AiSettings {
+  provider: 'openai'
+  /** آدرس پایه‌ی API (OpenAI یا سازگار با آن، مثل Groq/LocalAI) */
+  baseUrl: string
+  /** نام مدل پیش‌فرض */
+  model: string
+}
+
+/** تنظیمات تشخیص خودکار داده‌ی شبکه‌های اجتماعی */
+export interface SocialSettings {
+  /** آدرس واسط (proxy) اختیاری برای خواندن پروفایل‌های عمومی — بدون آن تلاش مستقیم می‌شود */
+  proxyUrl: string
+  /** آیا هنگام باز شدن صفحه‌ی ماژول، فالوورها خودکار تازه شوند */
+  autoRefresh: boolean
 }
 
 export interface Settings {
@@ -27,7 +48,9 @@ export interface Settings {
   accent: string
   focusCount: number
   weights: Weights
-  theme: 'dark' | 'light'
+  theme: 'dark' | 'light' | 'auto'
+  /** پوسته‌ی شیشه‌ای (شفافیت بیشتر سطوح) */
+  glass: boolean
   /** زبان رابط کاربری — پیش‌فرض فارسی */
   lang: Lang
   /** تقویم نمایشی: شمسی یا میلادی (ذخیره‌سازی همیشه میلادی است) */
@@ -36,6 +59,8 @@ export interface Settings {
   digits: 'fa' | 'latn'
   /** بررسی و دانلود خودکار بروزرسانی (پیش‌فرض روشن) */
   autoUpdate?: boolean
+  ai: AiSettings
+  social: SocialSettings
   cloud: CloudSettings
 }
 

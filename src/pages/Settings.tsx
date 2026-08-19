@@ -5,7 +5,8 @@ import { listSnapshots, getSnapshot, storageBackend, saveDoc } from '../lib/db'
 import type { Snapshot } from '../store/types'
 import { makeCustomModule, CORE_MODULES } from '../domain/schema'
 import type { ModuleDef, FieldDef, FieldType } from '../domain/schema'
-import { Card, SectionTitle, Button, Field, TextInput, Select, Icon, Modal, Badge, Empty } from '../components/ui/Primitives'
+import { Card, SectionTitle, Button, Field, TextInput, Icon, Modal, Badge, Empty } from '../components/ui/Primitives'
+import { Dropdown } from '../components/ui/Dropdown'
 import { ICON_NAMES } from '../components/ui/icons'
 import { useT, cloudError } from '../i18n'
 import { useFmt } from '../lib/useFmt'
@@ -15,6 +16,11 @@ import type { AppInfo } from '../lib/desktop'
 import { checkForUpdates, cmpVersion, fmtMB, fmtDate, APP_VERSION } from '../lib/updater'
 import type { UpdateRelease, UpdateCheckResult, DownloadProgress } from '../lib/desktop'
 import * as cloud from '../lib/cloud'
+import {
+  readLock, setPasscode, disableLock, setHint, setAutoLockMin, setBiometric,
+  biometricAvailable, cryptoAvailable,
+} from '../lib/lock'
+import { getAiKey, setAiKey as storeAiKey, chat as aiChat, AiError } from '../lib/ai'
 import type { Lang } from '../store/types'
 
 const ACCENTS = ['#6366f1', '#8b5cf6', '#06b6d4', '#22c55e', '#f59e0b', '#ef4444', '#ec4899', '#f97316']
@@ -29,6 +35,7 @@ export function Settings() {
   const [snaps, setSnaps] = useState<Snapshot[]>([])
   const [newMod, setNewMod] = useState('')
   const [editMod, setEditMod] = useState<ModuleDef | null>(null)
+  const [showTpl, setShowTpl] = useState(false)
 
   useEffect(() => { void listSnapshots().then(setSnaps) }, [data])
 
@@ -78,10 +85,12 @@ export function Settings() {
             <TextInput value={s.orgName} onChange={e => setSettings({ orgName: e.target.value })} />
           </Field>
           <Field label={t('set.currency')}>
-            <Select options={['$', '€', '£', '﷼', 'T']} value={s.currency} onChange={e => setSettings({ currency: e.target.value })} />
+            <Dropdown value={s.currency} onChange={v => setSettings({ currency: v })}
+              options={['$', '€', '£', '﷼', 'T'].map(o => ({ value: o, label: o }))} />
           </Field>
           <Field label={t('set.focusCount')} help={t('set.focusCountHint')}>
-            <Select options={['1', '2', '3', '4', '5']} value={String(s.focusCount)} onChange={e => setSettings({ focusCount: Number(e.target.value) })} />
+            <Dropdown value={String(s.focusCount)} onChange={v => setSettings({ focusCount: Number(v) })}
+              options={['1', '2', '3', '4', '5'].map(o => ({ value: o, label: o }))} />
           </Field>
         </div>
         <div className="mt-4">
@@ -122,7 +131,38 @@ export function Settings() {
             />
           </Field>
         </div>
+
+        {/* پوسته: تیره / روشن / سیستم + افکت شیشه‌ای */}
+        <div className="mt-4 pt-4 border-t border-[var(--color-line)] grid sm:grid-cols-2 gap-4">
+          <Field label={t('set.theme')} help={t('set.themeHint')}>
+            <Toggle
+              value={s.theme ?? 'dark'}
+              options={[
+                { v: 'dark', l: t('set.themeDark') },
+                { v: 'light', l: t('set.themeLight') },
+                { v: 'auto', l: t('set.themeSystem') },
+              ]}
+              onChange={v => setSettings({ theme: v as 'dark' | 'light' | 'auto' })}
+            />
+          </Field>
+          <Field label={t('set.glass')} help={t('set.glassHint')}>
+            <Toggle
+              value={s.glass ? 'on' : 'off'}
+              options={[{ v: 'on', l: t('common.yes') }, { v: 'off', l: t('common.no') }]}
+              onChange={v => setSettings({ glass: v === 'on' })}
+            />
+          </Field>
+        </div>
       </Card>
+
+      {/* ---------- security ---------- */}
+      <SecurityCard />
+
+      {/* ---------- ai ---------- */}
+      <AiCard />
+
+      {/* ---------- social ---------- */}
+      <SocialCard />
 
       {/* ---------- cloud ---------- */}
       <CloudCard />
@@ -169,8 +209,8 @@ export function Settings() {
         </SectionTitle>
         <p className="text-[12px] text-[var(--color-dim)] mb-3 leading-relaxed">{t('set.modulesNote')}</p>
 
-        <div className="flex gap-2 mb-4">
-          <TextInput value={newMod} placeholder={t('set.newModuleName')} className="py-1.5 text-[12.5px]"
+        <div className="flex gap-2 mb-4 flex-wrap">
+          <TextInput value={newMod} placeholder={t('set.newModuleName')} className="py-1.5 text-[12.5px] flex-1 min-w-[180px]"
             onChange={e => setNewMod(e.target.value)}
             onKeyDown={e => {
               if (e.key === 'Enter' && newMod.trim()) { addModule(makeCustomModule(newMod.trim())); setNewMod(''); setToast(t('set.moduleCreated')) }
@@ -178,6 +218,9 @@ export function Settings() {
           <Button size="sm" variant="primary" icon="Plus" disabled={!newMod.trim()}
             onClick={() => { addModule(makeCustomModule(newMod.trim())); setNewMod(''); setToast(t('set.moduleCreated')) }}>
             {t('common.add')}
+          </Button>
+          <Button size="sm" variant="outline" icon="LayoutGrid" onClick={() => setShowTpl(true)}>
+            {t('set.fromTemplate')}
           </Button>
         </div>
 
@@ -255,6 +298,8 @@ export function Settings() {
       </Card>
 
       {editMod && <ModuleEditor module={editMod} onClose={() => setEditMod(null)} onSave={p => { updateModule(editMod.key, p); setEditMod(null) }} />}
+      {showTpl && <NewModuleModal open={showTpl} onClose={() => setShowTpl(false)}
+        onCreate={m => { addModule(m); setShowTpl(false); setToast(t('set.moduleCreated')) }} />}
     </div>
   )
 }
@@ -758,10 +803,369 @@ function CloudCard() {
         <span className="text-[10.5px] text-[var(--color-dim2)]">— {t('set.cloudAutoHint')}</span>
       </label>
 
+      <label className="mt-2.5 flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={c.autoSync}
+          onChange={e => setSettings({ cloud: { ...c, autoSync: e.target.checked } })} />
+        <span className="text-[12px]">{t('set.cloudAutoSync')}</span>
+        <span className="text-[10.5px] text-[var(--color-dim2)]">— {t('set.cloudAutoSyncHint')}</span>
+      </label>
+
+      <label className="mt-2.5 flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={c.autoPull}
+          onChange={e => setSettings({ cloud: { ...c, autoPull: e.target.checked } })} />
+        <span className="text-[12px]">{t('set.cloudAutoPull')}</span>
+        <span className="text-[10.5px] text-[var(--color-dim2)]">— {t('set.cloudAutoPullHint')}</span>
+      </label>
+
       <p className="text-[10.5px] text-[var(--color-dim2)] mt-3 leading-relaxed">
         {t('set.cloudPrivacy')} {t('set.cloudLimits')}
       </p>
     </Card>
+  )
+}
+
+/* ---------- کارت قفل و امنیت ---------- */
+function SecurityCard() {
+  const { t, lang } = useT()
+  const { setToast } = useApp()
+  const [cfg, setCfg] = useState(readLock())
+  const [edit, setEdit] = useState(false)
+  const [code, setCode] = useState('')
+  const [confirmCode, setConfirmCode] = useState('')
+  const [hint, setHintInput] = useState(cfg.hint)
+  const [autoMin, setAutoMin] = useState(cfg.autoLockMin)
+  const [bio, setBio] = useState(cfg.biometric)
+  const [bioAvail, setBioAvail] = useState(false)
+
+  const refresh = () => setCfg(readLock())
+
+  useEffect(() => {
+    if (!isMobile) return
+    void biometricAvailable().then(setBioAvail)
+  }, [])
+
+  const save = async () => {
+    const clean = code.replace(/[^\d]/g, '')
+    if (clean.length < 4) { alert(t('set.passcodeShort')); return }
+    if (clean !== confirmCode.replace(/[^\d]/g, '')) { alert(t('set.passcodeMismatch')); return }
+    try {
+      await setPasscode(clean)
+      setHint(hint.trim())
+      setAutoLockMin(autoMin)
+      setBiometric(bio && bioAvail)
+      refresh(); setEdit(false); setCode(''); setConfirmCode('')
+      setToast(t('set.passcodeSet'))
+    } catch (e) {
+      alert(t('common.error') + ': ' + (e as Error).message)
+    }
+  }
+
+  const remove = () => {
+    if (!confirm(t('set.forgotWarn'))) return
+    disableLock(); refresh(); setToast(t('set.passcodeRemoved'))
+  }
+
+  const autoOpts = [
+    { v: '0', l: t('set.autoLock0') },
+    { v: '1', l: t('set.autoLock1') },
+    { v: '5', l: t('set.autoLock5') },
+    { v: '30', l: t('set.autoLock30') },
+    { v: '-1', l: t('set.autoLockOpen') },
+  ]
+
+  return (
+    <Card id="security">
+      <SectionTitle icon="Shield"
+        right={cfg.enabled && <span className="text-[10.5px] text-emerald-400">{t('set.cloudOn')}</span>}>
+        {t('set.security')}
+      </SectionTitle>
+      <p className="text-[12px] text-[var(--color-dim)] leading-relaxed mb-3">{t('set.securityNote')}</p>
+
+      {!cfg.enabled ? (
+        <Button variant="primary" size="sm" icon="KeyRound" onClick={() => setEdit(true)} disabled={!cryptoAvailable()}>
+          {t('set.setPasscode')}
+        </Button>
+      ) : (
+        <>
+          <div className="flex gap-2 flex-wrap mb-3">
+            <Button variant="outline" size="sm" icon="Pencil" onClick={() => { setHintInput(cfg.hint); setAutoMin(cfg.autoLockMin); setBio(cfg.biometric); setEdit(true) }}>
+              {t('set.changePasscode')}
+            </Button>
+            <Button variant="ghost" size="sm" icon="Trash2" onClick={remove}>{t('set.removePasscode')}</Button>
+            <Button variant="outline" size="sm" icon="Key" onClick={() => window.dispatchEvent(new Event('nexus:lock'))}>
+              {t('set.lockNow')}
+            </Button>
+          </div>
+          <div className="space-y-3">
+            {!!cfg.hint && <Row label={t('set.hint')} value={cfg.hint} />}
+            <div className="flex items-center gap-2">
+              <span className="text-[11.5px] text-[var(--color-dim)]">{t('set.autoLock')}:</span>
+              <Dropdown className="w-44" value={String(cfg.autoLockMin)}
+                onChange={nv => { setAutoLockMin(Number(nv)); refresh() }}
+                options={autoOpts.map(o => ({ value: o.v, label: o.l }))} />
+            </div>
+            {isMobile && bioAvail && (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={cfg.biometric}
+                  onChange={e => { setBiometric(e.target.checked); refresh(); if (e.target.checked) setToast(t('set.biometricOn')) }} />
+                <span className="text-[12px]">{t('set.biometric')}</span>
+                <span className="text-[10.5px] text-[var(--color-dim2)]">— {t('set.biometricHint')}</span>
+              </label>
+            )}
+          </div>
+        </>
+      )}
+
+      {!cryptoAvailable() && (
+        <p className="text-[11px] text-amber-400/90 mt-2">
+          {lang === 'fa' ? 'قفل در این محیط در دسترس نیست (نیاز به https یا نسخه‌ی ویندوز/اندروید دارد).' : 'Locking is unavailable here (needs https or the Windows/Android app).'}
+        </p>
+      )}
+
+      {edit && (
+        <Modal open onClose={() => setEdit(false)} title={cfg.enabled ? t('set.changePasscode') : t('set.setPasscode')}
+          footer={<>
+            <Button variant="ghost" size="sm" onClick={() => setEdit(false)}>{t('common.cancel')}</Button>
+            <Button variant="primary" size="sm" icon="Check" onClick={save}>{t('common.save')}</Button>
+          </>}>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <Field label={t('set.passcode')}>
+              <TextInput type="password" inputMode="numeric" value={code} className="ltr" onChange={e => setCode(e.target.value)} />
+            </Field>
+            <Field label={t('set.passcodeConfirm')}>
+              <TextInput type="password" inputMode="numeric" value={confirmCode} className="ltr" onChange={e => setConfirmCode(e.target.value)} />
+            </Field>
+          </div>
+          <div className="mt-3 space-y-3">
+            <Field label={t('set.hint')}>
+              <TextInput value={hint} placeholder={t('set.hintPh')} onChange={e => setHintInput(e.target.value)} />
+            </Field>
+            <Field label={t('set.autoLock')}>
+              <Dropdown value={String(autoMin)} onChange={nv => setAutoMin(Number(nv))}
+                options={autoOpts.map(o => ({ value: o.v, label: o.l }))} />
+            </Field>
+            {isMobile && bioAvail && (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={bio} onChange={e => setBio(e.target.checked)} />
+                <span className="text-[12px]">{t('set.biometric')}</span>
+              </label>
+            )}
+          </div>
+        </Modal>
+      )}
+    </Card>
+  )
+}
+
+/* ---------- کارت هوش مصنوعی ---------- */
+function AiCard() {
+  const { t } = useT()
+  const { data, setSettings, setToast } = useApp()
+  const ai = data.settings.ai
+  const [key, setKey] = useState(getAiKey())
+  const [showKey, setShowKey] = useState(false)
+  const [baseUrl, setBaseUrl] = useState(ai.baseUrl)
+  const [model, setModel] = useState(ai.model)
+  const [state, setState] = useState<'idle' | 'busy'>('idle')
+
+  const save = async () => {
+    if (!key.trim()) { alert(t('set.aiNeedKey')); return }
+    storeAiKey(key.trim())
+    setSettings({ ai: { ...ai, baseUrl: baseUrl.trim() || 'https://api.openai.com/v1', model: model.trim() || 'gpt-4o-mini' } })
+    setState('busy')
+    try {
+      await aiChat([{ role: 'user', content: 'Reply with exactly: OK' }], { baseUrl: baseUrl.trim(), model: model.trim() })
+      setToast(t('set.aiOk'))
+    } catch (e) {
+      alert(t('common.error') + ': ' + ((e as Error).message || (e as AiError).code))
+    } finally {
+      setState('idle')
+    }
+  }
+
+  return (
+    <Card id="ai">
+      <SectionTitle icon="Bot"
+        right={<span className={`text-[10.5px] ${getAiKey() ? 'text-emerald-400' : 'text-[var(--color-dim2)]'}`}>{getAiKey() ? t('set.cloudOn') : t('set.cloudOff')}</span>}>
+        {t('set.ai')}
+      </SectionTitle>
+      <p className="text-[12px] text-[var(--color-dim)] leading-relaxed mb-3">{t('set.aiNote')}</p>
+      <div className="grid sm:grid-cols-2 gap-4">
+        <Field label={t('set.aiKey')} help={t('set.aiKeyHint')}>
+          <div className="relative">
+            <TextInput type={showKey ? 'text' : 'password'} value={key} placeholder="sk-..." className="ltr pe-9"
+              onChange={e => setKey(e.target.value)} />
+            <button type="button" onClick={() => setShowKey(v => !v)}
+              className="absolute end-2 top-1/2 -translate-y-1/2 text-[var(--color-dim2)] hover:text-[var(--color-tx)]">
+              <Icon name={showKey ? 'EyeOff' : 'Eye'} size={14} />
+            </button>
+          </div>
+        </Field>
+        <Field label={t('set.aiModel')}>
+          <TextInput value={model} className="ltr" placeholder="gpt-4o-mini" onChange={e => setModel(e.target.value)} />
+        </Field>
+      </div>
+      <div className="mt-3">
+        <Field label={t('set.aiBaseUrl')} help={t('set.aiBaseUrlHint')}>
+          <TextInput value={baseUrl} className="ltr" onChange={e => setBaseUrl(e.target.value)} />
+        </Field>
+      </div>
+      <div className="mt-4">
+        <Button size="sm" variant="primary" icon={state === 'busy' ? 'Loader' : 'Check'} disabled={state === 'busy'} onClick={save}>
+          {t('set.aiSave')}
+        </Button>
+      </div>
+    </Card>
+  )
+}
+
+/* ---------- کارت شبکه‌های اجتماعی ---------- */
+function SocialCard() {
+  const { t } = useT()
+  const { data, setSettings } = useApp()
+  const social = data.settings.social
+  return (
+    <Card id="social">
+      <SectionTitle icon="Share2">{t('set.social')}</SectionTitle>
+      <p className="text-[12px] text-[var(--color-dim)] leading-relaxed mb-3">{t('set.socialNote')}</p>
+      <Field label={t('set.socialProxy')} help={t('set.socialProxyHint')}>
+        <TextInput value={social.proxyUrl} className="ltr" placeholder="https://your-worker.workers.dev"
+          onChange={e => setSettings({ social: { ...social, proxyUrl: e.target.value } })} />
+      </Field>
+      <label className="mt-3 flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={social.autoRefresh}
+          onChange={e => setSettings({ social: { ...social, autoRefresh: e.target.checked } })} />
+        <span className="text-[12px]">{t('set.socialAutoRefresh')}</span>
+      </label>
+    </Card>
+  )
+}
+
+/* ---------- ساخت دپارتمان از قالب ---------- */
+interface Tpl {
+  icon: string
+  key: string
+  fa: string
+  en: string
+  dFa: string
+  dEn: string
+  fields: FieldDef[]
+}
+
+const F = (key: string, label: string, type: FieldType, extra: Partial<FieldDef> = {}): FieldDef =>
+  ({ key, label, type, ...extra })
+
+const TEMPLATES: Tpl[] = [
+  {
+    icon: 'Radio', key: 'podcast', fa: 'پادکست', en: 'Podcast',
+    dFa: 'قسمت‌ها، مهمان‌ها و لینک پخش', dEn: 'Episodes, guests and play links',
+    fields: [
+      F('title', 'Title', 'text', { col: true }),
+      F('guest', 'Guest', 'text', { col: true }),
+      F('status', 'Status', 'select', { col: true, options: ['Idea', 'Recording', 'Editing', 'Published'] }),
+      F('publishDate', 'Publish Date', 'date', { col: true }),
+      F('duration', 'Duration (min)', 'number'),
+      F('link', 'Link', 'url'),
+      F('notes', 'Notes', 'textarea'),
+    ],
+  },
+  {
+    icon: 'GraduationCap', key: 'courses', fa: 'دوره آموزشی', en: 'Courses',
+    dFa: 'دوره‌ها، دانشجوها و قیمت', dEn: 'Courses, students and pricing',
+    fields: [
+      F('title', 'Course', 'text', { col: true }),
+      F('category', 'Category', 'select', { col: true, options: ['SEO', 'Music', 'Business', 'Marketing', 'Other'] }),
+      F('price', 'Price', 'money', { col: true }),
+      F('students', 'Students', 'number', { col: true }),
+      F('status', 'Status', 'select', { col: true, options: ['Draft', 'Live', 'Paused'] }),
+      F('startDate', 'Start Date', 'date', { col: true }),
+      F('link', 'Link', 'url'),
+      F('notes', 'Notes', 'textarea'),
+    ],
+  },
+  {
+    icon: 'ShoppingCart', key: 'inventory', fa: 'انبار / موجودی', en: 'Inventory',
+    dFa: 'کالاها، موجودی و قیمت', dEn: 'Items, stock and pricing',
+    fields: [
+      F('title', 'Item', 'text', { col: true }),
+      F('sku', 'SKU', 'text', { col: true }),
+      F('category', 'Category', 'select', { col: true, options: ['Merch', 'CD', 'Vinyl', 'Apparel', 'Other'] }),
+      F('quantity', 'Quantity', 'number', { col: true }),
+      F('price', 'Price', 'money', { col: true }),
+      F('status', 'Status', 'select', { col: true, options: ['In Stock', 'Low', 'Out', 'Archived'] }),
+      F('notes', 'Notes', 'textarea'),
+    ],
+  },
+  {
+    icon: 'Newspaper', key: 'blog', fa: 'مقالات / بلاگ', en: 'Blog',
+    dFa: 'مقاله‌ها و تقویم انتشار', dEn: 'Articles and publishing calendar',
+    fields: [
+      F('title', 'Title', 'text', { col: true }),
+      F('category', 'Category', 'select', { col: true, options: ['SEO', 'News', 'Guide', 'Review', 'Other'] }),
+      F('status', 'Status', 'select', { col: true, options: ['Draft', 'Review', 'Published'] }),
+      F('publishDate', 'Publish Date', 'date', { col: true }),
+      F('author', 'Author', 'ref', { refModule: 'team' }),
+      F('link', 'Link', 'url'),
+      F('body', 'Body', 'textarea'),
+    ],
+  },
+  {
+    icon: 'Phone', key: 'leads', fa: 'سرنخ / لید', en: 'Leads',
+    dFa: 'سرنخ‌های فروش و پیگیری', dEn: 'Sales leads and follow-ups',
+    fields: [
+      F('title', 'Name', 'text', { col: true }),
+      F('phone', 'Phone', 'text', { col: true }),
+      F('source', 'Source', 'select', { col: true, options: ['Instagram', 'Telegram', 'Website', 'Referral', 'Other'] }),
+      F('status', 'Status', 'select', { col: true, options: ['New', 'Contacted', 'Qualified', 'Won', 'Lost'] }),
+      F('value', 'Value', 'money', { col: true }),
+      F('nextContact', 'Next Contact', 'date', { col: true }),
+      F('notes', 'Notes', 'textarea'),
+    ],
+  },
+]
+
+function NewModuleModal({ open, onClose, onCreate }: { open: boolean; onClose: () => void; onCreate: (m: ModuleDef) => void }) {
+  const { t, lang } = useT()
+  const [q, setQ] = useState('')
+  const L = (fa: string, en: string) => (lang === 'fa' ? fa : en)
+
+  const build = (tpl: Tpl, customName?: string) => {
+    const label = customName?.trim() || (lang === 'fa' ? tpl.fa : tpl.en)
+    const key = 'm_' + label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') + '_' + Date.now().toString(36)
+    const m: ModuleDef = {
+      key, label, labelFa: lang === 'fa' ? label : tpl.fa, icon: tpl.icon, group: 'core', custom: true,
+      titleField: 'title', defaultView: 'table', views: ['table', 'kanban', 'cards'], groupBy: 'status',
+      fields: tpl.fields.map(fd => ({ ...fd })),
+    }
+    onCreate(m)
+  }
+
+  const filtered = TEMPLATES.filter(tp => (tp.fa + ' ' + tp.en).toLowerCase().includes(q.trim().toLowerCase()))
+
+  return (
+    <Modal open={open} onClose={onClose} wide title={t('set.templateTitle')}>
+      <p className="text-[12px] text-[var(--color-dim)] mb-3">{t('set.templateHint')}</p>
+      <TextInput value={q} placeholder={t('common.search')} className="mb-3 py-1.5" onChange={e => setQ(e.target.value)} />
+      <div className="grid sm:grid-cols-2 gap-2 max-h-[50vh] overflow-y-auto pe-1">
+        {filtered.map(tp => (
+          <div key={tp.key} className="p-3 rounded-xl border border-[var(--color-line)] hover:border-[var(--color-line2)] transition-colors">
+            <div className="flex items-center gap-2 mb-1.5">
+              <Icon name={tp.icon} size={15} className="text-[var(--color-acc)]" />
+              <span className="text-[13px] font-medium">{L(tp.fa, tp.en)}</span>
+            </div>
+            <p className="text-[10.5px] text-[var(--color-dim2)] leading-relaxed mb-2.5">{L(tp.dFa, tp.dEn)}</p>
+            <div className="flex gap-1.5 flex-wrap">
+              {tp.fields.slice(0, 4).map(fd => (
+                <span key={fd.key} className="text-[9.5px] px-1.5 py-0.5 rounded bg-white/[.06] text-[var(--color-dim)]">{fd.label}</span>
+              ))}
+              {tp.fields.length > 4 && <span className="text-[9.5px] text-[var(--color-dim2)] nums">+{tp.fields.length - 4}</span>}
+            </div>
+            <Button size="sm" variant="primary" icon="Plus" className="mt-2.5" onClick={() => build(tp)}>{t('common.add')}</Button>
+          </div>
+        ))}
+        {!filtered.length && <Empty icon="SearchX" title={t('empty.noResults')} />}
+      </div>
+    </Modal>
   )
 }
 
@@ -796,8 +1200,9 @@ function ModuleEditor({ module, onClose, onSave }: { module: ModuleDef; onClose:
           </>
         </Field>
         <Field label={t('set.modGroup')}>
-          <Select options={['core', 'media', 'business', 'ops']} value={group}
-            onChange={e => setGroup(e.target.value as ModuleDef['group'])} />
+          <Dropdown value={group}
+            onChange={v => setGroup(v as ModuleDef['group'])}
+            options={['core', 'media', 'business', 'ops'].map(o => ({ value: o, label: o }))} />
         </Field>
       </div>
 
@@ -810,10 +1215,9 @@ function ModuleEditor({ module, onClose, onSave }: { module: ModuleDef; onClose:
             <TextInput value={f.label} className="py-1 text-[12px] flex-1 ltr" onChange={e => upd(i, { label: e.target.value })} />
             <TextInput value={f.labelFa ?? ''} placeholder={fl(f)} className="py-1 text-[12px] flex-1"
               onChange={e => upd(i, { labelFa: e.target.value || undefined })} />
-            <select value={f.type} onChange={e => upd(i, { type: e.target.value as FieldType })}
-              className="rounded-lg bg-[var(--color-bg)] border border-[var(--color-line2)] px-2 py-1 text-[11.5px] cursor-pointer ltr">
-              {FIELD_TYPES.map(ty => <option key={ty} value={ty}>{ty}</option>)}
-            </select>
+            <Dropdown value={f.type} onChange={v => upd(i, { type: v as FieldType })}
+              className="w-32 shrink-0"
+              options={FIELD_TYPES.map(ty => ({ value: ty, label: ty }))} />
             {f.type === 'select' && (
               <TextInput value={(f.options ?? []).join(',')} placeholder="options,csv" className="py-1 text-[11px] w-32 ltr"
                 onChange={e => upd(i, { options: e.target.value.split(',').map(x => x.trim()).filter(Boolean) })} />

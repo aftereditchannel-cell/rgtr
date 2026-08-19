@@ -6,6 +6,7 @@ import { seedData, emptyData } from '../domain/seed'
 import { loadDoc, saveDoc, pushSnapshot } from '../lib/db'
 import { migrate } from '../lib/migrate'
 import { uid, nowISO } from '../lib/id'
+import * as cloud from '../lib/cloud'
 
 interface Store {
   data: AppData
@@ -36,12 +37,36 @@ interface Store {
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
+let syncTimer: ReturnType<typeof setTimeout> | null = null
 
 export const useApp = create<Store>((set, get) => {
+  /** ذخیره‌ی خودکار روی ابر (Gist) بعد از هر تغییر — اگر autoSync روشن و توکن موجود باشد */
+  const scheduleCloudPush = () => {
+    const c = get().data.settings.cloud
+    if (!c.autoSync || !cloud.hasToken()) return
+    if (syncTimer) clearTimeout(syncTimer)
+    syncTimer = setTimeout(() => { void autoPush() }, 3000)
+  }
+
+  const autoPush = async () => {
+    const st = get()
+    await st.persist()
+    const fresh = get().data
+    try {
+      const { id } = await cloud.ensureGist(fresh.settings.cloud.gistId, fresh)
+      await cloud.pushGist(id, fresh)
+      // مستقیم با set (نه setSettings) تا دوباره touch نشود و حلقه‌ی بی‌پایان نسازد
+      set(s => ({
+        data: { ...s.data, settings: { ...s.data.settings, cloud: { ...s.data.settings.cloud, gistId: id, lastSync: new Date().toISOString() } } },
+      }))
+    } catch { /* بی‌صدا — دفعه‌ی بعد دوباره تلاش می‌شود */ }
+  }
+
   const touch = () => {
     set({ dirty: true })
     if (saveTimer) clearTimeout(saveTimer)
     saveTimer = setTimeout(() => { void get().persist() }, 400)
+    scheduleCloudPush()
   }
 
   return {
@@ -175,6 +200,26 @@ export const useApp = create<Store>((set, get) => {
     async clearAll() { await get().replaceAll(emptyData()) },
   }
 })
+
+/**
+ * دریافت خودکار از ابر هنگام باز شدن/بازگشت برنامه — فقط اگر remote جدیدتر باشد
+ * (last-write-wins بر اساس updated_at گیت‌هاب).
+ */
+export async function autoPullIfEnabled(): Promise<void> {
+  const st = useApp.getState()
+  const c = st.data.settings.cloud
+  if (!c.autoPull || !c.gistId || !cloud.hasToken()) return
+  try {
+    const res = await cloud.pullGist(c.gistId)
+    if (!res) return
+    const remoteT = new Date(res.updatedAt).getTime()
+    const localT = c.lastSync ? new Date(c.lastSync).getTime() : 0
+    if (Number.isFinite(remoteT) && remoteT > localT) {
+      await st.replaceAll(res.data as never)
+      useApp.getState().setSettings({ cloud: { ...useApp.getState().data.settings.cloud, lastSync: res.updatedAt } })
+    }
+  } catch { /* بی‌صدا */ }
+}
 
 /* ---------- selectors ---------- */
 export const useRows = (key: string): Entity[] => useApp(s => s.data.records[key] ?? [])

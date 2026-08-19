@@ -243,6 +243,9 @@ export const UI: Record<string, Pair> = {
   'set.modules':        { fa: 'دپارتمان‌ها و ماژول‌ها', en: 'Departments & modules' },
   'set.modulesNote':    { fa: 'هر ماژول یک دپارتمان با جدول، کانبان، تقویم و فرم اختصاصی است. بدون کدنویسی بسازید، ویرایش کنید یا حذف کنید — حتی ماژول‌های پیش‌فرض.', en: 'Each module is a department with its own table, kanban, calendar and form. Create, edit or delete them without code — including the built-in ones.' },
   'set.newModuleName':  { fa: 'نام دپارتمان جدید — مثلاً: پادکست', en: 'New department name — e.g. Podcast' },
+  'set.fromTemplate':   { fa: 'از قالب بسازید', en: 'From template' },
+  'set.templateTitle':  { fa: 'ساخت دپارتمان از قالب', en: 'Create department from a template' },
+  'set.templateHint':   { fa: 'یک قالب انتخاب کنید تا فیلدهایش خودکار ساخته شوند؛ نام را بعداً می‌توانید عوض کنید.', en: 'Pick a template to auto-build its fields; you can rename it later.' },
   'set.moduleCreated':  { fa: 'ماژول ساخته شد', en: 'Module created' },
   'set.moduleCount':    { fa: '{n} ماژول', en: '{n} modules' },
   'set.confirmDelMod':  { fa: 'ماژول «{m}» و همه‌ی {n} رکوردش حذف شود؟ این کار برگشت‌ناپذیر است (ولی نقطه بازیابی دارید).', en: 'Delete module “{m}” and all {n} of its records? This cannot be undone (but you have restore points).' },
@@ -378,6 +381,104 @@ export const UI: Record<string, Pair> = {
   'upd.foundToast':     { fa: 'نسخه‌ی جدید {v} موجود است — تنظیمات ← بروزرسانی', en: 'New version {v} available — Settings → App update' },
   'upd.installFirst':   { fa: 'این نسخه‌ی وب است؛ برای نصب خودکار، نسخه‌ی ویندوز را از گیت‌هاب بگیرید.', en: 'This is the web build; for auto-install use the Windows build from GitHub.' },
   'upd.portableNote':   { fa: 'نسخه‌ی پرتابل دانلود شد؛ برای جایگزینی، برنامه را ببندید و فایل جدید را اجرا کنید.', en: 'Portable build downloaded; close the app and run the new file to replace it.' },
+
+  /* ---------- ناوبری موبایل / راهنما ---------- */
+  'nav.tasks':          { fa: 'کارها', en: 'Tasks' },
+  'nav.projects':       { fa: 'پروژه‌ها', en: 'Projects' },
+  'nav.more':           { fa: 'بیشتر', en: 'More' },
+  'nav.help':           { fa: 'راهنما', en: 'Help' },
+
+  /* ---------- قفل ---------- */
+  'lock.unlock':        { fa: 'باز کردن', en: 'Unlock' },
+  'lock.wrong':         { fa: 'رمز اشتباه است', en: 'Wrong passcode' },
+  'lock.cooldown':      { fa: 'کمی صبر کنید ({s} ثانیه)', en: 'Please wait ({s}s)' },
+  'lock.bio':           { fa: 'باز کردن با اثر انگشت / چهره', en: 'Unlock with fingerprint / face' },
+  'lock.bioReason':     { fa: 'برای باز کردن برنامه هویت خود را تأیید کنید', en: 'Confirm your identity to unlock the app' },
+
+  /* ---------- قفل و امنیت (تنظیمات) ---------- */
+  'set.security':       { fa: 'قفل و امنیت', en: 'Lock & security' },
+  'set.securityNote':   { fa: 'رمز با PBKDF2 هش می‌شود و هرگز به‌صورت متن ذخیره نمی‌شود. روی گوشی می‌توانید باز کردن با اثر انگشت/چهره را هم روشن کنید.', en: 'Your passcode is PBKDF2-hashed and never stored as text. On phones you can also enable fingerprint/face unlock.' },
+  'set.setPasscode':    { fa: 'تعیین رمز عبور', en: 'Set a passcode' },
+  'set.changePasscode': { fa: 'تغییر رمز عبور', en: 'Change passcode' },
+  'set.removePasscode': { fa: 'حذف رمز عبور', en: 'Remove passcode' },
+  'set.passcode':       { fa: 'رمز عبور (حداقل ۴ رقم)', en: 'Passcode (at least 4 digits)' },
+  'set.passcodeConfirm':{ fa: 'تکرار رمز', en: 'Confirm passcode' },
+  'set.passcodeShort':  { fa: 'حداقل ۴ رقم لازم است', en: 'At least 4 digits required' },
+  'set.passcodeMismatch': { fa: 'رمزها یکی نیستند', en: 'Passcodes do not match' },
+  'set.passcodeSet':    { fa: 'رمز عبور تنظیم شد', en: 'Passcode set' },
+  'set.passcodeRemoved':{ fa: 'رمز عبور حذف شد', en: 'Passcode removed' },
+  'set.biometric':      { fa: 'باز کردن با اثر انگشت / چهره', en: 'Unlock with fingerprint / face' },
+  'set.biometricHint':  { fa: 'فقط روی گوشی‌هایی که حسگر دارند', en: 'Only on phones with a sensor' },
+  'set.biometricOn':    { fa: 'اثر انگشت فعال شد', en: 'Fingerprint enabled' },
+  'set.autoLock':       { fa: 'قفل خودکار پس از بی‌کاری', en: 'Auto-lock after inactivity' },
+  'set.autoLock0':      { fa: 'بلافاصله', en: 'Immediately' },
+  'set.autoLock1':      { fa: '۱ دقیقه', en: '1 minute' },
+  'set.autoLock5':      { fa: '۵ دقیقه', en: '5 minutes' },
+  'set.autoLock30':     { fa: '۳۰ دقیقه', en: '30 minutes' },
+  'set.autoLockOpen':   { fa: 'فقط هنگام باز شدن برنامه', en: 'Only when the app opens' },
+  'set.hint':           { fa: 'یادآور روی صفحه‌ی قفل', en: 'Hint on the lock screen' },
+  'set.hintPh':         { fa: 'مثلاً: سال تولد', en: 'e.g. birth year' },
+  'set.lockNow':        { fa: 'قفل کردن اکنون', en: 'Lock now' },
+  'set.forgotWarn':     { fa: 'اگر رمز را فراموش کنید راه بازیابی نیست؛ باید برنامه را حذف و دوباره نصب کنید.', en: 'If you forget the passcode there is no recovery — you must reinstall the app.' },
+
+  /* ---------- پوسته ---------- */
+  'set.theme':          { fa: 'پوسته', en: 'Theme' },
+  'set.themeHint':      { fa: 'تیره یا روشن؛ «سیستم» از تنظیم ویندوز/اندروید پیروی می‌کند', en: 'Dark or light; “System” follows Windows/Android' },
+  'set.themeDark':      { fa: 'تیره', en: 'Dark' },
+  'set.themeLight':     { fa: 'روشن', en: 'Light' },
+  'set.themeSystem':    { fa: 'سیستم', en: 'System' },
+  'set.glass':          { fa: 'افکت شیشه‌ای', en: 'Glass effect' },
+  'set.glassHint':      { fa: 'سطوح نیمه‌شفاف و بلوری (روی تیره و روشن هر دو کار می‌کند)', en: 'Semi-transparent frosted surfaces (works on both dark and light)' },
+
+  /* ---------- هوش مصنوعی ---------- */
+  'set.ai':             { fa: 'هوش مصنوعی (ایجنت‌ها)', en: 'AI (agents)' },
+  'set.aiNote':         { fa: 'با یک کلید OpenAI (یا سرویس سازگار مثل Groq) ایجنت‌های بخش «AI Agents» واقعاً اجرا می‌شوند. کلید فقط روی همین دستگاه ذخیره می‌شود و وارد بکاپ نمی‌شود.', en: 'With an OpenAI key (or compatible service like Groq) your “AI Agents” actually run. The key stays on this device and is excluded from backups.' },
+  'set.aiKey':          { fa: 'کلید API', en: 'API key' },
+  'set.aiKeyHint':      { fa: 'از platform.openai.com/api-keys بگیرید (sk-...)', en: 'Get it from platform.openai.com/api-keys (sk-…)' },
+  'set.aiBaseUrl':      { fa: 'آدرس API', en: 'API base URL' },
+  'set.aiBaseUrlHint':  { fa: 'پیش‌فرض OpenAI؛ برای Groq: https://api.groq.com/openai/v1', en: 'OpenAI by default; for Groq: https://api.groq.com/openai/v1' },
+  'set.aiModel':        { fa: 'مدل', en: 'Model' },
+  'set.aiSave':         { fa: 'ذخیره و آزمایش', en: 'Save & test' },
+  'set.aiOk':           { fa: 'اتصال برقرار شد', en: 'Connection OK' },
+  'set.aiNeedKey':      { fa: 'اول کلید API را وارد کنید', en: 'Enter an API key first' },
+
+  /* ---------- شبکه‌های اجتماعی ---------- */
+  'set.social':         { fa: 'شبکه‌های اجتماعی (تشخیص خودکار)', en: 'Social (auto-fetch)' },
+  'set.socialNote':     { fa: 'فالوور و بیو را می‌توان از لینک پروفایل به‌صورت خودکار خواند. اینستاگرام API عمومی بدون‌کلید ندارد؛ برای داده‌ی زنده یک واسط رایگان (Cloudflare Worker) لازم است. الگویش در بخش راهنما است.', en: 'Followers and bio can be auto-read from a profile link. Instagram has no keyless public API; for live data you need a free proxy (Cloudflare Worker) — template in Help.' },
+  'set.socialProxy':    { fa: 'آدرس واسط (اختیاری)', en: 'Proxy URL (optional)' },
+  'set.socialProxyHint':{ fa: 'مثلاً https://your-worker.workers.dev', en: 'e.g. https://your-worker.workers.dev' },
+  'set.socialAutoRefresh': { fa: 'تازه‌سازی خودکار فالوورها هنگام باز شدن صفحه', en: 'Auto-refresh followers when opening the page' },
+
+  /* ---------- همگام‌سازی خودکار ---------- */
+  'set.cloudAutoSync':  { fa: 'ذخیره خودکار روی ابر بعد از هر تغییر', en: 'Auto-save to cloud after every change' },
+  'set.cloudAutoSyncHint': { fa: 'هر تغییر چند ثانیه بعد روی گیت‌هاب ذخیره می‌شود — همه‌ی دستگاه‌ها همگام می‌مانند', en: 'Every change is saved to GitHub a few seconds later — all devices stay in sync' },
+  'set.cloudAutoPull':  { fa: 'دریافت خودکار هنگام باز شدن برنامه', en: 'Auto-pull when the app opens' },
+  'set.cloudAutoPullHint': { fa: 'اگر نسخه‌ی ابری جدیدتر باشد، خودکار دریافت می‌شود', en: 'If the cloud version is newer, it is pulled automatically' },
+
+  /* ---------- راهنما ---------- */
+  'help.title':         { fa: 'آموزش و راهنما', en: 'Guide & help' },
+  'help.subtitle':      { fa: 'معرفی همه‌ی بخش‌های برنامه و نقشه‌ی ویرایش روی گیت‌هاب', en: 'An intro to every part of the app, plus a GitHub edit map' },
+  'help.tour':          { fa: 'تور معرفی', en: 'Guided tour' },
+  'help.tourHint':      { fa: 'قدم‌به‌قدم همه‌ی بخش‌های برنامه را معرفی می‌کند.', en: 'Walks you through every part of the app step by step.' },
+  'help.startTour':     { fa: 'شروع تور', en: 'Start tour' },
+  'help.sections':      { fa: 'بخش‌های برنامه', en: 'App sections' },
+  'help.gitMap':        { fa: 'چه چیزی را در گیت‌هاب ویرایش کنم؟', en: 'What should I edit on GitHub?' },
+  'help.gitMapHint':    { fa: 'هر بخش برنامه به فایل(های) مربوط در مخزن اشاره می‌کند.', en: 'Each feature maps to the file(s) responsible in the repository.' },
+  'help.prev':          { fa: 'قبلی', en: 'Back' },
+  'help.next':          { fa: 'بعدی', en: 'Next' },
+
+  /* ---------- پر کردن خودکار پروفایل ---------- */
+  'form.autoFill':      { fa: 'پر کردن خودکار', en: 'Auto-fill' },
+  'form.fetching':      { fa: 'در حال خواندن…', en: 'Fetching…' },
+  'form.noProfile':     { fa: 'پروفایلی خوانده نشد (برای اینستاگرام واسط لازم است)', en: 'No profile read (a proxy is needed for Instagram)' },
+
+  /* ---------- اجرای ایجنت ---------- */
+  'agent.run':          { fa: 'اجرای ایجنت', en: 'Run agent' },
+  'agent.select':       { fa: 'انتخاب ایجنت', en: 'Select an agent' },
+  'agent.input':        { fa: 'درخواست شما', en: 'Your request' },
+  'agent.output':       { fa: 'پاسخ', en: 'Response' },
+  'agent.noAgents':     { fa: 'اول در بخش «AI Agents» یک ایجنت تعریف کنید', en: 'Define an agent under “AI Agents” first' },
+  'agent.needKey':      { fa: 'اول کلید API را در تنظیمات ← هوش مصنوعی وارد کنید', en: 'Set your API key under Settings → AI first' },
 }
 
 /** پیام‌های وضعیت اتصال ابری که خارج از React هم لازم می‌شوند */

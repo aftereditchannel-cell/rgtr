@@ -11,11 +11,14 @@ export const DEFAULT_SETTINGS: Settings = {
   accent: '#6366f1',
   focusCount: 3,
   theme: 'dark',
+  glass: true,
   lang: 'fa',
   calendar: 'jalali',
   digits: 'fa',
   weights: DEFAULT_WEIGHTS,
-  cloud: { provider: 'gist', gistId: '', lastSync: '', askOnExit: true },
+  ai: { provider: 'openai', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+  social: { proxyUrl: '', autoRefresh: true },
+  cloud: { provider: 'gist', gistId: '', lastSync: '', askOnExit: true, autoSync: false, autoPull: false },
 }
 
 /**
@@ -33,6 +36,8 @@ export function migrate(input: unknown): AppData {
       ...DEFAULT_SETTINGS,
       ...rawSettings,
       weights: { ...DEFAULT_WEIGHTS, ...(rawSettings.weights ?? {}) },
+      ai: { ...DEFAULT_SETTINGS.ai, ...(rawSettings.ai ?? {}) },
+      social: { ...DEFAULT_SETTINGS.social, ...(rawSettings.social ?? {}) },
       cloud: { ...DEFAULT_SETTINGS.cloud, ...(rawSettings.cloud ?? {}) },
     },
     modules: Array.isArray(raw.modules) && raw.modules.length ? raw.modules : CORE_MODULES,

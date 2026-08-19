@@ -1,10 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#6366f1"/>
-      <stop offset="1" stop-color="#8b5cf6"/>
-    </linearGradient>
-  </defs>
-  <rect x="0" y="0" width="1024" height="1024" rx="228" ry="228" fill="url(#g)"/>
-  <path d="M330 726 V298 h74 l216 296 V298 h74 v428 h-74 L404 430 v296 z" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 684 889" role="img" aria-label="NEXUS HQ">
+  <rect width="684" height="889" fill="#08090c"/>
+  <g fill="#FFC800">
+    <rect x="0" y="368.3" width="36" height="36" rx="18"/><rect x="0" y="484.7" width="36" height="36" rx="18"/>
+    <rect x="54" y="321.4" width="36" height="90.9" rx="18"/><rect x="54" y="476.7" width="36" height="90.9" rx="18"/>
+    <rect x="108" y="257.1" width="36" height="139" rx="18"/><rect x="108" y="493" width="36" height="139" rx="18"/>
+    <rect x="162" y="192.8" width="36" height="187.1" rx="18"/><rect x="162" y="509.1" width="36" height="187.1" rx="18"/>
+    <rect x="216" y="128.5" width="36" height="235.2" rx="18"/><rect x="216" y="525.3" width="36" height="235.2" rx="18"/>
+    <rect x="270" y="64.3" width="36" height="283.3" rx="18"/><rect x="270" y="541.4" width="36" height="283.3" rx="18"/>
+    <rect x="324" y="0" width="36" height="331.4" rx="18"/><rect x="324" y="557.6" width="36" height="331.4" rx="18"/>
+    <rect x="378" y="64.3" width="36" height="283.3" rx="18"/><rect x="378" y="541.4" width="36" height="283.3" rx="18"/>
+    <rect x="432" y="128.5" width="36" height="235.2" rx="18"/><rect x="432" y="525.3" width="36" height="235.2" rx="18"/>
+    <rect x="486" y="192.8" width="36" height="187.1" rx="18"/><rect x="486" y="509.1" width="36" height="187.1" rx="18"/>
+    <rect x="540" y="257.1" width="36" height="139" rx="18"/><rect x="540" y="493" width="36" height="139" rx="18"/>
+    <rect x="594" y="321.4" width="36" height="90.9" rx="18"/><rect x="594" y="476.7" width="36" height="90.9" rx="18"/>
+    <rect x="648" y="368.3" width="36" height="36" rx="18"/><rect x="648" y="484.7" width="36" height="36" rx="18"/>
+  </g>
 </svg>

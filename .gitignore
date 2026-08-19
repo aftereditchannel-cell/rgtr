@@ -1,0 +1,20 @@
+# وابستگی‌ها و خروجی build
+node_modules/
+dist/
+release/
+
+# لاگ‌ها و فایل‌های موقت
+*.log
+.DS_Store
+npm-debug.log*
+
+# خروجی‌های گریدل اندروید
+android/.gradle/
+android/app/build/
+android/build/
+android/captures/
+android/app/release/
+
+# فایل‌های محلی ماشین
+.env
+.env.local
