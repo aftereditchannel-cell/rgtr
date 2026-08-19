@@ -1,50 +1,59 @@
 #!/usr/bin/env python3
 """
-ساخت آیکون برنامه از لوگوی کاربر.
+ساخت آیکون برنامه از لوگوی موج زرد (AfterEdit / NEXUS).
 
-لوگو روی پس‌زمینه‌ی مشکی و بدون کانال آلفا است، پس نمی‌شود مستقیم استفاده کرد:
-اول موج زرد را «کلید» می‌کنیم (آلفا از روشنایی)، بعد روی پس‌زمینه‌ی
-مخصوص هر پلتفرم می‌نشانیم.
+لوگو همان موجی است که در src/components/ui/BrandMark.tsx تعریف شده؛
+این اسکریپت آن را مستقیم می‌کشد (بدون نیاز به فایل ورودی) و همه‌ی خروجی‌ها را می‌سازد:
 
-خروجی‌ها:
   electron/icons/icon.png + سایزهای ۱۶..۵۱۲ + icon.ico   (ویندوز)
   android/app/src/main/res/mipmap-*/ic_launcher*.png      (اندروید، legacy)
   android/app/src/main/res/mipmap-anydpi-v26/*.xml        (اندروید، adaptive)
-  android/app/src/main/res/drawable/splash.png            (صفحه‌ی شروع)
-  public/favicon.png, public/apple-touch-icon.png         (وب)
+  android/app/src/main/res/drawable*/splash.png           (صفحه‌ی شروع)
+  public/favicon.png · public/icon-192/512.png · apple-touch-icon.png  (وب)
+
+اجرا:  python3 scripts/make-icons.py
 """
 import os
 from PIL import Image, ImageDraw, ImageFilter
-import numpy as np
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC = '/home/user/uploads/AfterEdit_Profile_Logo_Diamond.png'
-BG = (8, 9, 12)  # همان --color-bg برنامه
+BG = (8, 9, 12)          # --color-bg برنامه
+GOLD = (255, 200, 0, 255)
+
+# میله‌های موج — دقیقاً همان مختصات viewBox=684x889 در BrandMark
+BARS = [
+    (0, 368.3, 36, 36), (0, 484.7, 36, 36),
+    (54, 321.4, 36, 90.9), (54, 476.7, 36, 90.9),
+    (108, 257.1, 36, 139), (108, 493, 36, 139),
+    (162, 192.8, 36, 187.1), (162, 509.1, 36, 187.1),
+    (216, 128.5, 36, 235.2), (216, 525.3, 36, 235.2),
+    (270, 64.3, 36, 283.3), (270, 541.4, 36, 283.3),
+    (324, 0, 36, 331.4), (324, 557.6, 36, 331.4),
+    (378, 64.3, 36, 283.3), (378, 541.4, 36, 283.3),
+    (432, 128.5, 36, 235.2), (432, 525.3, 36, 235.2),
+    (486, 192.8, 36, 187.1), (486, 509.1, 36, 187.1),
+    (540, 257.1, 36, 139), (540, 493, 36, 139),
+    (594, 321.4, 36, 90.9), (594, 476.7, 36, 90.9),
+    (648, 368.3, 36, 36), (648, 484.7, 36, 36),
+]
+
+VW, VH = 684.0, 889.0
 
 
-def keyed_mark(size: int) -> Image.Image:
-    """موج زرد را با آلفای نرم از پس‌زمینه‌ی مشکی جدا می‌کند."""
-    im = Image.open(SRC).convert('RGB')
-    a = np.asarray(im).astype(np.float32) / 255.0
-    # روشنایی = آلفا. پس‌زمینه دقیقاً مشکی است، پس این کلید تمیز درمی‌آید.
-    lum = a.max(axis=2)
-    # کمی کشش کنتراست تا لبه‌ها نرم ولی بدون هاله بمانند
-    alpha = np.clip((lum - 0.06) / 0.80, 0, 1)
-    # رنگ را به زرد اشباع لوگو نرمال می‌کنیم تا لبه‌ها خاکستری نشوند
-    safe = np.maximum(lum, 1e-6)[..., None]
-    rgb = np.clip(a / safe, 0, 1)
-    out = np.dstack([rgb, alpha[..., None]])
-    img = Image.fromarray((out * 255).astype(np.uint8), 'RGBA')
-
-    # برش به کادر واقعیِ موج تا آیکون در سایزهای کوچک گم نشود
-    bbox = img.getchannel('A').point(lambda v: 255 if v > 8 else 0).getbbox()
-    img = img.crop(bbox)
-    # مربعی‌کردن
-    w, h = img.size
-    side = max(w, h)
-    sq = Image.new('RGBA', (side, side), (0, 0, 0, 0))
-    sq.paste(img, ((side - w) // 2, (side - h) // 2), img)
-    return sq.resize((size, size), Image.LANCZOS)
+def wave(size: int) -> Image.Image:
+    """موج زرد را در یک تصویر شفاف مربعی به ضلع size می‌کشد."""
+    img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    s = size / VW  # مقیاس
+    # نسبت ابعاد موج 684:889 است؛ موج را در مرکز مربع با حفظ نسبت می‌نشانیم
+    h_px = int(round(VH * s))
+    off = (size - h_px) // 2
+    for (x, y, w, h) in BARS:
+        r = int(round(18 * s))
+        d.rounded_rectangle(
+            [x * s, off + y * s, (x + w) * s, off + (y + h) * s],
+            radius=r, fill=GOLD)
+    return img
 
 
 def rounded_mask(size: int, radius_ratio: float) -> Image.Image:
@@ -55,29 +64,34 @@ def rounded_mask(size: int, radius_ratio: float) -> Image.Image:
     return m.resize((size, size), Image.LANCZOS)
 
 
-def tile(size: int, inset: float = 0.62, radius: float = 0.22, bg=BG, square=False) -> Image.Image:
+def tile(size: int, inset: float = 0.58, radius: float = 0.22, square: bool = False) -> Image.Image:
     """کاشی نهایی: پس‌زمینه‌ی تیره‌ی گرد + موج زرد در وسط."""
     canvas = Image.new('RGBA', (size, size), (0, 0, 0, 0))
-    plate = Image.new('RGBA', (size, size), bg + (255,))
-    # کمی عمق: گرادیان ملایم از بالا
-    grad = np.linspace(1.16, 0.92, size, dtype=np.float32)[:, None, None]
-    pa = np.asarray(plate).astype(np.float32)
-    pa[..., :3] = np.clip(pa[..., :3] * grad + 6 * grad, 0, 255)
-    plate = Image.fromarray(pa.astype(np.uint8), 'RGBA')
+    plate = Image.new('RGBA', (size, size), BG + (255,))
     if not square:
         plate.putalpha(rounded_mask(size, radius))
     canvas.alpha_composite(plate)
 
     mark_px = int(size * inset)
-    mark = keyed_mark(mark_px)
-    off = ((size - mark_px) // 2, (size - mark_px) // 2)
-    # درخشش ملایم پشت موج — حس «فوتوریستیک» بدون شلوغی.
-    # زیر ۹۶px میله‌های موج نازک‌اند و هاله آن‌ها را گِل‌آلود می‌کند، پس حذف می‌شود.
+    mark = wave(mark_px)
+    # موج باید «مربع» نباشد؛ ارتفاع واقعی‌اش کمتر است. برش به کادر واقعی موج.
+    bbox = mark.getchannel('A').getbbox()
+    if bbox:
+        mark = mark.crop(bbox)
+        w, h = mark.size
+        side = max(w, h)
+        sq = Image.new('RGBA', (side, side), (0, 0, 0, 0))
+        sq.paste(mark, ((side - w) // 2, (side - h) // 2), mark)
+        mark = sq.resize((int(size * 0.78), int(size * 0.78)), Image.LANCZOS)
+
+    off = ((size - mark.size[0]) // 2, (size - mark.size[1]) // 2)
     if size >= 96:
-        glow = mark.copy().filter(ImageFilter.GaussianBlur(size * 0.035))
-        ga = np.asarray(glow).astype(np.float32)
-        ga[..., 3] *= 0.38
-        canvas.alpha_composite(Image.fromarray(ga.astype(np.uint8), 'RGBA'), off)
+        glow = mark.filter(ImageFilter.GaussianBlur(size * 0.035))
+        ga = glow.split()
+        ga = list(ga)
+        ga[3] = ga[3].point(lambda v: int(v * 0.38))
+        glow = Image.merge('RGBA', ga)
+        canvas.alpha_composite(glow, off)
     canvas.alpha_composite(mark, off)
     return canvas
 
@@ -93,36 +107,37 @@ print('electron:')
 eic = os.path.join(ROOT, 'electron', 'icons')
 master = tile(1024)
 save(master, os.path.join(eic, 'icon.png'))
-sizes = [16, 24, 32, 48, 64, 128, 256, 512]
-for s in sizes:
-    # در سایزهای ریز، موج را بزرگ‌تر می‌کنیم وگرنه در نوار وظیفه دیده نمی‌شود
-    save(tile(s, inset=0.72 if s <= 32 else 0.66 if s < 96 else 0.62,
-              radius=0.22 if s >= 48 else 0.18),
+for s in [16, 24, 32, 48, 64, 128, 256, 512]:
+    ins = 0.72 if s <= 32 else 0.66 if s < 96 else 0.58
+    save(tile(s, inset=ins, radius=0.22 if s >= 48 else 0.18),
          os.path.join(eic, f'icon-{s}.png'))
-# ICO چندسایزی
-ico = os.path.join(eic, 'icon.ico')
-master.save(ico, format='ICO', sizes=[(s, s) for s in [16, 24, 32, 48, 64, 128, 256]])
+master.save(os.path.join(eic, 'icon.ico'), format='ICO',
+            sizes=[(s, s) for s in [16, 24, 32, 48, 64, 128, 256]])
 print('   electron/icons/icon.ico')
 
 # ---------- اندروید ----------
 print('android:')
 res = os.path.join(ROOT, 'android', 'app', 'src', 'main', 'res')
-# legacy launcher (مربع + گرد)
 DPI = {'mdpi': 48, 'hdpi': 72, 'xhdpi': 96, 'xxhdpi': 144, 'xxxhdpi': 192}
 for d, px in DPI.items():
-    ins = 0.70 if px < 96 else 0.64
+    ins = 0.70 if px < 96 else 0.62
     save(tile(px, inset=ins, radius=0.20), os.path.join(res, f'mipmap-{d}', 'ic_launcher.png'))
-    circ = tile(px, inset=ins * 0.92, radius=0.5)
-    save(circ, os.path.join(res, f'mipmap-{d}', 'ic_launcher_round.png'))
-    # foreground آداپتیو: ۷۲/۱۰۸ ناحیه‌ی امن ⇒ موج کوچک‌تر، پس‌زمینه شفاف
+    save(tile(px, inset=ins * 0.9, radius=0.5), os.path.join(res, f'mipmap-{d}', 'ic_launcher_round.png'))
+    # foreground آداپتیو: ناحیه‌ی امن ۶۶٪؛ موج کوچک‌تر روی پس‌زمینه شفاف
     fg_px = int(px * 108 / 48)
     fg = Image.new('RGBA', (fg_px, fg_px), (0, 0, 0, 0))
-    m_px = int(fg_px * 0.44)
-    mk = keyed_mark(m_px)
-    fg.alpha_composite(mk, ((fg_px - m_px) // 2, (fg_px - m_px) // 2))
+    mk = wave(int(fg_px * 0.42))
+    bbox = mk.getchannel('A').getbbox()
+    if bbox:
+        mk = mk.crop(bbox)
+        w, h = mk.size
+        side = max(w, h)
+        sq = Image.new('RGBA', (side, side), (0, 0, 0, 0))
+        sq.paste(mk, ((side - w) // 2, (side - h) // 2), mk)
+        mk = sq.resize((int(fg_px * 0.62), int(fg_px * 0.62)), Image.LANCZOS)
+    fg.alpha_composite(mk, ((fg_px - mk.size[0]) // 2, (fg_px - mk.size[1]) // 2))
     save(fg, os.path.join(res, f'mipmap-{d}', 'ic_launcher_foreground.png'))
 
-# پس‌زمینه‌ی آداپتیو به‌صورت رنگ ساده
 os.makedirs(os.path.join(res, 'mipmap-anydpi-v26'), exist_ok=True)
 adaptive = '''<?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
@@ -137,10 +152,18 @@ for name in ('ic_launcher.xml', 'ic_launcher_round.xml'):
 
 # صفحه‌ی شروع
 splash = Image.new('RGBA', (1080, 1920), BG + (255,))
-mk = keyed_mark(420)
-splash.alpha_composite(mk, ((1080 - 420) // 2, (1920 - 420) // 2))
-save(splash.convert('RGB').convert('RGBA'), os.path.join(res, 'drawable', 'splash.png'))
-save(splash.convert('RGB').convert('RGBA'), os.path.join(res, 'drawable-port-xxxhdpi', 'splash.png'))
+mk = wave(480)
+bbox = mk.getchannel('A').getbbox()
+if bbox:
+    mk = mk.crop(bbox)
+    w, h = mk.size
+    side = max(w, h)
+    sq = Image.new('RGBA', (side, side), (0, 0, 0, 0))
+    sq.paste(mk, ((side - w) // 2, (side - h) // 2), mk)
+    mk = sq.resize((420, 420), Image.LANCZOS)
+splash.alpha_composite(mk, ((1080 - mk.size[0]) // 2, (1920 - mk.size[1]) // 2))
+save(splash, os.path.join(res, 'drawable', 'splash.png'))
+save(splash, os.path.join(res, 'drawable-port-xxxhdpi', 'splash.png'))
 
 # ---------- وب ----------
 print('web:')

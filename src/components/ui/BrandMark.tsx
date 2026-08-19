@@ -1,0 +1,46 @@
+/**
+ * لوگوی برنامه — موج زرد (علامت «AfterEdit / NEXUS»).
+ * همین SVG هم در داخل برنامه استفاده می‌شود هم مبنای ساخت آیکون‌های ویندوز/اندروید است
+ * (scripts/make-icons.py).
+ */
+export function BrandMark({ size = 24, className = '' }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={(size * 889) / 684}
+      viewBox="0 0 684 889"
+      role="img"
+      aria-label="NEXUS HQ"
+      className={className}
+    >
+      <g fill="#FFC800">
+        <rect x="0" y="368.3" width="36" height="36" rx="18" />
+        <rect x="0" y="484.7" width="36" height="36" rx="18" />
+        <rect x="54" y="321.4" width="36" height="90.9" rx="18" />
+        <rect x="54" y="476.7" width="36" height="90.9" rx="18" />
+        <rect x="108" y="257.1" width="36" height="139" rx="18" />
+        <rect x="108" y="493" width="36" height="139" rx="18" />
+        <rect x="162" y="192.8" width="36" height="187.1" rx="18" />
+        <rect x="162" y="509.1" width="36" height="187.1" rx="18" />
+        <rect x="216" y="128.5" width="36" height="235.2" rx="18" />
+        <rect x="216" y="525.3" width="36" height="235.2" rx="18" />
+        <rect x="270" y="64.3" width="36" height="283.3" rx="18" />
+        <rect x="270" y="541.4" width="36" height="283.3" rx="18" />
+        <rect x="324" y="0" width="36" height="331.4" rx="18" />
+        <rect x="324" y="557.6" width="36" height="331.4" rx="18" />
+        <rect x="378" y="64.3" width="36" height="283.3" rx="18" />
+        <rect x="378" y="541.4" width="36" height="283.3" rx="18" />
+        <rect x="432" y="128.5" width="36" height="235.2" rx="18" />
+        <rect x="432" y="525.3" width="36" height="235.2" rx="18" />
+        <rect x="486" y="192.8" width="36" height="187.1" rx="18" />
+        <rect x="486" y="509.1" width="36" height="187.1" rx="18" />
+        <rect x="540" y="257.1" width="36" height="139" rx="18" />
+        <rect x="540" y="493" width="36" height="139" rx="18" />
+        <rect x="594" y="321.4" width="36" height="90.9" rx="18" />
+        <rect x="594" y="476.7" width="36" height="90.9" rx="18" />
+        <rect x="648" y="368.3" width="36" height="36" rx="18" />
+        <rect x="648" y="484.7" width="36" height="36" rx="18" />
+      </g>
+    </svg>
+  )
+}

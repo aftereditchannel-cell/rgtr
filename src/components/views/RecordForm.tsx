@@ -4,8 +4,10 @@ import type { Entity } from '../../store/types'
 import { useApp } from '../../store/useApp'
 import { emptyRecord } from '../../domain/schema'
 import { Modal, Button, Field, TextInput, TextArea, Icon } from '../ui/Primitives'
+import { Dropdown } from '../ui/Dropdown'
 import { useT } from '../../i18n'
 import { useFmt } from '../../lib/useFmt'
+import { fetchSocialProfile } from '../../lib/social'
 
 interface Props { module: ModuleDef; row: Entity | null; open: boolean; onClose: () => void }
 
@@ -53,21 +55,21 @@ export function RecordForm({ module, row, open, onClose }: Props) {
         return <TextInput type="date" value={String(val ?? '').slice(0, 10)} onChange={e => set(f.key, e.target.value)} />
       case 'select':
         return (
-          <select value={String(val ?? '')} onChange={e => set(f.key, e.target.value)}
-            className="w-full rounded-lg bg-[var(--color-bg)] border border-[var(--color-line2)] px-3 py-2 text-[13px] cursor-pointer focus:border-[var(--color-acc)]">
-            <option value="">—</option>
-            {(f.options ?? []).map(o => <option key={o} value={o}>{ol(o)}</option>)}
-          </select>
+          <Dropdown
+            value={String(val ?? '')}
+            onChange={nv => set(f.key, nv)}
+            options={(f.options ?? []).map(o => ({ value: o, label: ol(o) }))}
+          />
         )
       case 'ref': {
         const rm = data.modules.find(m => m.key === f.refModule)
         const rows = data.records[f.refModule ?? ''] ?? []
         return (
-          <select value={String(val ?? '')} onChange={e => set(f.key, e.target.value)}
-            className="w-full rounded-lg bg-[var(--color-bg)] border border-[var(--color-line2)] px-3 py-2 text-[13px] cursor-pointer focus:border-[var(--color-acc)]">
-            <option value="">—</option>
-            {rows.map(r => <option key={r.id} value={r.id}>{String(r[rm?.titleField ?? 'name'] ?? r.id)}</option>)}
-          </select>
+          <Dropdown
+            value={String(val ?? '')}
+            onChange={nv => set(f.key, nv)}
+            options={rows.map(r => ({ value: String(r.id), label: String(r[rm?.titleField ?? 'name'] ?? r.id) }))}
+          />
         )
       }
       case 'tags': {
@@ -93,9 +95,45 @@ export function RecordForm({ module, row, open, onClose }: Props) {
           </div>
         )
       }
+      case 'url': {
+        const s = String(val ?? '')
+        return (
+          <div className="flex items-center gap-2">
+            <TextInput value={s} placeholder={f.placeholder} className="ltr" onChange={e => set(f.key, e.target.value)} />
+            <Button size="sm" variant="outline" icon={enriching === f.key ? 'Loader' : 'Sparkles'}
+              title={t('form.autoFill')}
+              disabled={enriching === f.key || !s.trim()}
+              onClick={() => void enrich(f)}>
+              {enriching === f.key ? t('form.fetching') : t('form.autoFill')}
+            </Button>
+          </div>
+        )
+      }
       default:
         return <TextInput value={String(val ?? '')} placeholder={f.placeholder} onChange={e => set(f.key, e.target.value)} />
     }
+  }
+
+  // پر کردن خودکار پروفایل (فالوور/بیو/نام) از لینک اینستاگرام/یوتیوب/…
+  const [enriching, setEnriching] = useState<string | null>(null)
+  const enrich = async (f: FieldDef) => {
+    const raw = String(v[f.key] ?? '')
+    if (!raw.trim()) return
+    setEnriching(f.key)
+    const p = await fetchSocialProfile(raw, data.settings.social?.proxyUrl ?? '')
+    setEnriching(null)
+    if (!p) { alert(t('form.noProfile')); return }
+    const patch: Record<string, unknown> = {}
+    // فالوور → فیلد followers (یا subscriber)
+    const followersKey = ['followers', 'subscribers', 'followerCount'].find(k => module.fields.some(fd => fd.key === k))
+    if (followersKey && p.followers != null) patch[followersKey] = p.followers
+    // نام → فیلد name/account/title/artistName
+    const nameKey = ['name', 'account', 'title', 'artistName', 'mediaName'].find(k => module.fields.some(fd => fd.key === k))
+    if (nameKey && p.name && !v[nameKey]) patch[nameKey] = p.name
+    // بیو → اولین فیلد متنی بلند مناسب
+    const bioKey = ['bio', 'caption', 'description', 'notes'].find(k => module.fields.some(fd => fd.key === k))
+    if (bioKey && p.bio) patch[bioKey] = p.bio
+    setV(prev => ({ ...prev, ...patch }))
   }
 
   const wide = ['textarea', 'checklist', 'progress'] as const

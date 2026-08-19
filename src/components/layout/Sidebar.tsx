@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useApp } from '../../store/useApp'
 import type { ModuleDef } from '../../domain/schema'
 import { Icon } from '../ui/Primitives'
+import { BrandMark } from '../ui/BrandMark'
 import { useT } from '../../i18n'
 
 const FIXED_TOP = [
@@ -47,9 +48,9 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
       }`}>
         {/* brand */}
         <div className="px-3.5 py-3.5 border-b border-[var(--color-line)] flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg grid place-items-center shrink-0"
-            style={{ background: 'linear-gradient(135deg, var(--color-acc), #a855f7)' }}>
-            <Icon name="Command" size={15} className="text-white" />
+          <div className="w-7 h-7 rounded-lg grid place-items-center shrink-0 border border-[var(--glass-brd2)]"
+            style={{ background: 'linear-gradient(150deg, #16181f, #0b0d12)' }}>
+            <BrandMark size={17} />
           </div>
           <div className="min-w-0 flex-1">
             <div className="text-[13px] font-semibold tracking-tight truncate">{org || 'NEXUS HQ'}</div>
@@ -94,6 +95,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
             <Icon name="PlusCircle" size={15} /> {t('nav.newModule')}
           </button>
           {link('/settings', 'Settings', t('nav.settings'))}
+          {link('/help', 'HelpCircle', t('nav.help'))}
         </div>
       </aside>
     </>

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { useApp } from '../store/useApp'
 import type { Entity } from '../store/types'
@@ -9,9 +9,11 @@ import { CardsView } from '../components/views/CardsView'
 import { CalendarView } from '../components/views/CalendarView'
 import { RecordForm } from '../components/views/RecordForm'
 import { Button, Icon, TextInput, Empty } from '../components/ui/Primitives'
+import { Dropdown } from '../components/ui/Dropdown'
 import { exportModuleCSV } from '../lib/backup'
 import { useT } from '../i18n'
 import { useFmt } from '../lib/useFmt'
+import { fetchSocialProfile } from '../lib/social'
 
 const VIEW_ICON: Record<ViewKind, string> = { table: 'Table2', kanban: 'Columns3', cards: 'LayoutGrid', calendar: 'Calendar' }
 const VIEW_KEY: Record<ViewKind, string> = { table: 'view.table', kanban: 'view.kanban', cards: 'view.cards', calendar: 'view.calendar' }
@@ -19,6 +21,7 @@ const VIEW_KEY: Record<ViewKind, string> = { table: 'view.table', kanban: 'view.
 export function ModulePage() {
   const { key = '' } = useParams()
   const data = useApp(s => s.data)
+  const update = useApp(s => s.update)
   const { t, m: ml, f: fl, o: ol } = useT()
   const fmt = useFmt()
   const module = data.modules.find(m => m.key === key)
@@ -29,6 +32,30 @@ export function ModulePage() {
   const [filters, setFilters] = useState<Record<string, string>>({})
   const [editing, setEditing] = useState<Entity | null>(null)
   const [formOpen, setFormOpen] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+
+  // آیا این ماژول فالوور دارد که از لینک قابل تازه‌سازی باشد؟
+  const hasFollowers = module?.fields.some(f => f.key === 'followers') ?? false
+  const urlKey = module?.fields.find(f => f.type === 'url' || f.key === 'handle' || f.key === 'instagram')?.key
+  const refreshable = hasFollowers && !!urlKey
+  const socialCfg = data.settings.social
+
+  const refreshSocial = async () => {
+    if (!module || !urlKey) return
+    setRefreshing(true)
+    for (const r of rows.slice(0, 12)) {
+      const raw = String(r[urlKey] ?? '')
+      if (!raw.trim()) continue
+      const p = await fetchSocialProfile(raw, socialCfg?.proxyUrl ?? '')
+      if (p && p.followers != null) update(module.key, r.id, { followers: p.followers })
+    }
+    setRefreshing(false)
+  }
+
+  useEffect(() => {
+    if (refreshable && socialCfg?.autoRefresh) void refreshSocial()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [module?.key])
 
   const filterable = useMemo(
     () => module?.fields.filter(f => f.type === 'select' && (f.options?.length ?? 0) > 1).slice(0, 3) ?? [],
@@ -83,12 +110,19 @@ export function ModulePage() {
         </div>
 
         {filterable.map(f => (
-          <select key={f.key} value={filters[f.key] ?? ''} onChange={e => setFilters(p => ({ ...p, [f.key]: e.target.value }))}
-            className="rounded-lg bg-[var(--color-bg)] border border-[var(--color-line2)] px-2.5 py-1.5 text-[12px] cursor-pointer hover:border-[var(--color-dim2)] transition-colors">
-            <option value="">{t('module.filterAll', { f: fl(f) })}</option>
-            {f.options?.map(o => <option key={o} value={o}>{ol(o)}</option>)}
-          </select>
+          <Dropdown key={f.key} className="w-auto min-w-[140px]"
+            value={filters[f.key] ?? ''}
+            onChange={nv => setFilters(p => ({ ...p, [f.key]: nv }))}
+            options={[
+              { value: '', label: t('module.filterAll', { f: fl(f) }) },
+              ...(f.options ?? []).map(o => ({ value: o, label: ol(o) })),
+            ]} />
         ))}
+
+        {refreshable && (
+          <Button size="sm" variant="ghost" icon={refreshing ? 'Loader' : 'RefreshCw'} title="refresh"
+            disabled={refreshing} onClick={() => void refreshSocial()} />
+        )}
 
         {(activeFilters > 0 || q) && (
           <Button size="sm" variant="ghost" icon="X" onClick={() => { setFilters({}); setQ('') }}>{t('common.clear')}</Button>

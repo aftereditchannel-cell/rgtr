@@ -9,6 +9,7 @@ import { DecisionCenter } from './pages/DecisionCenter'
 import { Analytics } from './pages/Analytics'
 import { Settings } from './pages/Settings'
 import { ModulePage } from './pages/ModulePage'
+import { Help } from './pages/Help'
 import { Icon } from './components/ui/Primitives'
 import { BrandMark } from './components/ui/BrandMark'
 import { desktop } from './lib/desktop'
@@ -16,9 +17,10 @@ import { exportJSON, importViaDialog } from './lib/backup'
 import { useT, tr } from './i18n'
 import { ExitSavePrompt } from './components/layout/ExitSavePrompt'
 import { LockScreen } from './components/layout/LockScreen'
-import { applyTheme, watchSystemTheme } from './lib/theme'
+import { applyTheme, applyGlass, watchSystemTheme } from './lib/theme'
 import { isLockEnabled, readLock } from './lib/lock'
 import { isMobile, syncMobileChrome, onMobileResume } from './lib/mobile'
+import { autoPullIfEnabled } from './store/useApp'
 
 /** پل منوی بومی ویندوز → روتر و اکشن‌های برنامه */
 function DesktopMenuBridge() {
@@ -91,6 +93,7 @@ function Shell() {
               <Route path="/decision" element={<DecisionCenter />} />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/help" element={<Help />} />
               <Route path="/m/:key" element={<ModulePage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
@@ -121,10 +124,11 @@ function Shell() {
 /** انتخاب پوسته + قفل، بیرون از روتر تا کل برنامه را در بر بگیرد */
 function Root() {
   const theme = useApp(s => s.data.settings.theme) ?? 'dark'
+  const glass = useApp(s => s.data.settings.glass) ?? true
   const [locked, setLocked] = useState(() => isLockEnabled())
   const lastActive = useRef(Date.now())
 
-  // اعمال پوسته + پیروی از تنظیم سیستم در حالت auto
+  // اعمال پوسته + پیروی از تنظیم سیستم در حالت auto + افکت شیشه‌ای
   useEffect(() => {
     const eff = applyTheme(theme)
     if (isMobile) void syncMobileChrome(eff)
@@ -134,6 +138,18 @@ function Root() {
       if (isMobile) void syncMobileChrome(e2)
     })
   }, [theme])
+
+  useEffect(() => { applyGlass(glass) }, [glass])
+
+  // دریافت خودکار از ابر هنگام باز شدن/بازگشت برنامه (اگر autoPull روشن باشد)
+  useEffect(() => {
+    void autoPullIfEnabled()
+    const onVis = () => { if (document.visibilityState === 'visible') void autoPullIfEnabled() }
+    document.addEventListener('visibilitychange', onVis)
+    let offResume = () => {}
+    void onMobileResume(() => void autoPullIfEnabled()).then(fn => { offResume = fn })
+    return () => { document.removeEventListener('visibilitychange', onVis); offResume() }
+  }, [])
 
   // قفل خودکار: پس از بی‌کاری، یا وقتی برنامه از پس‌زمینه برمی‌گردد
   useEffect(() => {
@@ -153,7 +169,8 @@ function Root() {
     // رفتن به پس‌زمینه (تعویض برنامه در اندروید / کوچک کردن پنجره)
     const onHide = () => { if (document.visibilityState === 'hidden') lastActive.current = Date.now() }
     document.addEventListener('visibilitychange', onHide)
-    const offResume = onMobileResume(() => { if (shouldLock()) setLocked(true) })
+    let offResume = () => {}
+    void onMobileResume(() => { if (shouldLock()) setLocked(true) }).then(fn => { offResume = fn })
 
     return () => {
       for (const e of evts) window.removeEventListener(e, mark)

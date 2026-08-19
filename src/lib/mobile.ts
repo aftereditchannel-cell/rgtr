@@ -206,6 +206,26 @@ export function mobileDataPath(): string {
   return `Android/data/app.nexushq.mobile/files/${DATA_FILE}`
 }
 
+/** همگام‌سازی نوار وضعیت با پوسته‌ی فعال (تیره/روشن) */
+export async function syncMobileChrome(eff: 'dark' | 'light'): Promise<void> {
+  if (!isMobile) return
+  try {
+    const { StatusBar, Style } = await import('@capacitor/status-bar')
+    await StatusBar.setStyle({ style: eff === 'dark' ? Style.Dark : Style.Light })
+    if (isAndroid) await StatusBar.setBackgroundColor({ color: eff === 'dark' ? '#08090c' : '#eef1f7' })
+  } catch {
+    /* بعضی دستگاه‌ها پشتیبانی نمی‌کنند */
+  }
+}
+
+/** رویداد بازگشت برنامه از پس‌زمینه به پیش‌زمینه (resume) */
+export async function onMobileResume(handler: () => void): Promise<() => void> {
+  if (!isMobile) return () => {}
+  const { App } = await import('@capacitor/app')
+  const sub = await App.addListener('resume', handler)
+  return () => void sub.remove()
+}
+
 /* ---------- ظاهر بومی ---------- */
 
 /**

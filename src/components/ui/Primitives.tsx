@@ -13,7 +13,7 @@ export function Icon({ name, size = 16, className = '', style }: { name: string;
 export function Card({ children, className = '', pad = true, style, id }: { children: ReactNode; className?: string; pad?: boolean; style?: CSSProperties; id?: string }) {
   return (
     <div style={style} id={id}
-      className={`rounded-xl border border-[var(--color-line)] bg-[var(--color-panel)] ${pad ? 'p-4' : ''} ${className}`}>
+      className={`rounded-xl border border-[var(--color-line)] bg-[var(--color-panel)] glass-panel ${pad ? 'p-4' : ''} ${className}`}>
       {children}
     </div>
   )
@@ -174,7 +174,7 @@ export function Stat({ label, value, sub, icon, tone, onClick }: {
 }) {
   return (
     <div onClick={onClick}
-      className={`rounded-xl border border-[var(--color-line)] bg-[var(--color-panel)] p-3.5 transition-all duration-150 ${onClick ? 'cursor-pointer hover:border-[var(--color-line2)] hover:bg-white/[.02]' : ''}`}>
+      className={`rounded-xl border border-[var(--color-line)] bg-[var(--color-panel)] glass-panel p-3.5 transition-all duration-150 ${onClick ? 'cursor-pointer hover:border-[var(--color-line2)] hover:bg-white/[.02]' : ''}`}>
       <div className="flex items-start justify-between gap-2 mb-2">
         <span className="text-[10.5px] font-medium tracking-wider uppercase text-[var(--color-dim2)]">{label}</span>
         {icon && <Icon name={icon} size={14} style={{ color: tone ?? 'var(--color-dim2)' }} />}
