@@ -1,0 +1,256 @@
+@import 'tailwindcss';
+
+/* ---------- وزیرمتن: فونت فارسی، به‌صورت محلی (بدون نیاز به اینترنت) ---------- */
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('./assets/fonts/Vazirmatn-Regular.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('./assets/fonts/Vazirmatn-Medium.woff2') format('woff2');
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('./assets/fonts/Vazirmatn-SemiBold.woff2') format('woff2');
+  font-weight: 600; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('./assets/fonts/Vazirmatn-Bold.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+
+/*
+ * ---------- سیستم تم ----------
+ * همه‌ی رنگ‌ها از متغیرهای CSS می‌آیند. تم روشن فقط همین متغیرها را
+ * بازنویسی می‌کند، پس هیچ کامپوننتی نیاز به کلاس dark: ندارد.
+ */
+@theme {
+  --color-bg: #08090c;
+  --color-bg2: #0d0f14;
+  --color-panel: #11141b;
+  --color-line: #1e222c;
+  --color-line2: #2a2f3c;
+  --color-tx: #e8eaf0;
+  --color-dim: #8b93a7;
+  --color-dim2: #5d6577;
+  --color-acc: #6366f1;
+  --font-sans: 'Vazirmatn', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+:root {
+  color-scheme: dark;
+  /* شیشه — سطوح نیمه‌شفاف با بلور پس‌زمینه */
+  --glass-bg: rgba(255, 255, 255, .045);
+  --glass-bg-strong: rgba(20, 24, 34, .72);
+  --glass-brd: rgba(255, 255, 255, .085);
+  --glass-brd2: rgba(255, 255, 255, .14);
+  --glass-blur: 18px;
+  --glass-shadow: 0 8px 32px -12px rgba(0, 0, 0, .7);
+  --hover: rgba(255, 255, 255, .055);
+  --hover2: rgba(255, 255, 255, .09);
+  --track: rgba(255, 255, 255, .08);
+  --scrim: rgba(4, 5, 8, .72);
+  --sb-thumb: #232936;
+  --sb-thumb-h: #333b4d;
+  /* نور محیطی پشت شیشه */
+  --aura1: rgba(99, 102, 241, .16);
+  --aura2: rgba(168, 85, 247, .12);
+  --aura3: rgba(34, 211, 238, .08);
+}
+
+html[data-theme='light'] {
+  color-scheme: light;
+  --color-bg: #eef1f7;
+  --color-bg2: #f7f9fc;
+  --color-panel: #ffffff;
+  --color-line: #dfe4ee;
+  --color-line2: #c9d1e0;
+  --color-tx: #0d1017;
+  /* در پس‌زمینه‌ی روشن، خاکستری‌های تیره‌ی تم دارک کم‌کنتراست می‌شوند؛
+     این دو یک پله تیره‌تر از معادل دارک‌شان هستند تا WCAG AA رعایت شود. */
+  --color-dim: #4b5468;
+  --color-dim2: #6b7488;
+
+  --glass-bg: rgba(255, 255, 255, .66);
+  --glass-bg-strong: rgba(255, 255, 255, .86);
+  --glass-brd: rgba(16, 19, 26, .07);
+  --glass-brd2: rgba(16, 19, 26, .12);
+  --glass-shadow: 0 8px 32px -14px rgba(31, 41, 71, .28);
+  --hover: rgba(16, 19, 26, .045);
+  --hover2: rgba(16, 19, 26, .075);
+  --track: rgba(16, 19, 26, .09);
+  --scrim: rgba(226, 231, 240, .68);
+  --sb-thumb: #c3cbdb;
+  --sb-thumb-h: #a7b1c6;
+
+  --aura1: rgba(99, 102, 241, .2);
+  --aura2: rgba(168, 85, 247, .14);
+  --aura3: rgba(6, 182, 212, .12);
+}
+
+* { -webkit-font-smoothing: antialiased; }
+
+html, body, #root { height: 100%; }
+
+body {
+  background: var(--color-bg);
+  color: var(--color-tx);
+  font-family: var(--font-sans);
+  overflow: hidden;
+  transition: background-color .25s ease, color .25s ease;
+}
+
+/* هاله‌ی رنگی پس‌زمینه — چیزی که شیشه را «شیشه» نشان می‌دهد */
+body::before {
+  content: '';
+  position: fixed;
+  inset: -20%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(46rem 46rem at 12% -6%, var(--aura1), transparent 62%),
+    radial-gradient(38rem 38rem at 92% 8%, var(--aura2), transparent 60%),
+    radial-gradient(42rem 42rem at 74% 104%, var(--aura3), transparent 62%);
+}
+#root { position: relative; z-index: 1; }
+
+/* ---------- شیشه ---------- */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  border: 1px solid var(--glass-brd);
+}
+.glass-strong {
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(26px) saturate(165%);
+  -webkit-backdrop-filter: blur(26px) saturate(165%);
+  border: 1px solid var(--glass-brd);
+}
+/* درخشش لبه‌ی بالایی — عمق شیشه */
+.glass-sheen { position: relative; }
+.glass-sheen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .07), transparent 42%);
+}
+html[data-theme='light'] .glass-sheen::after {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .85), transparent 46%);
+}
+
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(128, 140, 170, .07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(128, 140, 170, .07) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+/* ---------- موبایل / Capacitor ---------- */
+/* ناحیه‌ی امن: نوار وضعیت بالا و نوار ناوبری پایین گوشی */
+body.is-mobile {
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+/* ورودی‌ها باید قابل انتخاب بمانند */
+body.is-mobile input,
+body.is-mobile textarea,
+body.is-mobile [contenteditable] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+/* iOS/اندروید زیر ۱۶px را زوم می‌کنند — ورودی‌ها را بزرگ‌تر نگه می‌داریم */
+body.is-mobile input,
+body.is-mobile select,
+body.is-mobile textarea { font-size: 16px; }
+/* هدف لمسی حداقل ۴۴px */
+body.is-mobile button,
+body.is-mobile a[role='button'] { touch-action: manipulation; }
+body.is-mobile .kanban-scroll { -webkit-overflow-scrolling: touch; }
+/* اسکرول‌بار نازک روی موبایل بی‌فایده است */
+body.is-mobile ::-webkit-scrollbar { width: 0; height: 0; }
+/* روی گوشی بلور سنگین است — سبک‌ترش می‌کنیم تا اسکرول روان بماند */
+body.is-mobile .glass { backdrop-filter: blur(12px) saturate(140%); -webkit-backdrop-filter: blur(12px) saturate(140%); }
+body.is-mobile .glass-strong { backdrop-filter: blur(16px) saturate(150%); -webkit-backdrop-filter: blur(16px) saturate(150%); }
+
+/* ناحیه‌ی امن — به‌صورت متغیر تا صفحه‌ها خودشان اعمالش کنند */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  /* ارتفاع نوار ناوبری پایین اندروید */
+  --tabbar-h: 58px;
+}
+.pt-safe { padding-top: var(--sat); }
+.pb-safe { padding-bottom: var(--sab); }
+
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--sb-thumb); border-radius: 9px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--sb-thumb-h); background-clip: padding-box; }
+
+input, select, textarea, button { font-family: inherit; }
+input:focus, select:focus, textarea:focus { outline: none; }
+select option { background: var(--color-panel); color: var(--color-tx); }
+/* تقویم/ساعت مرورگر در تم تیره باید روشن دیده شود */
+input[type='date']::-webkit-calendar-picker-indicator { filter: invert(var(--cal-invert, 1)); opacity: .55; cursor: pointer; }
+html[data-theme='light'] { --cal-invert: 0; }
+
+@keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.anim { animation: fadeUp .22s cubic-bezier(.16,1,.3,1) both; }
+
+@keyframes pulseDot { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
+.pulse { animation: pulseDot 2s ease-in-out infinite; }
+
+@keyframes sheetUp { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
+.anim-sheet { animation: sheetUp .24s cubic-bezier(.16,1,.3,1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim, .anim-sheet, .pulse { animation: none !important; }
+  * { transition-duration: .01ms !important; }
+}
+
+.drag-over { outline: 1px dashed var(--color-acc); outline-offset: -3px; background: color-mix(in srgb, var(--color-acc) 7%, transparent); }
+.dragging { opacity: .35; }
+
+/* ---------- راست‌چین ---------- */
+/*
+ * چیدمان با ویژگی‌های منطقی (logical properties) نوشته شده تا با تغییر dir
+ * خودبه‌خود قرینه شود. این بخش فقط تفاوت‌های باقی‌مانده را جبران می‌کند.
+ */
+html[dir='rtl'] body { font-family: 'Vazirmatn', ui-sans-serif, system-ui, sans-serif; }
+
+/*
+ * فاصله‌ی حروف، خط فارسی را از هم می‌گسلد. در حالت راست‌چین آن را صفر می‌کنیم،
+ * مگر برای عناصری که عمداً با کلاس .keep-tracking علامت خورده‌اند (برچسب‌های لاتین).
+ */
+html[dir='rtl'] :where(h1,h2,h3,h4,h5,h6,p,span,div,button,a,label,th,td,li,input,textarea,select) {
+  letter-spacing: normal;
+}
+html[dir='rtl'] .keep-tracking { letter-spacing: .08em; }
+
+/* اعداد، پول و تاریخ همیشه چپ‌چین و لاتین‌خوان می‌مانند */
+.ltr { direction: ltr; unicode-bidi: isolate; }
+.nums { font-variant-numeric: tabular-nums; }
+
+/* آیکون‌های جهت‌دار در حالت راست‌چین قرینه می‌شوند */
+html[dir='rtl'] .flip-rtl { transform: scaleX(-1); }
+
+/* نوار پیشرفت و نمودارها در RTL از راست پر می‌شوند */
+html[dir='rtl'] .bar-track > .bar-fill { margin-inline-start: 0; }
+
+/* اسکرول افقی کانبان در RTL */
+html[dir='rtl'] .kanban-scroll { direction: rtl; }
+
+/* ---------- کمک‌کننده‌های چیدمان ---------- */
+/* هر ناحیه‌ی اسکرول‌شونده باید انعطاف‌پذیر باشد وگرنه در فلکس‌باکس سرریز می‌کند */
+.scroll-y { overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; min-height: 0; }
+.no-scrollbar::-webkit-scrollbar { width: 0; height: 0; }

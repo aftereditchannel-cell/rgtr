@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#08090C</color>
+    <color name="colorPrimaryDark">#08090C</color>
+    <color name="colorAccent">#6366F1</color>
+    <color name="nexusBg">#08090C</color>
+</resources>
