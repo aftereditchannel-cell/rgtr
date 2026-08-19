@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from 'react'
 import type { ReactNode, CSSProperties } from 'react'
 import { ICONS } from './icons'
 import { useT } from '../../i18n'
@@ -124,19 +125,19 @@ export function Modal({ open, onClose, title, children, wide = false, footer }: 
 }) {
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:p-8"
-      style={{ background: 'rgba(4,5,8,.72)', backdropFilter: 'blur(4px)' }}
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto p-3 sm:p-8"
+      style={{ background: 'rgba(4,5,8,.72)', backdropFilter: 'blur(4px)', paddingBottom: 'max(0.75rem, var(--sab))' }}
       onClick={onClose}>
-      <div className={`anim w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} rounded-2xl border border-[var(--color-line2)] bg-[var(--color-bg2)] shadow-2xl my-auto`}
+      <div className={`anim w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} rounded-2xl border border-[var(--color-line2)] bg-[var(--color-bg2)] shadow-2xl my-auto flex flex-col max-h-[calc(100dvh-1.5rem)]`}
         onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--color-line)]">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--color-line)] shrink-0">
           <h3 className="text-[14px] font-semibold">{title}</h3>
           <button onClick={onClose} className="text-[var(--color-dim2)] hover:text-[var(--color-tx)] transition-colors p-1 rounded-md hover:bg-white/5">
             <Icon name="X" size={17} />
           </button>
         </div>
-        <div className="px-5 py-4">{children}</div>
-        {footer && <div className="px-5 py-3.5 border-t border-[var(--color-line)] flex justify-end gap-2">{footer}</div>}
+        <div className="px-5 py-4 overflow-y-auto min-h-0 overscroll-contain">{children}</div>
+        {footer && <div className="px-5 py-3.5 border-t border-[var(--color-line)] flex justify-end gap-2 shrink-0">{footer}</div>}
       </div>
     </div>
   )
@@ -151,11 +152,69 @@ export function TextInput(p: React.InputHTMLAttributes<HTMLInputElement>) {
 export function TextArea(p: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea {...p} className={`${inputCls} resize-y min-h-[76px] leading-relaxed ${p.className ?? ''}`} />
 }
-export function Select({ options, ...p }: { options: string[] } & React.SelectHTMLAttributes<HTMLSelectElement>) {
+/**
+ * Dropdown سفارشی — جایگزین <select> بومی
+ * رفتار یکسان در WebView2 (ویندوز) و WebView اندروید:
+ * باز/بسته با کلیک، بستن با کلیک بیرون/Esc، انتخاب با کلیک،
+ * همیشه روی بقیه‌ی عناصر (z-50) و بدون خروج از صفحه.
+ */
+export function Select({ options, value, onChange, className = '', disabled }: {
+  options: string[]
+  value: string
+  onChange: (e: { target: { value: string } }) => void
+  className?: string
+  disabled?: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const [hi, setHi] = useState(0)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDoc)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  const current = options.find(o => o === value) ?? ''
+  const label = (o: string) => (o === '' ? '—' : o)
+
   return (
-    <select {...p} className={`${inputCls} cursor-pointer ${p.className ?? ''}`}>
-      {options.map(o => <option key={o} value={o}>{o || '—'}</option>)}
-    </select>
+    <div ref={ref} className={`relative ${className}`}>
+      <button type="button" disabled={disabled} onClick={() => setOpen(o => !o)}
+        className={`${inputCls} cursor-pointer flex items-center justify-between gap-2 text-start w-full ${disabled ? 'opacity-50' : ''}`}
+        aria-haspopup="listbox" aria-expanded={open}>
+        <span className="truncate">{label(current)}</span>
+        <svg width="10" height="10" viewBox="0 0 10 10" className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true">
+          <path d="M1 3l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+        </svg>
+      </button>
+      {open && (
+        <div role="listbox" className="absolute z-50 left-0 right-0 mt-1.5 max-h-60 overflow-y-auto rounded-lg glass-strong shadow-2xl py-1 anim">
+          {options.map((o, i) => (
+            <button key={o} type="button" role="option" aria-selected={o === value}
+              onMouseEnter={() => setHi(i)}
+              onClick={() => { onChange({ target: { value: o } }); setOpen(false) }}
+              className={`w-full text-start px-3 py-2 text-[12px] transition-colors ${
+                o === value
+                  ? 'text-[var(--color-acc)] font-medium'
+                  : i === hi ? 'bg-[var(--hover)] text-[var(--color-tx)]' : 'text-[var(--color-dim)]'
+              }`}>
+              {label(o)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 export function Field({ label, children, help }: { label: string; children: ReactNode; help?: string }) {

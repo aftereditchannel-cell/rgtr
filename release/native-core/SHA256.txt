@@ -1,0 +1,4 @@
+179881da0e9fd41826b8ac449a89801cb9bf02f95922f4354c4cd4504fd9624f  NEXUS-HQ-NativeCore-Setup.exe
+772dc6da6c369a8d53ff3331ea4bc2ae83da93b79b68e8c301e10d3ff78896d4  NEXUS-HQ-NativeCore.exe
+168a1f175522f7fc136fcecd9e1a8e534275147d21ac59b0908ccda24a00d6f3  NEXUS-HQ-NativeCore-x86.exe
+d9d951efea33bdf9e9db6d3dbbba4d177de8c8b62430011eeacafe93a0889ad6  NEXUS-HQ-NativeCore-1.0.0-android.apk

@@ -214,7 +214,7 @@ html[data-theme='light'] { --cal-invert: 0; }
 .anim-sheet { animation: sheetUp .24s cubic-bezier(.16,1,.3,1) both; }
 
 @media (prefers-reduced-motion: reduce) {
-  .anim, .anim-sheet, .pulse { animation: none !important; }
+  .anim, .anim-sheet, .pulse, .lock-shake { animation: none !important; }
   * { transition-duration: .01ms !important; }
 }
 
@@ -254,3 +254,48 @@ html[dir='rtl'] .kanban-scroll { direction: rtl; }
 /* هر ناحیه‌ی اسکرول‌شونده باید انعطاف‌پذیر باشد وگرنه در فلکس‌باکس سرریز می‌کند */
 .scroll-y { overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; min-height: 0; }
 .no-scrollbar::-webkit-scrollbar { width: 0; height: 0; }
+
+
+/* ---------- تم شیشه‌ای (Acrylic/Glass) — با data-glass فعال می‌شود ---------- */
+html[data-glass='on'] .rounded-xl,
+html[data-glass='on'] .bg-\[var\(--color-panel\)\] {
+  /* نرم‌شروع: پنل‌های اصلی کمی شفاف */
+}
+html[data-glass='on'] [class*='border-[var(--color-line)'] {
+  border-color: var(--glass-brd2);
+}
+html[data-glass='on'] body::before { filter: saturate(160%) blur(0px); opacity: 1.25; }
+html[data-glass='on'] .glass, html[data-glass='on'] .glass-strong {
+  backdrop-filter: blur(calc(var(--glass-blur) * 1.6)) saturate(180%);
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 1.6)) saturate(180%);
+}
+html[data-glass='on'] aside, /* سایدبار */
+html[data-glass='on'] main > div > div > .rounded-xl {
+  background: color-mix(in srgb, var(--color-panel) 55%, transparent) !important;
+  backdrop-filter: blur(28px) saturate(170%);
+  -webkit-backdrop-filter: blur(28px) saturate(170%);
+}
+/* کارت‌ها (Card) شیشه‌ای */
+html[data-glass='on'] .rounded-xl.border {
+  background: color-mix(in srgb, var(--color-panel) 62%, transparent) !important;
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-glass='on'] * { backdrop-filter: none !important; }
+}
+
+
+/* ---------- ریسپانسیو فرم‌ها/صفحات (موبایل و دسکتاپ) ---------- */
+@media (max-width: 640px) {
+  /* شیت‌های پایین صفحه بالای نوار سیستمی بمانند */
+  .anim-sheet { padding-bottom: calc(1rem + var(--sab)); }
+  /* فرم‌های رکورد: ارتفاع کامل در دسترس و اسکرول داخلی */
+  form { max-width: 100%; }
+  /* ورودی‌ها حداقل ۴۴px لمس */
+  input, select, textarea, button { min-height: 0; }
+  body { overflow: hidden; }
+  #root { height: 100dvh; }
+}
+/* اسکرول نرم صفحات */
+main.scroll-y, .scroll-y { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }

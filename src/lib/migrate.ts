@@ -16,6 +16,9 @@ export const DEFAULT_SETTINGS: Settings = {
   digits: 'fa',
   weights: DEFAULT_WEIGHTS,
   cloud: { provider: 'gist', gistId: '', lastSync: '', askOnExit: true },
+  ai: { provider: 'openai', model: 'gpt-4o-mini', enabled: false },
+  custom: { appName: 'NEXUS HQ', secondaryColor: '#a855f7', platformLabels: {}, glass: true },
+  social: { refreshMode: 'manual' },
 }
 
 /**
@@ -34,6 +37,9 @@ export function migrate(input: unknown): AppData {
       ...rawSettings,
       weights: { ...DEFAULT_WEIGHTS, ...(rawSettings.weights ?? {}) },
       cloud: { ...DEFAULT_SETTINGS.cloud, ...(rawSettings.cloud ?? {}) },
+      ai: { ...DEFAULT_SETTINGS.ai, ...(rawSettings.ai ?? {}) },
+      custom: { ...DEFAULT_SETTINGS.custom, glass: DEFAULT_SETTINGS.custom.glass, ...(rawSettings.custom ?? {}) },
+      social: { ...DEFAULT_SETTINGS.social, ...(rawSettings.social ?? {}) },
     },
     modules: Array.isArray(raw.modules) && raw.modules.length ? raw.modules : CORE_MODULES,
     records: (raw.records ?? {}) as AppData['records'],
