@@ -62,12 +62,20 @@ def build_manifest() -> bytes:
 def main():
     manifest = build_manifest()
     arsc = build_arsc()
-    icon = os.path.join(ROOT, 'android', 'app', 'src', 'main', 'res', 'mipmap-xxxhdpi', 'ic_launcher.png')
     out = os.path.join(HERE, 'native-unsigned.apk')
+    icons = os.path.join(ROOT, 'electron', 'icons')
     with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
         z.writestr('AndroidManifest.xml', manifest)
         z.write(os.path.join(HERE, 'classes.dex'), 'classes.dex')
-        z.write(icon, 'res/mipmap-xxxhdpi/ic_launcher.png')
+        # آیکون در همه‌ی تراکم‌ها (واقعی، از آیکون‌های ریپو)
+        z.write(os.path.join(icons, '48x48.png'), 'res/mipmap-mdpi/ic_launcher.png')
+        z.write(os.path.join(icons, '64x64.png'), 'res/mipmap-hdpi/ic_launcher.png')
+        z.write(os.path.join(icons, '128x128.png'), 'res/mipmap-xhdpi/ic_launcher.png')
+        z.write(os.path.join(icons, '256x256.png'), 'res/mipmap-xxhdpi/ic_launcher.png')
+        z.write(os.path.join(icons, '512x512.png'), 'res/mipmap-xxxhdpi/ic_launcher.png')
+        # فونت فارسی وزیرمتن
+        z.write(os.path.join(HERE, 'assets', 'fonts', 'Vazirmatn-Regular.ttf'), 'assets/fonts/Vazirmatn-Regular.ttf')
+        z.write(os.path.join(HERE, 'assets', 'fonts', 'Vazirmatn-Bold.ttf'), 'assets/fonts/Vazirmatn-Bold.ttf')
         z.writestr('resources.arsc', arsc)
     print(f'native-unsigned.apk: {os.path.getsize(out)} bytes')
 

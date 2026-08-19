@@ -1,4 +1,4 @@
-# NEXUS HQ Native Edition — ۱۰۰٪ Native، صفر وب
+# NEXUS HQ Native Edition v1.1 — ۱۰۰٪ Native، صفر وب
 
 | فایل | حجم | توضیح |
 |---|---|---|
