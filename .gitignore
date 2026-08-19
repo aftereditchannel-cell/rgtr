@@ -22,3 +22,5 @@ android/app/src/main/assets/public/
 # --- متفرقه ---
 .DS_Store
 *.log
+
+# خروجی‌های build در git هستند (build-output/) — این خط فقط برای اطمینان از جدا ماندن سورس است
