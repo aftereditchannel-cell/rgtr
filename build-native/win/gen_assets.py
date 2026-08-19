@@ -7,7 +7,7 @@ DIST = os.path.join(ROOT, 'dist')
 LOADER = os.path.join(os.path.dirname(__file__), 'WebView2Loader.dll')
 OUT = os.path.join(os.path.dirname(__file__), 'assets.cpp')
 
-VERSION = '1.0.0'
+VERSION = '1.1.1'
 
 files = []  # (نام نسبی در پوشه‌ی وب, مسیر کامل)
 for root, dirs, names in os.walk(DIST):
@@ -15,7 +15,7 @@ for root, dirs, names in os.walk(DIST):
     for n in sorted(names):
         full = os.path.join(root, n)
         rel = os.path.relpath(full, DIST).replace(os.sep, '/')
-        files.append(('web/' + rel, full))
+        files.append((rel, full))
 files.sort()
 
 def c_bytes(data: bytes) -> str:

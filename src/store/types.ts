@@ -125,6 +125,8 @@ export interface Customization {
   secondaryColor: string
   /** تغییر برچسب Platformها در UI */
   platformLabels: Record<string, string>
+  /** تم شیشه‌ای (Acrylic) */
+  glass: boolean
 }
 
 export interface SocialSettings {

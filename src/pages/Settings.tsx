@@ -450,6 +450,13 @@ function CustomizationCard() {
             <span className="text-[11px] nums text-[var(--color-dim)]">{s.custom.secondaryColor}</span>
           </div>
         </Field>
+        <Field label={t('set.glass')} help={t('set.glassHint')}>
+          <Toggle
+            value={s.custom.glass === false ? 'off' : 'on'}
+            options={[{ v: 'on', l: t('set.glassOn') }, { v: 'off', l: t('set.glassOff') }]}
+            onChange={v => setSettings({ custom: { ...s.custom, glass: v === 'on' } })}
+          />
+        </Field>
       </div>
       <p className="text-[10px] text-[var(--color-dim2)] mt-3 leading-relaxed">{t('set.brandingNote')}</p>
     </Card>

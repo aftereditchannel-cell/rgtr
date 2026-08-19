@@ -254,3 +254,33 @@ html[dir='rtl'] .kanban-scroll { direction: rtl; }
 /* هر ناحیه‌ی اسکرول‌شونده باید انعطاف‌پذیر باشد وگرنه در فلکس‌باکس سرریز می‌کند */
 .scroll-y { overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; min-height: 0; }
 .no-scrollbar::-webkit-scrollbar { width: 0; height: 0; }
+
+
+/* ---------- تم شیشه‌ای (Acrylic/Glass) — با data-glass فعال می‌شود ---------- */
+html[data-glass='on'] .rounded-xl,
+html[data-glass='on'] .bg-\[var\(--color-panel\)\] {
+  /* نرم‌شروع: پنل‌های اصلی کمی شفاف */
+}
+html[data-glass='on'] [class*='border-[var(--color-line)'] {
+  border-color: var(--glass-brd2);
+}
+html[data-glass='on'] body::before { filter: saturate(160%) blur(0px); opacity: 1.25; }
+html[data-glass='on'] .glass, html[data-glass='on'] .glass-strong {
+  backdrop-filter: blur(calc(var(--glass-blur) * 1.6)) saturate(180%);
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 1.6)) saturate(180%);
+}
+html[data-glass='on'] aside, /* سایدبار */
+html[data-glass='on'] main > div > div > .rounded-xl {
+  background: color-mix(in srgb, var(--color-panel) 55%, transparent) !important;
+  backdrop-filter: blur(28px) saturate(170%);
+  -webkit-backdrop-filter: blur(28px) saturate(170%);
+}
+/* کارت‌ها (Card) شیشه‌ای */
+html[data-glass='on'] .rounded-xl.border {
+  background: color-mix(in srgb, var(--color-panel) 62%, transparent) !important;
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-glass='on'] * { backdrop-filter: none !important; }
+}

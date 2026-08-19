@@ -67,6 +67,11 @@ function Shell() {
   // رنگ دوم و نام سفارشی برنامه (App Customization)
   const secondary = useApp(s => s.data.settings.custom.secondaryColor)
   const appName = useApp(s => s.data.settings.custom.appName)
+  const glass = useApp(s => s.data.settings.custom.glass ?? true)
+  useEffect(() => {
+    if (glass) document.documentElement.setAttribute('data-glass', 'on')
+    else document.documentElement.removeAttribute('data-glass')
+  }, [glass])
   useEffect(() => {
     document.documentElement.style.setProperty('--color-acc2', secondary || '#a855f7')
   }, [secondary])

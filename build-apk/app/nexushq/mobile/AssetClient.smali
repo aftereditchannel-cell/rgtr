@@ -203,13 +203,13 @@
     const-string v4, "*"
     invoke-virtual {v6, v7, v4}, Ljava/util/HashMap;->put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
 
-    new-instance v4, Landroid/webkit/WebResourceResponse;
     invoke-virtual {v3}, Ljava/io/ByteArrayOutputStream;->toByteArray()[B
     move-result-object v7
-    invoke-static {v7}, Ljava/io/ByteArrayInputStream;-><init>([B)V
-    move-result-object v7
-    const-string v3, "utf-8"
-    invoke-direct {v4, v5, v3, v7, v6}, Landroid/webkit/WebResourceResponse;-><init>(Ljava/lang/String;Ljava/lang/String;Ljava/io/InputStream;Ljava/util/Map;)V
+    new-instance v3, Ljava/io/ByteArrayInputStream;
+    invoke-direct {v3, v7}, Ljava/io/ByteArrayInputStream;-><init>([B)V
+    const-string v7, "utf-8"
+    new-instance v4, Landroid/webkit/WebResourceResponse;
+    invoke-direct {v4, v5, v7, v3, v6}, Landroid/webkit/WebResourceResponse;-><init>(Ljava/lang/String;Ljava/lang/String;Ljava/io/InputStream;Ljava/util/Map;)V
     return-object v4
 
     :gw_fail
