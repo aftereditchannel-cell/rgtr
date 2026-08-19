@@ -438,6 +438,14 @@ export const UI: Record<string, Pair> = {
   'form.autoFill':      { fa: 'پر کردن خودکار', en: 'Auto-fill' },
   'form.fetching':      { fa: 'در حال خواندن…', en: 'Fetching…' },
   'form.noProfile':     { fa: 'پروفایلی خوانده نشد (برای اینستاگرام واسط لازم است)', en: 'No profile read (a proxy is needed for Instagram)' },
+
+  /* ---------- اجرای ایجنت ---------- */
+  'agent.run':          { fa: 'اجرای ایجنت', en: 'Run agent' },
+  'agent.select':       { fa: 'انتخاب ایجنت', en: 'Select an agent' },
+  'agent.input':        { fa: 'درخواست شما', en: 'Your request' },
+  'agent.output':       { fa: 'پاسخ', en: 'Response' },
+  'agent.noAgents':     { fa: 'اول در بخش «AI Agents» یک ایجنت تعریف کنید', en: 'Define an agent under “AI Agents” first' },
+  'agent.needKey':      { fa: 'اول کلید API را در تنظیمات ← هوش مصنوعی وارد کنید', en: 'Set your API key under Settings → AI first' },
 }
 
 /** پیام‌های وضعیت اتصال ابری که خارج از React هم لازم می‌شوند */

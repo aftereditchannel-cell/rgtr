@@ -8,6 +8,7 @@ import { KanbanView } from '../components/views/KanbanView'
 import { CardsView } from '../components/views/CardsView'
 import { CalendarView } from '../components/views/CalendarView'
 import { RecordForm } from '../components/views/RecordForm'
+import { AgentRunner } from '../components/views/AgentRunner'
 import { Button, Icon, TextInput, Empty } from '../components/ui/Primitives'
 import { Dropdown } from '../components/ui/Dropdown'
 import { exportModuleCSV } from '../lib/backup'
@@ -33,6 +34,7 @@ export function ModulePage() {
   const [editing, setEditing] = useState<Entity | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [runner, setRunner] = useState(false)
 
   // آیا این ماژول فالوور دارد که از لینک قابل تازه‌سازی باشد؟
   const hasFollowers = module?.fields.some(f => f.key === 'followers') ?? false
@@ -98,6 +100,9 @@ export function ModulePage() {
         <div className="flex items-center gap-2">
           <Button size="sm" variant="ghost" icon="Download" title={t('module.exportCSV')}
             onClick={() => void exportModuleCSV(module.key, filtered, module.fields.map(f => f.key))} />
+          {module.key === 'agents' && (
+            <Button size="sm" variant="outline" icon="Bot" onClick={() => setRunner(true)}>{t('agent.run')}</Button>
+          )}
           <Button size="sm" variant="primary" icon="Plus" onClick={create}>{t('module.newRecord')}</Button>
         </div>
       </div>
@@ -146,6 +151,7 @@ export function ModulePage() {
       {v === 'calendar' && <CalendarView module={module} rows={filtered} onOpen={open} />}
 
       <RecordForm module={module} row={editing} open={formOpen} onClose={() => setFormOpen(false)} />
+      {runner && <AgentRunner onClose={() => setRunner(false)} />}
     </div>
   )
 }
