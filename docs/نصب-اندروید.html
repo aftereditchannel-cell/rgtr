@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NEXUS HQ — راهنمای نصب روی گوشی اندروید</title>
+<style>
+  :root{
+    --bg:#08090c; --bg2:#11141b; --bg3:#171b24;
+    --line:#1e2330; --line2:#2a2f3c;
+    --tx:#e8eaf0; --dim:#8b93a7; --dim2:#5d6577;
+    --acc:#6366f1; --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--tx);
+    font-family:'Vazirmatn',system-ui,'Segoe UI',Tahoma,sans-serif;
+    line-height:1.9; padding:32px 18px 80px;
+  }
+  .wrap{max-width:780px;margin:0 auto}
+  h1{font-size:26px;margin:0 0 6px;font-weight:700;letter-spacing:-.3px}
+  .sub{color:var(--dim);font-size:14px;margin-bottom:28px}
+  h2{font-size:18px;margin:38px 0 14px;padding-bottom:9px;border-bottom:1px solid var(--line);font-weight:650}
+  p{font-size:14.5px;color:#cdd2de;margin:10px 0}
+  code{background:var(--bg3);border:1px solid var(--line2);border-radius:6px;padding:2px 7px;font-size:13px;direction:ltr;display:inline-block;font-family:ui-monospace,Menlo,Consolas,monospace}
+  .card{background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:16px 0}
+  .step{display:flex;gap:14px;align-items:flex-start;margin:18px 0}
+  .num{
+    flex:0 0 30px;height:30px;border-radius:9px;display:grid;place-items:center;
+    background:color-mix(in srgb,var(--acc) 14%,transparent);
+    border:1px solid color-mix(in srgb,var(--acc) 32%,transparent);
+    color:#a5b0ff;font-weight:700;font-size:13.5px;
+  }
+  .step-b{flex:1;min-width:0}
+  .step-t{font-weight:650;font-size:15px;margin-bottom:3px}
+  .step-d{font-size:13.5px;color:var(--dim)}
+  .note{border-inline-start:3px solid var(--acc);background:color-mix(in srgb,var(--acc) 7%,transparent);border-radius:0 10px 10px 0;padding:12px 16px;margin:16px 0;font-size:13.5px}
+  .warn{border-inline-start:3px solid var(--warn);background:color-mix(in srgb,var(--warn) 8%,transparent);border-radius:0 10px 10px 0;padding:12px 16px;margin:16px 0;font-size:13.5px}
+  .ok{border-inline-start:3px solid var(--ok);background:color-mix(in srgb,var(--ok) 8%,transparent);border-radius:0 10px 10px 0;padding:12px 16px;margin:16px 0;font-size:13.5px}
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13.5px}
+  th,td{border:1px solid var(--line2);padding:9px 12px;text-align:right}
+  th{background:var(--bg3);font-weight:650;color:#b9c0d0}
+  td:first-child{white-space:nowrap;color:var(--dim)}
+  .phone{
+    width:250px;margin:20px auto;border:8px solid #22262f;border-radius:30px;
+    background:var(--bg);overflow:hidden;box-shadow:0 18px 50px rgba(0,0,0,.55)
+  }
+  .phone-top{height:22px;background:#0d0f14;display:grid;place-items:center}
+  .notch{width:70px;height:5px;background:#22262f;border-radius:4px}
+  .phone-b{padding:16px 14px}
+  .pill{display:inline-block;background:var(--bg3);border:1px solid var(--line2);border-radius:999px;padding:3px 11px;font-size:11.5px;color:var(--dim);margin:2px}
+  .big{font-size:15px;font-weight:650;color:#fff}
+  .hash{font-size:11px;direction:ltr;text-align:left;word-break:break-all;color:var(--dim2);background:var(--bg3);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-family:ui-monospace,monospace}
+  ul{padding-inline-start:20px;font-size:14px;color:#cdd2de}
+  li{margin:7px 0}
+  .kbd{background:#1b202b;border:1px solid var(--line2);border-bottom-width:2px;border-radius:6px;padding:1px 7px;font-size:12.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>نصب NEXUS HQ روی گوشی اندروید</h1>
+  <div class="sub">فایل نصبی: <code>NEXUS-HQ-1.0.0.apk</code> — حجم حدود ۳٫۵ مگابایت — اندروید ۶ به بالا</div>
+
+  <div class="ok">
+    <b>همان برنامه‌ی ویندوز، با همه‌ی امکانات.</b> هر ۱۶ ماژول، داشبورد تمرکز امروز،
+    مرکز تصمیم، کانبان، تقویم، نمودارها، جست‌وجو، فارسی راست‌چین و همگام‌سازی ابری —
+    همگی داخل همین APK هستند و <b>آفلاین</b> کار می‌کنند.
+  </div>
+
+  <h2>مرحله ۱ — انتقال فایل به گوشی</h2>
+  <p>فایل <code>NEXUS-HQ-1.0.0.apk</code> را با یکی از این روش‌ها به گوشی برسانید:</p>
+  <ul>
+    <li>کابل USB → کپی در پوشه‌ی <code>Download</code> گوشی</li>
+    <li>ارسال برای «پیام‌های ذخیره‌شده» خودتان در تلگرام، سپس دانلود در گوشی</li>
+    <li>آپلود در گوگل درایو یا هر فضای ابری و دانلود از گوشی</li>
+  </ul>
+
+  <h2>مرحله ۲ — اجازه‌ی نصب از منبع ناشناس</h2>
+  <p>چون این برنامه از گوگل‌پلی نمی‌آید، اندروید یک‌بار اجازه می‌خواهد. این کاملاً عادی است.</p>
+
+  <div class="step">
+    <div class="num">۱</div>
+    <div class="step-b">
+      <div class="step-t">روی فایل APK بزنید</div>
+      <div class="step-d">در برنامه‌ی «فایل‌ها» یا لیست دانلودها، روی <code>NEXUS-HQ-1.0.0.apk</code> ضربه بزنید.</div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="num">۲</div>
+    <div class="step-b">
+      <div class="step-t">پیام «نصب برنامه‌های ناشناس» ظاهر می‌شود</div>
+      <div class="step-d">روی <b>تنظیمات</b> (Settings) بزنید تا به صفحه‌ی اجازه بروید.</div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="num">۳</div>
+    <div class="step-b">
+      <div class="step-t">گزینه را روشن کنید</div>
+      <div class="step-d">
+        «<b>اجازه از این منبع</b>» / <span class="pill">Allow from this source</span> را فعال کنید،
+        سپس دکمه‌ی <b>بازگشت</b> گوشی را بزنید.
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="num">۴</div>
+    <div class="step-b">
+      <div class="step-t">نصب</div>
+      <div class="step-d">روی <b>نصب</b> / <span class="pill">Install</span> بزنید و چند ثانیه صبر کنید.</div>
+    </div>
+  </div>
+
+  <div class="warn">
+    اگر Play&nbsp;Protect پیام «برنامه‌ی ناشناس» داد، روی
+    «<b>به‌هرحال نصب کن</b>» / <span class="pill">Install anyway</span> بزنید.
+    دلیلش فقط این است که برنامه در گوگل‌پلی ثبت نشده — این برنامه‌ی شخصی خودتان است.
+  </div>
+
+  <div class="phone">
+    <div class="phone-top"><div class="notch"></div></div>
+    <div class="phone-b" style="text-align:center">
+      <div style="width:56px;height:56px;margin:6px auto 10px;border-radius:14px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:grid;place-items:center;font-weight:800;color:#fff;font-size:22px">N</div>
+      <div class="big">NEXUS HQ</div>
+      <div style="font-size:11.5px;color:var(--dim);margin-top:4px">آیکون روی صفحه‌ی اصلی گوشی</div>
+    </div>
+  </div>
+
+  <h2>مرحله ۳ — انتقال اطلاعات از ویندوز به گوشی</h2>
+  <p>هر دو نسخه از یک حساب گیت‌هاب برای همگام‌سازی استفاده می‌کنند، پس داده‌ها بین کامپیوتر و گوشی رد و بدل می‌شوند.</p>
+
+  <table>
+    <tr><th>روی کامپیوتر (ویندوز)</th><th>روی گوشی (اندروید)</th></tr>
+    <tr>
+      <td>تنظیمات ← همگام‌سازی ابری ← «<b>ارسال به ابر</b>»</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>«<b>کپی شناسه</b>» را بزنید و Gist ID را بردارید</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>—</td>
+      <td>تنظیمات ← همگام‌سازی ابری ← توکن + شناسه Gist را وارد کنید</td>
+    </tr>
+    <tr>
+      <td>—</td>
+      <td>«<b>دریافت از ابر</b>» را بزنید — همه‌ی داده‌ها می‌آیند</td>
+    </tr>
+  </table>
+
+  <div class="note">
+    <b>همان توکن ویندوز را وارد کنید.</b> نیازی به ساخت توکن جدید نیست.
+    اگر توکن را گم کرده‌اید، طبق راهنمای <code>توکن-قدم-به-قدم.html</code> یکی بسازید
+    (فقط دسترسی <code>gist</code> کافی است).
+  </div>
+
+  <h2>تفاوت‌های نسخه‌ی گوشی</h2>
+  <table>
+    <tr><th>موضوع</th><th>توضیح</th></tr>
+    <tr><td>محل ذخیره</td><td>حافظه‌ی داخلی گوشی، داخل فضای خصوصی برنامه</td></tr>
+    <tr><td>خروج و ذخیره</td><td>دکمه‌ی <b>back</b> در صفحه‌ی اصلی همان سؤال «ذخیره در ابر؟» را می‌پرسد</td></tr>
+    <tr><td>ذخیره‌ی خودکار</td><td>وقتی برنامه را کوچک می‌کنید، داده‌ها خودکار ذخیره می‌شوند</td></tr>
+    <tr><td>خروجی بکاپ</td><td>فایل ساخته و برگه‌ی «اشتراک‌گذاری» باز می‌شود (تلگرام، درایو، …)</td></tr>
+    <tr><td>منو</td><td>با دکمه‌ی ☰ بالای صفحه باز می‌شود</td></tr>
+    <tr><td>میان‌برهای کیبورد</td><td>روی گوشی کاربرد ندارند — بقیه‌ی امکانات کامل است</td></tr>
+  </table>
+
+  <div class="warn">
+    <b>مهم:</b> اگر برنامه را از گوشی حذف کنید، داده‌های داخل گوشی هم پاک می‌شوند.
+    پس قبل از حذف، حتماً یک‌بار «<b>ارسال به ابر</b>» بزنید یا خروجی بکاپ بگیرید.
+  </div>
+
+  <h2>به‌روزرسانی در آینده</h2>
+  <p>
+    برای نصب نسخه‌ی جدید کافی است APK جدید را روی همین برنامه نصب کنید —
+    داده‌ها پاک نمی‌شوند، چون کلید امضا یکی است. برنامه را <b>حذف نکنید</b>.
+  </p>
+
+  <h2>مشخصات فنی</h2>
+  <table>
+    <tr><td>شناسه‌ی برنامه</td><td><code>app.nexushq.mobile</code></td></tr>
+    <tr><td>نسخه</td><td>1.0.0 (versionCode 1)</td></tr>
+    <tr><td>حداقل اندروید</td><td>6.0 — API 23</td></tr>
+    <tr><td>هدف</td><td>Android 15 — API 35</td></tr>
+    <tr><td>دسترسی‌ها</td><td>فقط اینترنت (برای همگام‌سازی ابری)</td></tr>
+    <tr><td>امضا</td><td>v1 + v2 — کلید شخصی، اعتبار ۳۰ سال</td></tr>
+  </table>
+
+  <p style="margin-top:22px;font-size:13px;color:var(--dim)">اثر انگشت SHA-256 فایل APK:</p>
+  <div class="hash">c18541334ecef40b53802e47347383eb1216de1dedc7a5f46e8ffdf9b6c9a5d6</div>
+
+</div>
+</body>
+</html>

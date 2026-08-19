@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ساخت توکن گیت‌هاب — قدم به قدم با تصویر</title>
+<style>
+  :root{
+    --bg:#08090c; --card:#0f1117; --line:#232838; --txt:#e8eaf2; --dim:#98a0b6; --dim2:#6b7488;
+    --acc:#6366f1; --acc2:#8b5cf6; --ok:#22c55e; --warn:#f59e0b; --danger:#ef4444;
+    /* github light mock */
+    --gh-bg:#ffffff; --gh-line:#d1d9e0; --gh-txt:#1f2328; --gh-dim:#59636e;
+    --gh-btn:#1f883d; --gh-blue:#0969da; --gh-head:#f6f8fa;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);
+    font-family:"Vazirmatn","Segoe UI",Tahoma,sans-serif;line-height:1.95;padding:30px 16px 90px}
+  .wrap{max-width:900px;margin:0 auto}
+  header{background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:22px;padding:30px 28px;margin-bottom:14px}
+  header h1{margin:0 0 8px;font-size:27px;letter-spacing:-.4px}
+  header p{margin:0;opacity:.92;font-size:14.5px}
+  .meta{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0 26px}
+  .pill{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 14px;font-size:12.5px;color:var(--dim)}
+
+  .step{background:var(--card);border:1px solid var(--line);border-radius:18px;margin-bottom:18px;overflow:hidden}
+  .sh{display:flex;align-items:center;gap:13px;padding:16px 20px;background:rgba(99,102,241,.06);border-bottom:1px solid var(--line)}
+  .num{flex:0 0 36px;height:36px;border-radius:12px;background:linear-gradient(135deg,var(--acc),var(--acc2));
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:#fff}
+  .sh h2{margin:0;font-size:17px;font-weight:600}
+  .sb{padding:18px 20px}
+  .sb p{margin:0 0 10px}
+  .dim{color:var(--dim);font-size:13.5px}
+  .tiny{color:var(--dim2);font-size:12.5px}
+  code{direction:ltr;unicode-bidi:isolate;display:inline-block;background:#171b26;border:1px solid var(--line);
+    border-radius:7px;padding:1px 8px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#c7d2fe}
+  .ltr{direction:ltr;unicode-bidi:isolate}
+  .note{border-radius:12px;padding:12px 15px;margin:12px 0;font-size:13.5px;border:1px solid}
+  .n-warn{background:#1d1707;border-color:#5c4711;color:#fcd34d}
+  .n-dang{background:#1c0c0c;border-color:#5b2020;color:#fca5a5}
+  .n-ok{background:#07160e;border-color:#14532d;color:#86efac}
+  .n-info{background:#0b1020;border-color:#28305c;color:#c7d2fe}
+
+  /* ---- GitHub mockups ---- */
+  .mock{direction:ltr;unicode-bidi:isolate;background:var(--gh-bg);color:var(--gh-txt);border-radius:12px;
+    border:1px solid var(--gh-line);overflow:hidden;margin:14px 0;
+    font-family:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;font-size:13px;line-height:1.5;
+    box-shadow:0 8px 30px rgba(0,0,0,.45)}
+  .mock-bar{background:#1f2328;color:#fff;padding:9px 14px;display:flex;align-items:center;justify-content:space-between;font-size:12.5px}
+  .mock-body{padding:16px 18px}
+  .gh-label{font-weight:600;font-size:13px;margin-bottom:5px;display:block}
+  .gh-in{border:1px solid var(--gh-line);border-radius:6px;padding:6px 10px;background:#fff;color:var(--gh-txt);font-size:13px}
+  .gh-in.full{display:block;width:100%}
+  .gh-hint{color:var(--gh-dim);font-size:12px;margin-top:4px}
+  .gh-btn{background:var(--gh-btn);color:#fff;border-radius:6px;padding:6px 14px;font-weight:600;font-size:13px;display:inline-block}
+  .gh-btn.gray{background:var(--gh-head);color:var(--gh-txt);border:1px solid var(--gh-line);font-weight:500}
+  .gh-menu{border:1px solid var(--gh-line);border-radius:8px;overflow:hidden;max-width:290px;box-shadow:0 6px 18px rgba(0,0,0,.12)}
+  .gh-mi{padding:8px 13px;border-bottom:1px solid #eaeef2;display:flex;align-items:center;gap:9px}
+  .gh-mi:last-child{border-bottom:0}
+  .gh-mi.hl{background:#ddf4ff;font-weight:600;box-shadow:inset 3px 0 0 var(--gh-blue)}
+  .gh-scope{border:1px solid var(--gh-line);border-radius:8px;overflow:hidden}
+  .gh-sc{padding:9px 13px;border-bottom:1px solid #eaeef2;display:flex;gap:10px;align-items:flex-start}
+  .gh-sc:last-child{border-bottom:0}
+  .gh-sc.hl{background:#dafbe1;box-shadow:inset 3px 0 0 var(--gh-btn)}
+  .cb{width:14px;height:14px;border:1px solid #8c959f;border-radius:3px;margin-top:4px;flex:0 0 14px;background:#fff}
+  .cb.on{background:var(--gh-blue);border-color:var(--gh-blue);position:relative}
+  .cb.on::after{content:"✓";color:#fff;font-size:11px;position:absolute;top:-3px;left:1.5px;font-weight:700}
+  .sc-name{font-family:ui-monospace,Consolas,monospace;font-weight:600;font-size:12.5px}
+  .sc-desc{color:var(--gh-dim);font-size:11.5px}
+  .tokenbox{background:#dafbe1;border:1px solid #4ac26b;border-radius:6px;padding:9px 12px;
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#1a7f37;word-break:break-all}
+  .arrow{color:var(--acc);font-size:19px;text-align:center;margin:-4px 0 6px}
+
+  /* nexus mock */
+  .nx{direction:rtl;background:#0f1117;border:1px solid var(--line);border-radius:12px;padding:15px 17px;margin:14px 0}
+  .nx-t{font-size:13.5px;margin-bottom:11px;display:flex;justify-content:space-between;color:var(--txt)}
+  .nx-f{background:#0a0c12;border:1px solid var(--line);border-radius:8px;padding:7px 11px;font-size:12.5px;color:var(--dim2)}
+  .nx-btn{background:var(--acc);color:#fff;border-radius:8px;padding:6px 14px;font-size:12.5px;display:inline-block;margin-top:11px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+  @media(max-width:620px){.grid2{grid-template-columns:1fr}}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:10px}
+  th,td{text-align:right;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--dim2);font-size:12.5px;font-weight:600}
+  .yes{color:var(--ok);font-weight:700}
+  .no{color:var(--danger);font-weight:700}
+  h3.sec{font-size:19px;margin:34px 0 14px;padding-right:12px;border-right:3px solid var(--acc)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>ساخت توکن گیت‌هاب — قدم به قدم</h1>
+  <p>هر قدم با تصویرِ همان چیزی که روی صفحه می‌بینید</p>
+</header>
+
+<div class="meta">
+  <span class="pill">⏱ حدود ۲ دقیقه</span>
+  <span class="pill">💳 بدون کارت بانکی</span>
+  <span class="pill">🔁 فقط یک‌بار</span>
+  <span class="pill">🆓 کاملاً رایگان</span>
+</div>
+
+<div class="note n-info">
+  <b>قدم صفر:</b> باید یک حساب گیت‌هاب داشته باشید و <b>ایمیل‌تان تأیید شده</b> باشد.
+  اگر حساب ندارید اول در <code>github.com/signup</code> ثبت‌نام کنید و روی لینک تأییدی که ایمیل می‌شود کلیک کنید.
+  تا ایمیل تأیید نشود، گیت‌هاب اجازه‌ی ساخت توکن نمی‌دهد.
+</div>
+
+<!-- 1 -->
+<div class="step">
+  <div class="sh"><div class="num">۱</div><h2>باز کردن صفحه‌ی توکن‌ها</h2></div>
+  <div class="sb">
+    <p>وارد حساب گیت‌هاب شوید و این آدرس را مستقیم در نوار آدرس مرورگر بزنید:</p>
+    <p><code>https://github.com/settings/tokens</code></p>
+    <p class="dim">اگر ترجیح می‌دهید دستی بروید: روی عکس پروفایل بالا-راست کلیک کنید ←</p>
+    <div class="mock" style="max-width:320px">
+      <div class="mock-bar"><span>github.com</span><span>◉ profile ▾</span></div>
+      <div class="mock-body" style="padding:8px">
+        <div class="gh-menu" style="border:0;box-shadow:none">
+          <div class="gh-mi">Your profile</div>
+          <div class="gh-mi">Your repositories</div>
+          <div class="gh-mi hl">⚙ Settings</div>
+          <div class="gh-mi">Sign out</div>
+        </div>
+      </div>
+    </div>
+    <div class="arrow">↓</div>
+    <p class="dim">بعد در منوی کناریِ چپ، تا <b>ته صفحه</b> اسکرول کنید — آخرین گزینه:</p>
+    <div class="mock" style="max-width:320px">
+      <div class="mock-body" style="padding:8px">
+        <div class="gh-menu" style="border:0;box-shadow:none">
+          <div class="gh-mi">Emails</div>
+          <div class="gh-mi">Notifications</div>
+          <div class="gh-mi">Billing and plans</div>
+          <div class="gh-mi hl">&lt;/&gt; Developer settings</div>
+        </div>
+      </div>
+    </div>
+    <div class="arrow">↓</div>
+    <p class="dim">و در آخر: <b>Personal access tokens</b> ← <b>Tokens (classic)</b></p>
+  </div>
+</div>
+
+<!-- 2 -->
+<div class="step">
+  <div class="sh"><div class="num">۲</div><h2>زدن دکمه‌ی ساخت توکن</h2></div>
+  <div class="sb">
+    <p>بالای صفحه دکمه‌ی <b>Generate new token</b> است. رویش کلیک کنید تا یک منوی کوچک باز شود، بعد گزینه‌ی دوم را بزنید:</p>
+    <div class="mock">
+      <div class="mock-bar"><span>Personal access tokens (classic)</span><span>Generate new token ▾</span></div>
+      <div class="mock-body">
+        <div class="gh-menu" style="margin-right:auto;margin-left:0">
+          <div class="gh-mi">
+            <div><div style="font-weight:600">Generate new token (Beta)</div>
+            <div class="sc-desc">Fine-grained, repo-scoped</div></div>
+          </div>
+          <div class="gh-mi hl">
+            <div><div>Generate new token (classic)</div>
+            <div class="sc-desc" style="font-weight:400">For general use ← این یکی</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="note n-dang">
+      ⛔ <b>مهم‌ترین نکته‌ی کل راهنما:</b> گزینه‌ی <b>Fine-grained</b> (بالایی) را انتخاب نکنید.
+      آن نوع توکن اصلاً دسترسی Gist ندارد و همگام‌سازی با آن کار نمی‌کند. حتماً <b>classic</b>.
+    </div>
+    <p class="tiny">ممکن است همین‌جا رمز حساب یا کد دومرحله‌ای را بپرسد — وارد کنید و ادامه بدهید.</p>
+  </div>
+</div>
+
+<!-- 3 -->
+<div class="step">
+  <div class="sh"><div class="num">۳</div><h2>پر کردن فرم: اسم و تاریخ انقضا</h2></div>
+  <div class="sb">
+    <p>حالا یک فرم باز می‌شود. دو فیلد اول را این‌طور پر کنید:</p>
+    <div class="mock">
+      <div class="mock-bar"><span>New personal access token (classic)</span></div>
+      <div class="mock-body">
+        <label class="gh-label">Note</label>
+        <div class="gh-in full">NEXUS HQ sync</div>
+        <div class="gh-hint">What's this token for?</div>
+
+        <div style="height:15px"></div>
+
+        <label class="gh-label">Expiration</label>
+        <div class="gh-in" style="display:inline-block;min-width:190px">No expiration &nbsp;▾</div>
+        <div class="gh-hint">⚠ GitHub recommends that you set an expiration date.</div>
+      </div>
+    </div>
+    <table>
+      <tr><th>فیلد</th><th>چه بنویسم</th><th>چرا</th></tr>
+      <tr><td><b>Note</b></td><td><code>NEXUS HQ sync</code></td><td>فقط یک اسم است تا بعداً بشناسیدش. هرچه دوست دارید.</td></tr>
+      <tr><td><b>Expiration</b></td><td><b>No expiration</b></td><td>اگر تاریخ بگذارید، همان روز همگام‌سازی از کار می‌افتد و باید توکن نو بسازید.</td></tr>
+    </table>
+    <p class="tiny">گیت‌هاب برای «No expiration» یک هشدار زرد نشان می‌دهد. اشکالی ندارد — این توکن فقط به Gist دسترسی دارد و به کد و حساب شما کاری ندارد.</p>
+  </div>
+</div>
+
+<!-- 4 -->
+<div class="step">
+  <div class="sh"><div class="num">۴</div><h2>انتخاب دسترسی — فقط یک تیک</h2></div>
+  <div class="sb">
+    <p>پایین‌تر یک لیست بلند به اسم <b>Select scopes</b> می‌بینید. در تمام این لیست، <b>فقط و فقط</b> کنار <code>gist</code> را تیک بزنید:</p>
+    <div class="mock">
+      <div class="mock-bar"><span>Select scopes</span></div>
+      <div class="mock-body">
+        <div class="gh-scope">
+          <div class="gh-sc"><div class="cb"></div><div><div class="sc-name">repo</div><div class="sc-desc">Full control of private repositories</div></div></div>
+          <div class="gh-sc"><div class="cb"></div><div><div class="sc-name">workflow</div><div class="sc-desc">Update GitHub Action workflows</div></div></div>
+          <div class="gh-sc"><div class="cb"></div><div><div class="sc-name">admin:org</div><div class="sc-desc">Full control of orgs and teams</div></div></div>
+          <div class="gh-sc hl"><div class="cb on"></div><div><div class="sc-name">gist</div><div class="sc-desc">Create gists  ← فقط این</div></div></div>
+          <div class="gh-sc"><div class="cb"></div><div><div class="sc-name">notifications</div><div class="sc-desc">Access notifications</div></div></div>
+          <div class="gh-sc"><div class="cb"></div><div><div class="sc-name">delete_repo</div><div class="sc-desc">Delete repositories</div></div></div>
+        </div>
+      </div>
+    </div>
+    <table>
+      <tr><th>دسترسی</th><th>تیک؟</th><th>توضیح</th></tr>
+      <tr><td><code>gist</code></td><td class="yes">✔ بله</td><td>اجازه‌ی ساخت و به‌روزرسانی فایل داده‌ی شما</td></tr>
+      <tr><td><code>repo</code></td><td class="no">✘ نه</td><td>دسترسی کامل به همه‌ی مخازن — اصلاً لازم نیست</td></tr>
+      <tr><td>بقیه</td><td class="no">✘ نه</td><td>هیچ‌کدام لازم نیست</td></tr>
+    </table>
+    <div class="note n-ok">
+      🔒 هرچه دسترسی کمتر، امن‌تر. توکنی که فقط <code>gist</code> دارد نمی‌تواند کد شما را ببیند، ایمیل‌تان را بخواند یا چیزی را پاک کند.
+    </div>
+  </div>
+</div>
+
+<!-- 5 -->
+<div class="step">
+  <div class="sh"><div class="num">۵</div><h2>ساختن توکن</h2></div>
+  <div class="sb">
+    <p>تا ته صفحه اسکرول کنید و دکمه‌ی سبز را بزنید:</p>
+    <div class="mock">
+      <div class="mock-body" style="text-align:left">
+        <span class="gh-btn">Generate token</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 6 -->
+<div class="step">
+  <div class="sh"><div class="num">۶</div><h2>کپی کردن توکن — حساس‌ترین قدم</h2></div>
+  <div class="sb">
+    <p>حالا یک نوار سبز با یک رشته‌ی طولانی که با <code>ghp_</code> شروع می‌شود نمایش داده می‌شود. روی آیکن کپی 📋 کنارش بزنید:</p>
+    <div class="mock">
+      <div class="mock-bar"><span>Personal access tokens (classic)</span></div>
+      <div class="mock-body">
+        <div class="tokenbox">
+          <span>ghp_A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8</span>
+          <span style="flex:0 0 auto">📋</span>
+        </div>
+        <div class="gh-hint" style="margin-top:8px">Make sure to copy your personal access token now. You won't be able to see it again!</div>
+      </div>
+    </div>
+    <div class="note n-dang">
+      ⛔ <b>این رشته فقط همین یک‌بار نمایش داده می‌شود.</b> اگر صفحه را ببندید یا رفرش کنید، دیگر هیچ‌جا قابل دیدن نیست
+      و باید از اول توکن جدید بسازید. همین الان کپی کنید و بروید سراغ قدم بعد.
+    </div>
+  </div>
+</div>
+
+<!-- 7 -->
+<div class="step">
+  <div class="sh"><div class="num">۷</div><h2>وارد کردن در برنامه</h2></div>
+  <div class="sb">
+    <p>در NEXUS HQ بروید به <b>تنظیمات ← همگام‌سازی ابری (رایگان)</b> و این‌طور پر کنید:</p>
+    <div class="nx">
+      <div class="nx-t"><span>☁ همگام‌سازی ابری (رایگان)</span><span style="color:var(--dim2);font-size:11.5px">متصل نیست</span></div>
+      <div class="grid2">
+        <div>
+          <div style="font-size:12px;margin-bottom:5px">توکن گیت‌هاب</div>
+          <div class="nx-f ltr" style="color:#c7d2fe">ghp_A1b2C3d4E5f6G7h8•••</div>
+          <div class="tiny" style="margin-top:4px">↑ توکنی که کپی کردید را بچسبانید</div>
+        </div>
+        <div>
+          <div style="font-size:12px;margin-bottom:5px">شناسه Gist</div>
+          <div class="nx-f">اختیاری</div>
+          <div class="tiny" style="margin-top:4px">↑ روی دستگاه اول <b>خالی</b> بماند</div>
+        </div>
+      </div>
+      <div class="nx-btn">🔑 اتصال و آزمایش</div>
+    </div>
+    <div class="note n-ok">
+      ✅ اگر پیام <b>«اتصال برقرار شد و Gist ساخته شد»</b> را دیدید، تمام است.
+      یک فایل محرمانه به اسم <code>nexus-hq-data.json</code> در حساب گیت‌هاب شما ساخته شد.
+    </div>
+    <p class="tiny">همین راهنما داخل خود برنامه هم هست: در همان کارت، روی «چطور توکن بسازم؟ (راهنمای ۲ دقیقه‌ای)» بزنید.</p>
+  </div>
+</div>
+
+<h3 class="sec">💻 دستگاه دوم یا بعد از نصب مجدد</h3>
+<div class="step">
+  <div class="sb">
+    <p><b>الان روی دستگاه اول این کار را بکنید:</b> در همان کارت همگام‌سازی، دکمه‌ی <b>کپی شناسه</b> را بزنید و آن رشته را جایی امن نگه دارید (مثلاً Saved Messages تلگرام، کنار خود توکن).</p>
+    <p><b>بعداً روی دستگاه دوم:</b></p>
+    <table>
+      <tr><th>#</th><th>کار</th></tr>
+      <tr><td>۱</td><td>برنامه را نصب کنید</td></tr>
+      <tr><td>۲</td><td>تنظیمات ← همگام‌سازی ابری ← <b>همان توکن</b> را بچسبانید</td></tr>
+      <tr><td>۳</td><td>این بار <b>شناسه Gist</b> را هم وارد کنید</td></tr>
+      <tr><td>۴</td><td><b>اتصال و آزمایش</b> ← بعد <b>دریافت از ابر</b></td></tr>
+    </table>
+    <p class="dim">همه‌ی داده‌ها برمی‌گردد. قبل از جایگزینی، برنامه خودش یک نقطه‌ی بازیابی محلی می‌سازد که اگر پشیمان شدید برگردید.</p>
+    <div class="note n-info">
+      شناسه را گم کردید؟ به <code>gist.github.com</code> بروید، Gist با نام <code>nexus-hq-data.json</code> را باز کنید —
+      شناسه همان رشته‌ی آخر آدرس مرورگر است.
+    </div>
+  </div>
+</div>
+
+<h3 class="sec">🧯 اگر خطا گرفتید</h3>
+<div class="step"><div class="sb">
+  <table>
+    <tr><th>پیام</th><th>علت و راه‌حل</th></tr>
+    <tr><td>توکن نامعتبر است</td><td>یا ناقص کپی شده (اول/آخرش جا افتاده)، یا Fine-grained ساخته‌اید. یک <b>classic</b> با تیک <code>gist</code> بسازید.</td></tr>
+    <tr><td>Gist پیدا نشد</td><td>شناسه اشتباه است یا مال حساب دیگری است. کادر شناسه را خالی کنید تا یکی نو ساخته شود.</td></tr>
+    <tr><td>خطای شبکه</td><td>دسترسی به <code>api.github.com</code> برقرار نیست. اینترنت یا فیلترشکن/پروکسی را بررسی کنید.</td></tr>
+    <tr><td>محدودیت درخواست</td><td>سقف ۵۰۰۰ درخواست در ساعت پر شده. کمی صبر کنید.</td></tr>
+  </table>
+  <div class="note n-info" style="margin-top:14px">
+    خیالتان راحت: حتی اگر ابر اصلاً کار نکند، داده‌ی شما همیشه محلی روی دیسک هست —
+    <span class="ltr">%APPDATA%\NEXUS HQ\data\nexus-hq.json</span> — و همیشه می‌توانید از تنظیمات خروجی JSON بگیرید.
+  </div>
+</div></div>
+
+<h3 class="sec">🔐 دو نکته‌ی امنیتی</h3>
+<div class="step"><div class="sb">
+  <p>۱. توکن مثل رمز عبور است. برای کسی نفرستید و در گروه عمومی نگذارید. اگر لو رفت: <code>github.com/settings/tokens</code> ← کنار توکن <b>Delete</b> ← یکی نو بسازید و در برنامه جایگزین کنید.</p>
+  <p>۲. «Secret Gist» یعنی <b>لینکش مخفی و فهرست‌نشده است، نه رمزنگاری‌شده</b>. برای داده‌ی کاری شخصی کاملاً کافی است، ولی رمز عبور و اطلاعات بانکی داخل برنامه نگذارید.</p>
+</div></div>
+
+<p style="text-align:center;margin-top:30px"><span class="pill">NEXUS HQ · راهنمای قدم‌به‌قدم توکن</span></p>
+
+</div>
+</body>
+</html>

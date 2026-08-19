@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NEXUS HQ — تازه‌های این نسخه</title>
+<style>
+  :root{
+    --bg:#08090c; --panel:rgba(255,255,255,.045); --brd:rgba(255,255,255,.09);
+    --tx:#e8eaf0; --dim:#8b93a7; --dim2:#5d6577;
+    --acc:#6366f1; --ok:#22c55e; --warn:#f59e0b; --gold:#FFC800;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--tx);
+    font-family:'Vazirmatn',system-ui,'Segoe UI',Tahoma,sans-serif;
+    line-height:1.95; padding:34px 18px 90px;
+    background-image:
+      radial-gradient(700px 420px at 82% -8%, rgba(99,102,241,.16), transparent 65%),
+      radial-gradient(620px 380px at 10% 8%, rgba(168,85,247,.11), transparent 62%);
+    background-attachment:fixed;
+  }
+  .wrap{max-width:820px;margin:0 auto}
+  .head{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+  .logo{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;
+    background:linear-gradient(150deg,#16181f,#0b0d12);border:1px solid var(--brd);flex:0 0 auto}
+  h1{font-size:24px;margin:0;letter-spacing:-.3px}
+  .sub{color:var(--dim);font-size:14px;margin:0 0 30px 60px}
+  h2{font-size:16.5px;margin:34px 0 12px;display:flex;align-items:center;gap:9px}
+  h2 .n{width:24px;height:24px;border-radius:8px;background:rgba(99,102,241,.16);
+    border:1px solid rgba(99,102,241,.32);color:#a5b4fc;font-size:12px;
+    display:grid;place-items:center;flex:0 0 auto}
+  .card{background:var(--panel);border:1px solid var(--brd);border-radius:16px;
+    padding:18px 20px;margin:14px 0;backdrop-filter:blur(10px)}
+  .card p{margin:0 0 10px}
+  .card p:last-child{margin-bottom:0}
+  ul{margin:8px 0;padding-inline-start:22px}
+  li{margin:7px 0;font-size:14.2px;color:#cdd2de}
+  b{color:#fff}
+  .tag{display:inline-block;font-size:11.5px;padding:2px 10px;border-radius:999px;
+    background:rgba(34,197,94,.14);color:#4ade80;border:1px solid rgba(34,197,94,.3);
+    margin-inline-start:8px;vertical-align:middle}
+  .warn{border-inline-start:3px solid var(--warn);background:rgba(245,158,11,.08);
+    border-radius:0 12px 12px 0;padding:13px 17px;font-size:13.8px;margin:16px 0}
+  .note{border-inline-start:3px solid var(--acc);background:rgba(99,102,241,.08);
+    border-radius:0 12px 12px 0;padding:13px 17px;font-size:13.8px;margin:16px 0}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin:14px 0}
+  .mini{background:rgba(255,255,255,.03);border:1px solid var(--brd);border-radius:13px;padding:14px 16px}
+  .mini .t{font-size:13.5px;font-weight:700;color:#fff;margin-bottom:3px}
+  .mini .d{font-size:12.3px;color:var(--dim)}
+  code{font-family:ui-monospace,monospace;font-size:12.3px;direction:ltr;display:inline-block;
+    background:#0d1017;border:1px solid #1e2330;border-radius:7px;padding:1px 8px;color:#a5b0ff}
+  .steps{counter-reset:s;list-style:none;padding:0;margin:10px 0}
+  .steps li{counter-increment:s;position:relative;padding-inline-start:34px;margin:11px 0}
+  .steps li::before{content:counter(s);position:absolute;inset-inline-start:0;top:3px;
+    width:23px;height:23px;border-radius:50%;background:rgba(99,102,241,.18);
+    border:1px solid rgba(99,102,241,.35);color:#a5b4fc;font-size:12px;
+    display:grid;place-items:center}
+  .foot{color:var(--dim2);font-size:12.5px;text-align:center;margin-top:44px;
+    border-top:1px solid var(--brd);padding-top:20px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="head">
+    <div class="logo">
+      <svg width="24" height="31" viewBox="0 0 684 889" role="img" aria-label="NEXUS HQ">
+        <g fill="#FFC800">
+          <rect x="0" y="368.3" width="36" height="36" rx="18"/><rect x="0" y="484.7" width="36" height="36" rx="18"/>
+          <rect x="54" y="321.4" width="36" height="90.9" rx="18"/><rect x="54" y="476.7" width="36" height="90.9" rx="18"/>
+          <rect x="108" y="257.1" width="36" height="139" rx="18"/><rect x="108" y="493" width="36" height="139" rx="18"/>
+          <rect x="162" y="192.8" width="36" height="187.1" rx="18"/><rect x="162" y="509.1" width="36" height="187.1" rx="18"/>
+          <rect x="216" y="128.5" width="36" height="235.2" rx="18"/><rect x="216" y="525.3" width="36" height="235.2" rx="18"/>
+          <rect x="270" y="64.3" width="36" height="283.3" rx="18"/><rect x="270" y="541.4" width="36" height="283.3" rx="18"/>
+          <rect x="324" y="0" width="36" height="331.4" rx="18"/><rect x="324" y="557.6" width="36" height="331.4" rx="18"/>
+          <rect x="378" y="64.3" width="36" height="283.3" rx="18"/><rect x="378" y="541.4" width="36" height="283.3" rx="18"/>
+          <rect x="432" y="128.5" width="36" height="235.2" rx="18"/><rect x="432" y="525.3" width="36" height="235.2" rx="18"/>
+          <rect x="486" y="192.8" width="36" height="187.1" rx="18"/><rect x="486" y="509.1" width="36" height="187.1" rx="18"/>
+          <rect x="540" y="257.1" width="36" height="139" rx="18"/><rect x="540" y="493" width="36" height="139" rx="18"/>
+          <rect x="594" y="321.4" width="36" height="90.9" rx="18"/><rect x="594" y="476.7" width="36" height="90.9" rx="18"/>
+          <rect x="648" y="368.3" width="36" height="36" rx="18"/><rect x="648" y="484.7" width="36" height="36" rx="18"/>
+        </g>
+      </svg>
+    </div>
+    <h1>تازه‌های این نسخه</h1>
+  </div>
+  <p class="sub">نسخه‌ی ۱٫۰٫۰ — ویندوز و اندروید، هر دو با همین امکانات</p>
+
+  <h2><span class="n">۱</span> قفل برنامه <span class="tag">جدید</span></h2>
+  <div class="card">
+    <p>مثل تلگرام: صفحه‌ی قفل با شماره‌گیر روی صفحه، نقطه‌های پرشونده، و لرزش هنگام رمز اشتباه.</p>
+    <ul>
+      <li><b>رمز عبور:</b> تنظیمات ← قفل و امنیت ← «تعیین رمز عبور». حداقل ۴ رقم؛ رمز ۴ رقمی خودکار بررسی می‌شود.</li>
+      <li><b>اثر انگشت / چهره:</b> روی گوشی، اگر حسگر داشته باشید در همان بخش روشن می‌شود.</li>
+      <li><b>قفل خودکار:</b> بلافاصله، ۱ دقیقه، ۵ دقیقه، ۳۰ دقیقه، یا «فقط هنگام باز شدن برنامه».</li>
+      <li><b>یادآور:</b> می‌توانید یک متن کوتاه بنویسید که روی صفحه‌ی قفل دیده شود.</li>
+      <li><b>محافظت از حدس زدن:</b> بعد از ۵ تلاش ناموفق، تأخیر پلکانی فعال می‌شود.</li>
+    </ul>
+    <div class="note">
+      <b>صادقانه بگویم:</b> رمز با الگوریتم PBKDF2 (۲۱۰٬۰۰۰ تکرار) هش می‌شود و هرگز به‌صورت متن ذخیره نمی‌شود،
+      ولی این قفل فقط جلوی <em>باز کردن رابط برنامه</em> را می‌گیرد — فایل داده روی دیسک رمزنگاری نشده است.
+      کسی که به فایل‌های کامپیوتر دسترسی مستقیم داشته باشد می‌تواند آن را بخواند.
+      همچنین رمز داخل بکاپ و فضای ابری نمی‌رود؛ روی هر دستگاه جداگانه تنظیم می‌شود.
+    </div>
+    <div class="warn"><b>اگر رمز را فراموش کنید هیچ راه بازیابی وجود ندارد.</b>
+      باید برنامه را حذف و دوباره نصب کنید — پس قبلش حتماً یک بار «ذخیره روی ابر» یا خروجی JSON بگیرید.</div>
+  </div>
+
+  <h2><span class="n">۲</span> پوسته‌ی روشن و تیره <span class="tag">جدید</span></h2>
+  <div class="card">
+    <p>تنظیمات ← زبان و نمایش ← <b>پوسته</b>. سه حالت:</p>
+    <div class="grid">
+      <div class="mini"><div class="t">تیره</div><div class="d">همان حالت همیشگی — پیش‌فرض</div></div>
+      <div class="mini"><div class="t">روشن</div><div class="d">برای محیط پرنور و روز</div></div>
+      <div class="mini"><div class="t">سیستم</div><div class="d">از تنظیم ویندوز یا اندروید پیروی می‌کند</div></div>
+    </div>
+    <p>در حالت «سیستم»، اگر گوشی‌تان شب خودکار تیره می‌شود، برنامه هم همراهش عوض می‌شود.
+      نوار وضعیت اندروید هم با پوسته هم‌رنگ می‌شود.</p>
+  </div>
+
+  <h2><span class="n">۳</span> طراحی تازه</h2>
+  <div class="card">
+    <ul>
+      <li><b>سطوح شیشه‌ای:</b> کارت‌ها، نوار کناری و پنجره‌ها حالا بلور پس‌زمینه دارند — همان «گلس‌مورفیسم محدود» که خواسته بودید، نه بیشتر.</li>
+      <li><b>نوار ناوبری پایین در گوشی:</b> پنج مقصد اصلی در دسترس شست — داشبورد، کارها، پروژه‌ها، مرکز تصمیم، و «بیشتر».</li>
+      <li><b>هدف‌های لمسی بزرگ‌تر:</b> دکمه‌ها و ردیف‌ها روی گوشی راحت‌تر زده می‌شوند.</li>
+      <li><b>آیکون برنامه:</b> حالا لوگوی خودتان است — روی ویندوز، روی صفحه‌ی گوشی، و داخل خود برنامه.</li>
+    </ul>
+  </div>
+
+  <h2><span class="n">۴</span> رفع ایراد فرم‌های بلند</h2>
+  <div class="card">
+    <p>مشکلی که در تصویر فرستادید: پنجره‌ی «ویرایش — رسانه‌ها» از پایین بریده می‌شد و دکمه‌ی ذخیره دیده نمی‌شد.</p>
+    <p><b>حل شد.</b> حالا عنوان و دکمه‌ها همیشه ثابت می‌مانند و فقط میانه‌ی فرم اسکرول می‌شود.
+      روی صفحه‌های کوتاه (حتی ۶۰۰ پیکسل ارتفاع) و گوشی‌های کوچک (۳۶۰×۶۴۰) آزمایش شد.</p>
+  </div>
+
+  <h2><span class="n">۵</span> ذخیره روی ابر هنگام خروج</h2>
+  <div class="card">
+    <p>وقتی برنامه را می‌بندید، گزینه‌ی پیش‌فرض حالا <b>«ذخیره و خروج»</b> است و با Enter انتخاب می‌شود.</p>
+    <p>اگر هنوز فضای ابری را وصل نکرده باشید، برنامه به‌جای رد شدن بی‌صدا، همین را می‌گوید
+      و دکمه‌ی «تنظیم فضای ابری» را نشان می‌دهد. اگر ذخیره ناموفق بود، دکمه‌ی «تلاش دوباره» می‌آید.</p>
+  </div>
+
+  <h2><span class="n">۶</span> نصب</h2>
+  <div class="card">
+    <p><b>ویندوز</b> — دو گزینه دارید:</p>
+    <ul>
+      <li><code>NexusHQ-Setup.exe</code> — نصب عادی، میان‌بر دسکتاپ و منوی استارت می‌سازد.</li>
+      <li><code>NexusHQ-Portable.exe</code> — بدون نصب، یک فایل، مستقیم اجرا می‌شود.</li>
+    </ul>
+    <div class="warn">ویندوز ممکن است «Windows protected your PC» نشان دهد، چون گواهی امضای کد پولی است
+      و ما همه‌چیز را رایگان نگه داشتیم. روی <b>More info</b> ← <b>Run anyway</b> بزنید.</div>
+
+    <p style="margin-top:16px"><b>اندروید</b> — فایل <code>NexusHQ.apk</code>:</p>
+    <ol class="steps">
+      <li>فایل را روی گوشی دانلود و بازش کنید.</li>
+      <li>پیام «نصب از منبع ناشناس» می‌آید ← تنظیمات ← «اجازه از این منبع» را روشن کنید.</li>
+      <li>بازگشت ← <b>نصب</b>.</li>
+      <li>اگر Play Protect هشدار داد ← «به‌هرحال نصب کن».</li>
+    </ol>
+    <div class="note">این هشدارها طبیعی‌اند و به معنی مشکل‌دار بودن برنامه نیستند —
+      فقط یعنی برنامه از فروشگاه گوگل نیامده و امضای پولی ندارد.</div>
+  </div>
+
+  <h2><span class="n">۷</span> انتقال داده بین ویندوز و گوشی</h2>
+  <div class="card">
+    <ol class="steps">
+      <li>در ویندوز: تنظیمات ← همگام‌سازی ابری ← توکن گیت‌هاب را بچسبانید ← «اتصال و آزمایش».</li>
+      <li>دکمه‌ی «کپی شناسه» را بزنید (Gist ID کپی می‌شود).</li>
+      <li>در گوشی: همان توکن و همان شناسه را وارد کنید ← «دریافت از ابر».</li>
+    </ol>
+    <p style="margin-top:10px">از این به بعد هر بار که در یکی از دستگاه‌ها «ذخیره و خروج» بزنید،
+      دستگاه دیگر با «دریافت از ابر» به‌روز می‌شود.</p>
+  </div>
+
+  <div class="foot">
+    NEXUS HQ ۱٫۰٫۰ — بدون هزینه، بدون سرور، داده روی دستگاه خودتان.<br>
+    ۴۹ آزمون خودکار (۲۸ دسکتاپ · ۱۳ چیدمان · ۸ قفل) سبز است.
+  </div>
+</div>
+</body>
+</html>

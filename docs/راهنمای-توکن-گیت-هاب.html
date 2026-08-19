@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>راهنمای ساخت توکن گیت‌هاب — NEXUS HQ</title>
+<style>
+  :root{
+    --bg:#08090c; --card:#101218; --card2:#151824; --line:#22263a;
+    --txt:#e6e8f0; --dim:#9aa0b4; --acc:#6366f1; --acc2:#8b5cf6;
+    --ok:#22c55e; --warn:#f59e0b; --danger:#ef4444;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--txt);
+    font-family:"Vazirmatn","Segoe UI",Tahoma,sans-serif;
+    line-height:2; padding:32px 18px 80px;
+  }
+  .wrap{max-width:860px;margin:0 auto}
+  header{
+    background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);
+    border-radius:20px; padding:28px 26px; margin-bottom:26px;
+  }
+  header h1{margin:0 0 6px;font-size:26px;letter-spacing:-.3px}
+  header p{margin:0;opacity:.9;font-size:14px}
+  .card{
+    background:var(--card); border:1px solid var(--line);
+    border-radius:16px; padding:20px 22px; margin-bottom:16px;
+  }
+  h2{font-size:18px;margin:0 0 12px;display:flex;align-items:center;gap:10px}
+  .step{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+  .step:last-child{border-bottom:0}
+  .n{
+    flex:0 0 32px;height:32px;border-radius:10px;
+    background:linear-gradient(135deg,var(--acc),var(--acc2));
+    display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:14px;margin-top:4px
+  }
+  .step div p{margin:0 0 4px}
+  .dim{color:var(--dim);font-size:13.5px}
+  code,.ltr{
+    direction:ltr; unicode-bidi:isolate; display:inline-block;
+    background:var(--card2); border:1px solid var(--line);
+    border-radius:8px; padding:1px 8px; font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:13px; color:#c7d2fe
+  }
+  .box{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:12px 0}
+  .warn{border-color:#5b4410;background:#1c1608}
+  .ok{border-color:#14532d;background:#08160e}
+  .danger{border-color:#4c1d1d;background:#1a0b0b}
+  table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
+  th,td{text-align:right;padding:9px 10px;border-bottom:1px solid var(--line)}
+  th{color:var(--dim);font-weight:600;font-size:13px}
+  .chk{color:var(--ok);font-weight:700}
+  .x{color:var(--danger);font-weight:700}
+  ul{margin:6px 0;padding-right:20px}
+  li{margin-bottom:4px}
+  .pill{display:inline-block;background:var(--card2);border:1px solid var(--line);
+    border-radius:999px;padding:2px 12px;font-size:12.5px;color:var(--dim)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>ساخت توکن گیت‌هاب برای همگام‌سازی ابری</h1>
+  <p>یک‌بار انجام می‌دهید · حدود ۲ دقیقه · کاملاً رایگان · بدون کارت بانکی</p>
+</header>
+
+<div class="card">
+  <h2>🎯 قبل از شروع</h2>
+  <p class="dim">فقط یک حساب گیت‌هاب لازم دارید. اگر ندارید، اول در <span class="ltr">github.com/signup</span> ثبت‌نام کنید (رایگان) و ایمیل‌تان را تأیید کنید — تا ایمیل تأیید نشود، گیت‌هاب اجازه‌ی ساخت توکن نمی‌دهد.</p>
+</div>
+
+<div class="card">
+  <h2>🪜 مرحله‌به‌مرحله</h2>
+
+  <div class="step"><div class="n">۱</div><div>
+    <p>وارد گیت‌هاب شوید و در مرورگر مستقیم این آدرس را باز کنید:</p>
+    <p><span class="ltr">https://github.com/settings/tokens</span></p>
+    <p class="dim">مسیر دستی: عکس پروفایل بالا-راست ← <b>Settings</b> ← پایین منوی کناری ← <b>Developer settings</b> ← <b>Personal access tokens</b> ← <b>Tokens (classic)</b></p>
+  </div></div>
+
+  <div class="step"><div class="n">۲</div><div>
+    <p>روی <b>Generate new token</b> کلیک کنید و از منوی بازشو گزینه‌ی <b>Generate new token (classic)</b> را بزنید.</p>
+    <p class="dim">⚠️ گزینه‌ی «Fine-grained token» را انتخاب <b>نکنید</b> — آن نوع توکن به Gist دسترسی نمی‌دهد و کار نمی‌کند.</p>
+  </div></div>
+
+  <div class="step"><div class="n">۳</div><div>
+    <p>ممکن است رمز حساب یا کد دومرحله‌ای را بپرسد. وارد کنید.</p>
+  </div></div>
+
+  <div class="step"><div class="n">۴</div><div>
+    <p>در فیلد <b>Note</b> یک اسم دلخواه بنویسید تا بعداً بشناسیدش:</p>
+    <p><code>NEXUS HQ sync</code></p>
+  </div></div>
+
+  <div class="step"><div class="n">۵</div><div>
+    <p>در <b>Expiration</b> (تاریخ انقضا) گزینه‌ی <b>No expiration</b> را انتخاب کنید.</p>
+    <p class="dim">اگر انقضا بگذارید، آن روز همگام‌سازی از کار می‌افتد و باید توکن جدید بسازید. گیت‌هاب یک هشدار زرد نشان می‌دهد؛ اشکالی ندارد چون این توکن فقط به Gist دسترسی دارد.</p>
+  </div></div>
+
+  <div class="step"><div class="n">۶</div><div>
+    <p>در لیست <b>Select scopes</b> فقط و فقط تیک <b>gist</b> را بزنید.</p>
+    <div class="box">
+      <table>
+        <tr><th>دسترسی</th><th>تیک بزنم؟</th><th>چرا</th></tr>
+        <tr><td><code>gist</code></td><td class="chk">✔ بله</td><td>ساخت و به‌روزرسانی فایل داده‌ی شما</td></tr>
+        <tr><td><code>repo</code></td><td class="x">✘ نه</td><td>دسترسی کامل به مخازن — لازم نیست</td></tr>
+        <tr><td>بقیه</td><td class="x">✘ نه</td><td>هیچ‌کدام لازم نیست</td></tr>
+      </table>
+    </div>
+    <p class="dim">هرچه دسترسی کمتر، امن‌تر. توکنی که فقط <code>gist</code> دارد نمی‌تواند به کد، ایمیل یا تنظیمات حساب شما دست بزند.</p>
+  </div></div>
+
+  <div class="step"><div class="n">۷</div><div>
+    <p>پایین صفحه دکمه‌ی سبز <b>Generate token</b> را بزنید.</p>
+  </div></div>
+
+  <div class="step"><div class="n">۸</div><div>
+    <p>حالا یک رشته‌ی طولانی نمایش داده می‌شود که با <code>ghp_</code> شروع می‌شود. روی آیکن کپی 📋 کنارش بزنید.</p>
+    <div class="box danger">
+      <b>⛔ این رشته فقط همین یک‌بار نمایش داده می‌شود.</b><br>
+      اگر صفحه را ببندید دیگر قابل دیدن نیست و باید توکن جدید بسازید. همین الان کپی کنید.
+    </div>
+  </div></div>
+
+  <div class="step"><div class="n">۹</div><div>
+    <p>در برنامه‌ی NEXUS HQ بروید به: <b>تنظیمات ← همگام‌سازی ابری (رایگان)</b></p>
+    <ul>
+      <li>توکن را در کادر <b>توکن گیت‌هاب</b> بچسبانید</li>
+      <li>کادر <b>شناسه Gist</b> را روی دستگاه اول <b>خالی</b> بگذارید</li>
+      <li>دکمه‌ی <b>اتصال و آزمایش</b> را بزنید</li>
+    </ul>
+    <div class="box ok">
+      ✅ اگر پیام «اتصال برقرار شد و Gist ساخته شد» را دیدید، تمام است. یک فایل محرمانه به نام
+      <code>nexus-hq-data.json</code> در حساب گیت‌هاب شما ساخته شد.
+    </div>
+  </div></div>
+</div>
+
+<div class="card">
+  <h2>💻 روی دستگاه دوم (یا بعد از نصب مجدد)</h2>
+  <div class="step"><div class="n">۱</div><div>
+    <p>روی دستگاه اول: <b>تنظیمات ← همگام‌سازی ابری ← کپی شناسه</b> — این شناسه‌ی Gist را یک‌جا نگه دارید (مثلاً در تلگرام Saved Messages).</p>
+  </div></div>
+  <div class="step"><div class="n">۲</div><div>
+    <p>روی دستگاه دوم: <b>همان توکن</b> + <b>همان شناسه‌ی Gist</b> را وارد کنید ← <b>اتصال و آزمایش</b> ← بعد <b>دریافت از ابر</b>.</p>
+    <p class="dim">همه‌ی داده‌ها برمی‌گردد. قبل از جایگزینی، برنامه خودش یک نقطه‌ی بازیابی محلی می‌سازد.</p>
+  </div></div>
+  <div class="step"><div class="n">۳</div><div>
+    <p>اگر شناسه را گم کردید: در <span class="ltr">https://gist.github.com/</span> وارد شوید، Gist با نام <code>nexus-hq-data.json</code> را باز کنید — شناسه همان رشته‌ی آخر آدرس مرورگر است.</p>
+  </div></div>
+</div>
+
+<div class="card">
+  <h2>🚪 هنگام بستن برنامه</h2>
+  <p>اگر همگام‌سازی وصل باشد، موقع خروج یک پنجره می‌پرسد:</p>
+  <ul>
+    <li><b>ذخیره و خروج</b> — اول روی دیسک، بعد روی Gist ذخیره می‌کند و بعد می‌بندد</li>
+    <li><b>خروج بدون ذخیره</b> — فقط روی دیسک ذخیره می‌کند</li>
+    <li><b>انصراف</b> — برنامه باز می‌ماند</li>
+  </ul>
+  <p class="dim">این پرسش را می‌توانید از همان بخش تنظیمات با کلید «پرسیدن هنگام خروج» خاموش کنید.</p>
+</div>
+
+<div class="card">
+  <h2>🔐 نکات امنیتی و محدودیت‌ها</h2>
+  <div class="box warn">
+    توکن مثل رمز عبور است. آن را برای کسی نفرستید و در گروه/چت عمومی نگذارید.
+    اگر جایی لو رفت: <span class="ltr">github.com/settings/tokens</span> ← <b>Delete</b> ← یک توکن جدید بسازید.
+  </div>
+  <table>
+    <tr><th>مورد</th><th>وضعیت</th></tr>
+    <tr><td>هزینه</td><td class="chk">صفر · برای همیشه</td></tr>
+    <tr><td>حجم هر Gist</td><td>حدود ۱۰ مگابایت (داده‌ی فعلی شما ~۴۰ کیلوبایت)</td></tr>
+    <tr><td>تعداد درخواست</td><td>۵۰۰۰ در ساعت</td></tr>
+    <tr><td>محل نگهداری توکن</td><td>فقط روی همین دستگاه · داخل فایل بکاپ قرار نمی‌گیرد</td></tr>
+    <tr><td>معنی «Secret»</td><td>لینک مخفی و فهرست‌نشده — <b>نه</b> رمزنگاری‌شده</td></tr>
+  </table>
+  <p class="dim">یعنی: برای داده‌ی کاری شخصی کاملاً کافی است، ولی رمز عبور و اطلاعات بانکی داخلش نگذارید.</p>
+</div>
+
+<div class="card">
+  <h2>🧯 اگر خطا گرفتید</h2>
+  <table>
+    <tr><th>پیام</th><th>علت و راه‌حل</th></tr>
+    <tr><td>توکن نامعتبر است</td><td>توکن ناقص کپی شده یا Fine-grained ساخته‌اید. یک Token (classic) با تیک <code>gist</code> بسازید.</td></tr>
+    <tr><td>Gist پیدا نشد</td><td>شناسه اشتباه است یا مال حساب دیگری است. کادر شناسه را خالی کنید تا Gist تازه ساخته شود.</td></tr>
+    <tr><td>خطای شبکه</td><td>دسترسی به <span class="ltr">api.github.com</span> برقرار نیست. اتصال اینترنت یا فیلترشکن/پروکسی را بررسی کنید.</td></tr>
+    <tr><td>محدودیت درخواست</td><td>سقف ۵۰۰۰ درخواست در ساعت پر شده. کمی صبر کنید.</td></tr>
+  </table>
+  <p class="dim">حتی اگر ابر اصلاً کار نکند، داده‌ی شما همیشه به‌صورت محلی روی دیسک هست:
+    <span class="ltr">%APPDATA%\NEXUS HQ\data\nexus-hq.json</span> — و همیشه می‌توانید از تنظیمات، بکاپ JSON بگیرید.</p>
+</div>
+
+<p style="text-align:center;margin-top:26px"><span class="pill">NEXUS HQ · راهنمای همگام‌سازی ابری</span></p>
+
+</div>
+</body>
+</html>
