@@ -33,3 +33,6 @@ build-apk/*.apk
 build-apk/classes.dex
 build-apk/AndroidManifest.xml.bin
 build-apk/resources.arsc
+build-apk-native/*.apk
+build-apk-native/classes.dex
+build-native/win-native/payload_native.cpp
