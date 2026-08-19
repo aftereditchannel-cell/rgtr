@@ -36,23 +36,36 @@ def b64(b: bytes) -> str:
 
 # ---------------------------------------------------------------- کلید و گواهی
 
-_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-now = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=1)
-_name = x509.Name([
-    x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, 'Mobile'),
-    x509.NameAttribute(NameOID.ORGANIZATION_NAME, 'NEXUS HQ'),
-    x509.NameAttribute(NameOID.COMMON_NAME, 'NEXUS HQ'),
-])
-_cert = (
-    x509.CertificateBuilder()
-    .subject_name(_name)
-    .issuer_name(_name)
-    .public_key(_key.public_key())
-    .serial_number(x509.random_serial_number())
-    .not_valid_before(now)
-    .not_valid_after(now + datetime.timedelta(days=10950))
-    .sign(_key, hashes.SHA256())
-)
+import os
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
+
+_KEY_PATH = os.path.join(os.path.dirname(os.path.abspath(IN_APK)), 'signing-key.pem')
+_CERT_PATH = os.path.join(os.path.dirname(os.path.abspath(IN_APK)), 'signing-cert.pem')
+
+if os.path.exists(_KEY_PATH) and os.path.exists(_CERT_PATH):
+    # همان کلید نسخه‌های قبلی — تا کاربران بتوانند «به‌روزرسانی» نصب کنند
+    _key = load_pem_private_key(open(_KEY_PATH, 'rb').read(), password=None)
+    _cert = x509.load_pem_x509_certificate(open(_CERT_PATH, 'rb').read())
+    print('signing: reusing existing key (upgrade-compatible)')
+else:
+    _key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    now = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=1)
+    _name = x509.Name([
+        x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, 'Mobile'),
+        x509.NameAttribute(NameOID.ORGANIZATION_NAME, 'NEXUS HQ'),
+        x509.NameAttribute(NameOID.COMMON_NAME, 'NEXUS HQ'),
+    ])
+    _cert = (
+        x509.CertificateBuilder()
+        .subject_name(_name)
+        .issuer_name(_name)
+        .public_key(_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now)
+        .not_valid_after(now + datetime.timedelta(days=10950))
+        .sign(_key, hashes.SHA256())
+    )
+    print('signing: new key generated')
 
 # ذخیره‌ی کلید برای ساخ‌های بعدی (قابل بازتولید)
 _pem_dir = os.path.dirname(os.path.abspath(IN_APK))
@@ -118,5 +131,5 @@ with open(OUT_APK, 'wb') as f:
     f.write(buf.getvalue())
 
 print(f'signed: {OUT_APK} ({os.path.getsize(OUT_APK)} bytes)')
-print(f'  cert : subject={_name.rfc4514_string()}')
+print(f'  cert : subject={_cert.subject.rfc4514_string()}')
 print(f'  valid: 30 سال · RSA-2048 · SHA256withRSA')

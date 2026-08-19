@@ -24,3 +24,12 @@ android/app/src/main/assets/public/
 *.log
 
 # خروجی‌های build در git هستند (build-output/) — این خط فقط برای اطمینان از جدا ماندن سورس است
+
+# خروجی‌های میانی build-native (قابل تولید مجدد با gen_assets.py / gen_payload.py)
+build-native/win/assets.cpp
+build-native/win/payload.cpp
+build-native/win/*.pdb
+build-apk/*.apk
+build-apk/classes.dex
+build-apk/AndroidManifest.xml.bin
+build-apk/resources.arsc

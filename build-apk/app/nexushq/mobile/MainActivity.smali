@@ -53,14 +53,14 @@
     invoke-direct {v1}, Landroid/webkit/WebChromeClient;-><init>()V
     invoke-virtual {v0, v1}, Landroid/webkit/WebView;->setWebChromeClient(Landroid/webkit/WebChromeClient;)V
 
-    # همه‌ی درخواست‌های https://localhost از داخل APK سرو می‌شوند (کاملاً آفلاین)
+    # همه‌ی درخواست‌های https://app.nexushq.mobile از داخل APK سرو می‌شوند (کاملاً آفلاین)
     new-instance v1, Lapp/nexushq/mobile/AssetClient;
     invoke-direct {v1}, Lapp/nexushq/mobile/AssetClient;-><init>()V
     invoke-virtual {v0, v1}, Landroid/webkit/WebView;->setWebViewClient(Landroid/webkit/WebViewClient;)V
 
     invoke-virtual {p0, v0}, Landroid/app/Activity;->setContentView(Landroid/view/View;)V
 
-    const-string v1, "https://localhost/index.html"
+    const-string v1, "https://app.nexushq.mobile/index.html"
     invoke-virtual {v0, v1}, Landroid/webkit/WebView;->loadUrl(Ljava/lang/String;)V
 
     return-void
