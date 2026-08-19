@@ -143,24 +143,30 @@ function Root() {
     const evts = ['pointerdown', 'keydown', 'wheel', 'touchstart'] as const
     for (const e of evts) window.addEventListener(e, mark, { passive: true })
 
-    const shouldLock = () => {
+    const idleMs = () => Date.now() - lastActive.current
+    // قفل بر اساس بی‌کاری (فقط وقتی بیشتر از صفر دقیقه تنظیم شده باشد)
+    const lockIfIdle = () => {
       const mins = readLock().autoLockMin
-      if (mins < 0) return false // «فقط هنگام باز شدن برنامه»
-      if (mins === 0) return true
-      return Date.now() - lastActive.current >= mins * 60_000
+      if (mins > 0 && idleMs() >= mins * 60_000) setLocked(true)
     }
-    const tick = setInterval(() => { if (shouldLock()) setLocked(true) }, 20_000)
+    // قفل هنگام برگشت از پس‌زمینه: «۰» یعنی بلافاصله، بقیه طبق بی‌کاری
+    const lockOnReturn = () => {
+      const mins = readLock().autoLockMin
+      if (mins === 0) setLocked(true)
+      else lockIfIdle()
+    }
+    const tick = setInterval(lockIfIdle, 20_000)
 
-    // رفتن به پس‌زمینه (تعویض برنامه در اندروید / کوچک کردن پنجره)
-    const onHide = () => { if (document.visibilityState === 'hidden') lastActive.current = Date.now() }
-    document.addEventListener('visibilitychange', onHide)
+    // تعویض برنامه (اندروید) / کوچک و بزرگ‌کردن پنجره (ویندوز)
+    const onVis = () => { if (document.visibilityState === 'visible') lockOnReturn() }
+    document.addEventListener('visibilitychange', onVis)
     let offResume = () => {}
-    void onMobileResume(() => { if (shouldLock()) setLocked(true) }).then(fn => { offResume = fn })
+    void onMobileResume(lockOnReturn).then(fn => { offResume = fn })
 
     return () => {
       for (const e of evts) window.removeEventListener(e, mark)
       clearInterval(tick)
-      document.removeEventListener('visibilitychange', onHide)
+      document.removeEventListener('visibilitychange', onVis)
       offResume()
     }
   }, [locked])
