@@ -1,0 +1,19 @@
+{
+  "appId": "app.nexushq.mobile",
+  "appName": "NEXUS HQ",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#08090c"
+  },
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#08090c",
+      "overlaysWebView": false
+    }
+  }
+}

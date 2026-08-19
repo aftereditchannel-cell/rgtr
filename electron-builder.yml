@@ -1,0 +1,55 @@
+appId: com.nexushq.app
+productName: NEXUS HQ
+copyright: MIT — NEXUS HQ
+
+directories:
+  output: release
+  buildResources: electron/icons
+
+# فقط چیزهایی که برنامه واقعاً لازم دارد وارد بسته می‌شود
+files:
+  - dist/**/*
+  - electron/main.cjs
+  - electron/preload.cjs
+  - electron/icons/icon.png
+  - package.json
+
+# فشرده‌سازی حداکثری برای حجم کمتر
+compression: maximum
+asar: true
+removePackageScripts: true
+buildVersion: "1.0.0"
+
+win:
+  icon: electron/icons/icon.ico
+  target:
+    - target: nsis      # نصب‌کننده
+      arch: [x64]
+    - target: portable  # نسخه‌ی تک‌فایلی بدون نصب
+      arch: [x64]
+  legalTrademarks: NEXUS HQ
+
+nsis:
+  artifactName: "NEXUS-HQ-${version}-Setup.${ext}"
+  oneClick: false                      # کاربر مسیر نصب را انتخاب کند
+  perMachine: false                    # نصب برای همین کاربر → بدون نیاز به Administrator
+  allowToChangeInstallationDirectory: true
+  allowElevation: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: NEXUS HQ
+  installerIcon: electron/icons/icon.ico
+  uninstallerIcon: electron/icons/icon.ico
+  installerHeaderIcon: electron/icons/icon.ico
+  deleteAppDataOnUninstall: false      # مهم: داده‌ی کاربر با حذف برنامه پاک نشود
+  runAfterFinish: true
+  menuCategory: false
+
+portable:
+  artifactName: "NEXUS-HQ-${version}-Portable.${ext}"
+  requestExecutionLevel: user
+
+# بدون امضای دیجیتال (گواهی کد پولی است — رایگان نگه می‌داریم)
+forceCodeSigning: false
+
+publish: null
