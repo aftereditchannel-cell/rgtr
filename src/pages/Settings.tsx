@@ -12,6 +12,9 @@ import { useFmt } from '../lib/useFmt'
 import { desktop, isDesktop } from '../lib/desktop'
 import { isMobile, mobilePlatform, mobileDataPath } from '../lib/mobile'
 import { readLock, writeLock, clearLock, hashPin, LOCK_DEFAULTS } from '../lib/lock'
+import { AI_PROVIDERS, testAIConnection, aiProviderById, type AIProviderId } from '../ai/providers'
+import { getKey, setKey, maskKey, secureAvailable } from '../lib/secrets'
+import { PROVIDERS } from '../social/registry'
 import type { AppInfo } from '../lib/desktop'
 import * as cloud from '../lib/cloud'
 import type { Lang } from '../store/types'
@@ -132,6 +135,18 @@ export function Settings() {
 
       {/* ---------- security ---------- */}
       <SecurityCard onSaved={msg => setToast(msg)} />
+
+      {/* ---------- social platforms ---------- */}
+      <SocialCard />
+
+      {/* ---------- AI ---------- */}
+      <AICard onSaved={msg => setToast(msg)} />
+
+      {/* ---------- API keys ---------- */}
+      <ApiKeysCard onSaved={msg => setToast(msg)} />
+
+      {/* ---------- customization ---------- */}
+      <CustomizationCard />
 
       {/* ---------- cloud ---------- */}
       <CloudCard />
@@ -268,6 +283,179 @@ export function Settings() {
 }
 
 /* ---------- سوییچ چندگزینه‌ای ---------- */
+
+/* ---------- Social Platforms: رفتار Refresh + نام‌گذاری ---------- */
+function SocialCard() {
+  const { t, lang } = useT()
+  const s = useApp(x => x.data.settings)
+  const setSettings = useApp(x => x.setSettings)
+  const [labels, setLabels] = useState<Record<string, string>>(s.custom.platformLabels ?? {})
+  return (
+    <Card>
+      <SectionTitle icon="Share2">{t('set.social')}</SectionTitle>
+      <div className="grid sm:grid-cols-2 gap-4">
+        <Field label={t('set.refreshMode')} help={t('set.refreshModeHint')}>
+          <Toggle
+            value={s.social.refreshMode}
+            options={[
+              { v: 'manual', l: t('social.mode.manual') },
+              { v: 'open', l: t('social.mode.open') },
+              { v: '5', l: t('social.mode.5') },
+              { v: '15', l: t('social.mode.15') },
+            ]}
+            onChange={v => setSettings({ social: { ...s.social, refreshMode: v as 'manual' | 'open' | '5' | '15' } })}
+          />
+        </Field>
+      </div>
+      <div className="mt-4">
+        <span className="block text-[11px] font-medium text-[var(--color-dim)] mb-2">{t('set.platformLabels')}</span>
+        <div className="grid sm:grid-cols-2 gap-2">
+          {PROVIDERS.map(p => (
+            <div key={p.id} className="flex items-center gap-2">
+              <span className="text-[11px] w-24 shrink-0">{lang === 'fa' ? p.labelFa : p.label}</span>
+              <TextInput value={labels[p.id] ?? ''} placeholder={p.label}
+                onChange={e => {
+                  const next = { ...labels, [p.id]: e.target.value }
+                  setLabels(next)
+                  setSettings({ custom: { ...s.custom, platformLabels: next } })
+                }} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+/* ---------- AI: Provider / Model / Key / Test ---------- */
+function AICard({ onSaved }: { onSaved: (msg: string) => void }) {
+  const { t } = useT()
+  const s = useApp(x => x.data.settings)
+  const setSettings = useApp(x => x.setSettings)
+  const [testing, setTesting] = useState(false)
+  const [testMsg, setTestMsg] = useState('')
+  const prov = aiProviderById(s.ai.provider) ?? AI_PROVIDERS[0]
+  const [draftKey, setDraftKey] = useState('')
+
+  const doTest = async () => {
+    setTesting(true); setTestMsg('')
+    const key = draftKey || getKey(prov.keyName) || ''
+    if (!key) { setTestMsg(t('set.aiNeedKey')); setTesting(false); return }
+    const r = await testAIConnection(s.ai.provider, s.ai.model, key)
+    setTestMsg((r.ok ? '✔ ' : '✖ ') + r.detail.slice(0, 140))
+    setTesting(false)
+  }
+
+  return (
+    <Card>
+      <SectionTitle icon="Bot" right={<span className={`w-1.5 h-1.5 rounded-full ${s.ai.enabled ? 'bg-emerald-500' : 'bg-[var(--color-dim2)]'}`} />}>
+        {t('set.ai')}
+      </SectionTitle>
+      <p className="text-[11.5px] text-[var(--color-dim)] leading-relaxed mb-3">{t('set.aiNote')}</p>
+      <div className="grid sm:grid-cols-3 gap-4">
+        <Field label={t('set.aiProvider')}>
+          <Toggle
+            value={s.ai.provider}
+            options={AI_PROVIDERS.map(p => ({ v: p.id, l: p.id === 'openai' ? 'OpenAI' : p.id === 'gemini' ? 'Gemini' : 'Claude' }))}
+            onChange={v => {
+              const p = aiProviderById(v as AIProviderId)
+              setSettings({ ai: { ...s.ai, provider: v as AIProviderId, model: p?.defaultModel ?? s.ai.model } })
+            }}
+          />
+        </Field>
+        <Field label={t('set.aiModel')}>
+          <Select options={prov.models} value={s.ai.model} onChange={e => setSettings({ ai: { ...s.ai, model: e.target.value } })} />
+        </Field>
+        <Field label={t('set.apiKey')} help={maskKey(prov.keyName) || t('set.noKey')}>
+          <div className="flex gap-2">
+            <TextInput value={draftKey} type="password" placeholder={maskKey(prov.keyName) || '••••••••'}
+              onChange={e => setDraftKey(e.target.value)} />
+          </div>
+        </Field>
+      </div>
+      <div className="flex items-center gap-2 flex-wrap mt-3">
+        <Button size="sm" variant="outline" icon={testing ? 'Loader' : 'Zap'} disabled={testing} onClick={() => void doTest()}>
+          {t('set.testConn')}
+        </Button>
+        <Button size="sm" variant="primary" icon="Save" disabled={!draftKey} onClick={() => {
+          setKey(prov.keyName, draftKey); setDraftKey(''); onSaved(t('set.keySaved'))
+        }}>{t('common.save')}</Button>
+        <Button size="sm" variant={s.ai.enabled ? 'outline' : 'ghost'} icon={s.ai.enabled ? 'Pause' : 'Play'}
+          onClick={() => setSettings({ ai: { ...s.ai, enabled: !s.ai.enabled } })}>
+          {s.ai.enabled ? t('wf.disable') : t('wf.enable')}
+        </Button>
+        <span className="text-[10px] text-[var(--color-dim2)] ltr">{prov.docsUrl}</span>
+      </div>
+      {testMsg && <div className={`mt-2 text-[11px] ${testMsg.startsWith('✔') ? 'text-emerald-500' : 'text-red-400'}`}>{testMsg}</div>}
+    </Card>
+  )
+}
+
+/* ---------- API & Integrations: کلیدهای سرویس‌ها ---------- */
+const SERVICE_KEYS: Array<{ name: string; label: string; hint: string }> = [
+  { name: 'youtube', label: 'YouTube Data API v3', hint: 'console.cloud.google.com' },
+  { name: 'soundcloud', label: 'SoundCloud client_id', hint: 'soundcloud.com/you/apps' },
+  { name: 'spotify_client_id', label: 'Spotify Client ID', hint: 'developer.spotify.com/dashboard' },
+  { name: 'spotify_client_secret', label: 'Spotify Client Secret', hint: '—' },
+  { name: 'instagram_graph_token', label: 'Instagram Graph token (own Business account)', hint: 'developers.facebook.com' },
+  { name: 'telegram_bot_token', label: 'Telegram Bot token (optional)', hint: '@BotFather' },
+]
+
+function ApiKeysCard({ onSaved }: { onSaved: (msg: string) => void }) {
+  const { t } = useT()
+  const [drafts, setDrafts] = useState<Record<string, string>>({})
+  return (
+    <Card>
+      <SectionTitle icon="Key">
+        {t('set.apiKeys')}
+        <span className="ms-2 text-[9.5px] text-emerald-500">{secureAvailable() ? t('set.secureStore') : t('set.browserStore')}</span>
+      </SectionTitle>
+      <p className="text-[11.5px] text-[var(--color-dim)] leading-relaxed mb-3">{t('set.apiKeysNote')}</p>
+      <div className="space-y-2">
+        {SERVICE_KEYS.map(k => (
+          <div key={k.name} className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11.5px] w-56 shrink-0">{k.label}</span>
+            <TextInput type="password" className="flex-1 min-w-40" placeholder={maskKey(k.name) || '—'}
+              value={drafts[k.name] ?? ''} onChange={e => setDrafts({ ...drafts, [k.name]: e.target.value })} />
+            <Button size="sm" variant="primary" icon="Save" disabled={!drafts[k.name]}
+              onClick={() => { setKey(k.name, drafts[k.name]); setDrafts({ ...drafts, [k.name]: '' }); onSaved(t('set.keySaved')) }}>
+              {t('common.save')}
+            </Button>
+            {getKey(k.name) && <Button size="sm" variant="ghost" icon="Trash2" onClick={() => { setKey(k.name, ''); onSaved(t('set.keyRemoved')) }} />}
+            <span className="text-[9.5px] text-[var(--color-dim2)] w-full sm:w-auto ltr">{k.hint}</span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  )
+}
+
+/* ---------- Customization: نام، رنگ دوم، تم ---------- */
+function CustomizationCard() {
+  const { t } = useT()
+  const s = useApp(x => x.data.settings)
+  const setSettings = useApp(x => x.setSettings)
+  return (
+    <Card>
+      <SectionTitle icon="Palette">{t('set.customization')}</SectionTitle>
+      <div className="grid sm:grid-cols-2 gap-4">
+        <Field label={t('set.appName')} help={t('set.appNameHint')}>
+          <TextInput value={s.custom.appName} onChange={e => setSettings({ custom: { ...s.custom, appName: e.target.value } })}
+            placeholder="NEXUS HQ" />
+        </Field>
+        <Field label={t('set.secondaryColor')}>
+          <div className="flex items-center gap-2">
+            <input type="color" value={s.custom.secondaryColor} className="w-9 h-8 rounded-lg bg-transparent border border-[var(--color-line2)]"
+              onChange={e => setSettings({ custom: { ...s.custom, secondaryColor: e.target.value } })} />
+            <span className="text-[11px] nums text-[var(--color-dim)]">{s.custom.secondaryColor}</span>
+          </div>
+        </Field>
+      </div>
+      <p className="text-[10px] text-[var(--color-dim2)] mt-3 leading-relaxed">{t('set.brandingNote')}</p>
+    </Card>
+  )
+}
+
 function Toggle({ value, options, onChange }: { value: string; options: { v: string; l: string }[]; onChange: (v: string) => void }) {
   return (
     <div className="inline-flex rounded-lg border border-[var(--color-line2)] p-0.5 bg-[var(--color-bg)] w-full">

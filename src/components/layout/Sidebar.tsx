@@ -9,11 +9,13 @@ const FIXED_TOP = [
   { to: '/', icon: 'LayoutDashboard', k: 'nav.dashboard' },
   { to: '/decision', icon: 'Target', k: 'nav.decision' },
   { to: '/analytics', icon: 'BarChart3', k: 'nav.analytics' },
+  { to: '/social', icon: 'Share2', k: 'nav.social' },
+  { to: '/automation', icon: 'Workflow', k: 'nav.automation' },
 ]
 
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const modules = useApp(s => s.data.modules)
-  const org = useApp(s => s.data.settings.orgName)
+  const org = useApp(s => s.data.settings.custom.appName) || useApp(s => s.data.settings.orgName)
   const dirty = useApp(s => s.dirty)
   const nav = useNavigate()
   const { t, m: ml, g: gl, lang, rtl } = useT()

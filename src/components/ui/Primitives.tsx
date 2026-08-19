@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from 'react'
 import type { ReactNode, CSSProperties } from 'react'
 import { ICONS } from './icons'
 import { useT } from '../../i18n'
@@ -151,11 +152,69 @@ export function TextInput(p: React.InputHTMLAttributes<HTMLInputElement>) {
 export function TextArea(p: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea {...p} className={`${inputCls} resize-y min-h-[76px] leading-relaxed ${p.className ?? ''}`} />
 }
-export function Select({ options, ...p }: { options: string[] } & React.SelectHTMLAttributes<HTMLSelectElement>) {
+/**
+ * Dropdown سفارشی — جایگزین <select> بومی
+ * رفتار یکسان در WebView2 (ویندوز) و WebView اندروید:
+ * باز/بسته با کلیک، بستن با کلیک بیرون/Esc، انتخاب با کلیک،
+ * همیشه روی بقیه‌ی عناصر (z-50) و بدون خروج از صفحه.
+ */
+export function Select({ options, value, onChange, className = '', disabled }: {
+  options: string[]
+  value: string
+  onChange: (e: { target: { value: string } }) => void
+  className?: string
+  disabled?: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const [hi, setHi] = useState(0)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDoc)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  const current = options.find(o => o === value) ?? ''
+  const label = (o: string) => (o === '' ? '—' : o)
+
   return (
-    <select {...p} className={`${inputCls} cursor-pointer ${p.className ?? ''}`}>
-      {options.map(o => <option key={o} value={o}>{o || '—'}</option>)}
-    </select>
+    <div ref={ref} className={`relative ${className}`}>
+      <button type="button" disabled={disabled} onClick={() => setOpen(o => !o)}
+        className={`${inputCls} cursor-pointer flex items-center justify-between gap-2 text-start w-full ${disabled ? 'opacity-50' : ''}`}
+        aria-haspopup="listbox" aria-expanded={open}>
+        <span className="truncate">{label(current)}</span>
+        <svg width="10" height="10" viewBox="0 0 10 10" className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true">
+          <path d="M1 3l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+        </svg>
+      </button>
+      {open && (
+        <div role="listbox" className="absolute z-50 left-0 right-0 mt-1.5 max-h-60 overflow-y-auto rounded-lg glass-strong shadow-2xl py-1 anim">
+          {options.map((o, i) => (
+            <button key={o} type="button" role="option" aria-selected={o === value}
+              onMouseEnter={() => setHi(i)}
+              onClick={() => { onChange({ target: { value: o } }); setOpen(false) }}
+              className={`w-full text-start px-3 py-2 text-[12px] transition-colors ${
+                o === value
+                  ? 'text-[var(--color-acc)] font-medium'
+                  : i === hi ? 'bg-[var(--hover)] text-[var(--color-tx)]' : 'text-[var(--color-dim)]'
+              }`}>
+              {label(o)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 export function Field({ label, children, help }: { label: string; children: ReactNode; help?: string }) {

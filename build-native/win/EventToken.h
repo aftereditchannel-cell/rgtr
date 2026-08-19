@@ -1,5 +1,4 @@
 // EventToken.h — تعریف استاندارد ویندوز (Windows::Foundation::EventRegistrationToken)
-// مطابق SDK مایکروسافت؛ فقط همین یک struct است.
 #pragma once
 
 #ifndef _EVENTTOKEN_H_
@@ -13,8 +12,13 @@ struct EventRegistrationToken {
 };
 }  // namespace Foundation
 }  // namespace Windows
-#endif  // __cplusplus
 
-typedef struct EventRegistrationToken EventRegistrationToken;
+// در ++C نام سراسری هم در دسترس باشد (مشابه SDK رسمی)
+using Windows::Foundation::EventRegistrationToken;
+#else   // C
+typedef struct EventRegistrationToken {
+  __int64 value;
+} EventRegistrationToken;
+#endif  // __cplusplus
 
 #endif  // _EVENTTOKEN_H_

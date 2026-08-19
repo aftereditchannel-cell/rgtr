@@ -58,6 +58,14 @@
     invoke-direct {v1}, Lapp/nexushq/mobile/AssetClient;-><init>()V
     invoke-virtual {v0, v1}, Landroid/webkit/WebView;->setWebViewClient(Landroid/webkit/WebViewClient;)V
 
+    # پل بومی JS: مخزن کلید + تنظیم عنوان (حافظه‌ی خصوصی برنامه)
+    new-instance v1, Lapp/nexushq/mobile/KeyBridge;
+    invoke-direct {v1, p0}, Lapp/nexushq/mobile/KeyBridge;-><init>(Landroid/app/Activity;)V
+    const-string v2, "NexusKeyStore"
+    invoke-virtual {v0, v1, v2}, Landroid/webkit/WebView;->addJavascriptInterface(Ljava/lang/Object;Ljava/lang/String;)V
+    const-string v2, "NexusNative"
+    invoke-virtual {v0, v1, v2}, Landroid/webkit/WebView;->addJavascriptInterface(Ljava/lang/Object;Ljava/lang/String;)V
+
     invoke-virtual {p0, v0}, Landroid/app/Activity;->setContentView(Landroid/view/View;)V
 
     const-string v1, "https://app.nexushq.mobile/index.html"

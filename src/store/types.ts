@@ -36,6 +36,12 @@ export interface Settings {
   /** ارقام فارسی یا لاتین */
   digits: 'fa' | 'latn'
   cloud: CloudSettings
+  /** پیکربندی AI (کلیدها جدا و امن نگه داشته می‌شوند) */
+  ai: AISettings
+  /** شخصی‌سازی ظاهر و نام برنامه */
+  custom: Customization
+  /** رفتار Refresh اطلاعات شبکه‌های اجتماعی */
+  social: SocialSettings
 }
 
 export interface AppData {
@@ -50,6 +56,10 @@ export interface AppData {
   removedCore?: string[]
   /** زمان اولین seed — وجودش یعنی دیگر نباید داده‌ی نمونه ساخته شود */
   seededAt?: string
+  /* ---------- Social Analyzer & Automation ---------- */
+  socialAccounts?: SocialAccount[]
+  workflows?: Workflow[]
+  runLogs?: RunLog[]
 }
 
 export interface Snapshot {
@@ -57,4 +67,67 @@ export interface Snapshot {
   at: string
   size: number
   data: AppData
+}
+
+/* ---------- Social Analyzer & Automation (v1.1) ---------- */
+
+import type { PlatformId } from '../social/types'
+import type { AIProviderId } from '../ai/providers'
+
+export interface SocialAccount {
+  id: string
+  platform: PlatformId
+  handle: string
+  /** آخرین اطلاعات موفق — همان ساختاری که Provider داده */
+  info: import('../social/types').SocialInfo
+  addedAt: string
+}
+
+export interface WorkflowStep {
+  /** fetch | ai | save */
+  type: 'fetch' | 'ai' | 'save'
+  prompt?: string
+}
+
+export interface Workflow {
+  id: string
+  name: string
+  enabled: boolean
+  /** ورودی‌های شبکه‌ی اجتماعی (URL یا @handle) */
+  targets: string[]
+  steps: WorkflowStep[]
+  /** دقیقه بین اجراهای خودکار — 0 = دستی */
+  intervalMin: number
+  lastRunAt?: string
+  lastStatus?: 'ok' | 'error' | 'partial'
+  createdAt: string
+}
+
+export interface RunLog {
+  id: string
+  at: string
+  kind: 'social' | 'workflow' | 'ai' | 'api'
+  subject: string
+  ok: boolean
+  detail: string
+}
+
+export interface AISettings {
+  provider: AIProviderId
+  model: string
+  enabled: boolean
+}
+
+export interface Customization {
+  /** نام نمایشی برنامه — روی عنوان پنجره و هدر اعمال می‌شود */
+  appName: string
+  /** رنگ دوم (Secondary) — #RRGGBB */
+  secondaryColor: string
+  /** تغییر برچسب Platformها در UI */
+  platformLabels: Record<string, string>
+}
+
+export interface SocialSettings {
+  /** manual | open | 5 | 15 (دقیقه) */
+  refreshMode: 'manual' | 'open' | '5' | '15'
 }

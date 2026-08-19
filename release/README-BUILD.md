@@ -1,4 +1,4 @@
-# NEXUS HQ v1.0.0 — نسخه‌های Native (ویندوز + اندروید)
+# NEXUS HQ v1.1.0 — Native Apps (ویندوز + اندروید) + Social Analyzer + AI
 
 > این نسخه‌ها اپلیکیشن‌های **واقعی و مستقل** هستند — نه Web/PWA/مرورگر.
 > بدون سرور · بدون localhost · بدون Node/Python/Fluter · تمام وابستگی‌ها داخل بسته
@@ -8,7 +8,7 @@
 | `NEXUS-HQ-Setup.exe` | ۱.۹ MB | 🪟 **نصب‌کننده Native** — شورتکات دسکتاپ/استارت + Add/Remove Programs + Uninstaller |
 | `NEXUS-HQ.exe` | ۱.۵ MB | 🪟 **اپ مستقل** (Portable) — همان برنامه بدون نصب؛ از فلش هم اجرا می‌شود |
 | `NEXUS-HQ-1.0.0-android.apk` | ۰.۵ MB | 📱 **اپ اندروید** — نصب مستقیم روی اندروید ۷+ |
-| `NEXUS-HQ-v1.0.0-native.zip` | ~۱ MB | همه‌ی خروجی‌ها یکجا |
+| `NEXUS-HQ-v1.1.0-native.zip` | ~۲ MB | همه‌ی خروجی‌ها یکجا |
 | `SHA256.txt` | — | صحت‌سنجی |
 
 درستی فایل‌ها: `SHA256.txt`
@@ -53,3 +53,31 @@
 - سورس کامل و تکرارپذیر: پوشه‌های `build-native/win/` و `build-apk/` در همین ریپو
 - کلید امضای اندروید: `build-apk/signing-key.pem` — برای به‌روزرسانی‌های بعدی نگه دارید
 - **AAB**: در این محیط ممکن نیست (نیازمند Android SDK/Gradle) — ورک‌فلو آماده: `ci-templates/build-all.yml`
+
+
+---
+
+# 🆕 v1.1.0 — Social Analyzer + AI + Automation
+
+## Social Media Analyzer
+- ورودی: `@username` یا URL — تشخیص خودکار Platform
+- Providerهای ماژولار: **YouTube · Telegram · SoundCloud · Spotify · Instagram**
+- فقط منابع قانونی: YouTube RSS عمومی/Data API، پیش‌نمایش رسمی t.me، کلیدهای خودِ کاربر برای SoundCloud/Spotify/Graph API
+- **داده‌ی جعلی ندارد** — هر چیزی در دسترس نباشد صریحاً «در دسترس نیست» می‌شود
+- Refresh: دستی / هنگام باز شدن / هر ۵ یا ۱۵ دقیقه (از تنظیمات)
+
+## AI Automation
+- Providerها: **OpenAI · Gemini · Claude** (کلید خودتان — بدون ادعای رایگان)
+- Test Connection واقعی، انتخاب مدل، فعال/غیرفعال
+- Workflow: Fetch → AI Analysis → Report + تاریخچه و لاگ
+
+## دروازه‌ی شبکه‌ی بومی (بدون CORS)
+- ویندوز: WinHTTP داخل خود EXE — اندروید: HttpURLConnection داخل خود APK
+- دامنه‌ی داخلی `api.nexushq.mobile` — **هیچ localhost/127.0.0.1 در باینری‌ها نیست** (بررسی شد)
+
+## مخزن امن کلیدها
+- ویندوز: **DPAPI** (رمزنگاری سطح‌کاربر ویندوز) — اندروید: حافظه‌ی خصوصی برنامه (SharedPreferences)
+- کلیدها هرگز وارد Export/بکاپ/لاگ نمی‌شوند و در UI ماسک می‌شوند
+
+## شخصی‌سازی
+- نام برنامه (عنوان پنجره‌ی واقعی از طریق پل بومی تغییر می‌کند) · رنگ دوم · تغییر نام Platformها · Dark/Light/Auto

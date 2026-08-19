@@ -6,6 +6,8 @@ import { seedData, emptyData } from '../domain/seed'
 import { loadDoc, saveDoc, pushSnapshot } from '../lib/db'
 import { migrate } from '../lib/migrate'
 import { uid, nowISO } from '../lib/id'
+import type { SocialAccount, Workflow, RunLog } from './types'
+import type { SocialInfo } from '../social/types'
 
 interface Store {
   data: AppData
@@ -33,6 +35,16 @@ interface Store {
   replaceAll: (d: AppData) => Promise<void>
   loadSeed: () => Promise<void>
   clearAll: () => Promise<void>
+
+  /* ---------- Social Analyzer & Automation ---------- */
+  upsertSocial: (info: SocialInfo) => void
+  removeSocial: (id: string) => void
+  getSocial: () => SocialAccount[]
+  upsertWorkflow: (w: Workflow) => void
+  removeWorkflow: (id: string) => void
+  getWorkflows: () => Workflow[]
+  pushLog: (l: Omit<RunLog, 'id' | 'at'>) => void
+  getLogs: () => RunLog[]
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
@@ -159,6 +171,54 @@ export const useApp = create<Store>((set, get) => {
       touch()
       return missing.length
     },
+
+    upsertSocial(info) {
+      set(s => {
+        const list = s.data.socialAccounts ?? []
+        const existing = list.find(a => a.platform === info.platform && a.handle.toLowerCase() === info.handle.toLowerCase())
+        const acc: SocialAccount = existing
+          ? { ...existing, info, }
+          : { id: uid(), platform: info.platform, handle: info.handle, info, addedAt: nowISO() }
+        const next = existing ? list.map(a => a.id === acc.id ? acc : a) : [acc, ...list]
+        return { data: { ...s.data, socialAccounts: next.slice(0, 200) } }
+      })
+      touch()
+    },
+
+    removeSocial(id) {
+      set(s => ({ data: { ...s.data, socialAccounts: (s.data.socialAccounts ?? []).filter(a => a.id !== id) } }))
+      touch()
+    },
+
+    getSocial() { return get().data.socialAccounts ?? [] },
+
+    upsertWorkflow(w) {
+      set(s => {
+        const list = s.data.workflows ?? []
+        const next = list.some(x => x.id === w.id) ? list.map(x => x.id === w.id ? w : x) : [w, ...list]
+        return { data: { ...s.data, workflows: next } }
+      })
+      touch()
+    },
+
+    removeWorkflow(id) {
+      set(s => ({ data: { ...s.data, workflows: (s.data.workflows ?? []).filter(w => w.id !== id) } }))
+      touch()
+    },
+
+    getWorkflows() { return get().data.workflows ?? [] },
+
+    pushLog(l) {
+      set(s => ({
+        data: {
+          ...s.data,
+          runLogs: [{ id: uid(), at: nowISO(), ...l }, ...(s.data.runLogs ?? [])].slice(0, 300),
+        },
+      }))
+      touch()
+    },
+
+    getLogs() { return get().data.runLogs ?? [] },
 
     setSettings(patch) {
       set(s => ({ data: { ...s.data, settings: { ...s.data.settings, ...patch } } }))

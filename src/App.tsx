@@ -7,6 +7,8 @@ import { CommandPalette } from './components/layout/CommandPalette'
 import { Dashboard } from './pages/Dashboard'
 import { DecisionCenter } from './pages/DecisionCenter'
 import { Analytics } from './pages/Analytics'
+import { Social } from './pages/Social'
+import { Automation } from './pages/Automation'
 import { Settings } from './pages/Settings'
 import { ModulePage } from './pages/ModulePage'
 import { Icon } from './components/ui/Primitives'
@@ -62,6 +64,19 @@ function Shell() {
     document.documentElement.style.setProperty('--color-acc', accent)
   }, [accent])
 
+  // رنگ دوم و نام سفارشی برنامه (App Customization)
+  const secondary = useApp(s => s.data.settings.custom.secondaryColor)
+  const appName = useApp(s => s.data.settings.custom.appName)
+  useEffect(() => {
+    document.documentElement.style.setProperty('--color-acc2', secondary || '#a855f7')
+  }, [secondary])
+  useEffect(() => {
+    document.title = appName || 'NEXUS HQ'
+    // اگر پل بومی موجود باشد، عنوان پنجره‌ی واقعی هم عوض می‌شود
+    const w = window as unknown as { NexusNative?: { setTitle?: (t: string) => void } }
+    try { w.NexusNative?.setTitle?.(appName || 'NEXUS HQ') } catch { /* مرورگر */ }
+  }, [appName])
+
   // جهت و زبان کل سند با تنظیمات همگام می‌شود
   useEffect(() => {
     const el = document.documentElement
@@ -81,7 +96,7 @@ function Shell() {
           <button onClick={() => setNavOpen(true)} className="text-[var(--color-dim)] p-1.5 -m-1 rounded-lg active:bg-[var(--hover)]" aria-label="menu">
             <Icon name="Menu" size={19} />
           </button>
-          <span className="text-[13px] font-semibold flex-1 truncate">NEXUS HQ</span>
+          <span className="text-[13px] font-semibold flex-1 truncate">{appName || 'NEXUS HQ'}</span>
         </div>
 
         <main className="flex-1 scroll-y">
@@ -90,6 +105,8 @@ function Shell() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/decision" element={<DecisionCenter />} />
               <Route path="/analytics" element={<Analytics />} />
+              <Route path="/social" element={<Social />} />
+              <Route path="/automation" element={<Automation />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/m/:key" element={<ModulePage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
