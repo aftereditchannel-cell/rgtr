@@ -9,9 +9,11 @@ const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></
   url: 'http://localhost/', pretendToBeVisual: true,
 })
 const g = globalThis as Record<string, unknown>
-g.window = dom.window; g.document = dom.window.document; g.navigator = dom.window.navigator
-g.HTMLElement = dom.window.HTMLElement; g.Element = dom.window.Element; g.Node = dom.window.Node
-g.getComputedStyle = dom.window.getComputedStyle; g.requestAnimationFrame = (f: FrameRequestCallback) => setTimeout(() => f(0), 0)
+// روی Node 21+ بعضی از این‌ها (مثل navigator) فقط getter هستند — defineProperty بدون خطا رد می‌شود
+const def = (k: string, v: unknown) => { try { Object.defineProperty(g, k, { value: v, configurable: true, writable: true }) } catch { /* نسخه‌های قدیمی */ } }
+def('window', dom.window); def('document', dom.window.document); def('navigator', dom.window.navigator)
+def('HTMLElement', dom.window.HTMLElement); def('Element', dom.window.Element); def('Node', dom.window.Node)
+def('getComputedStyle', dom.window.getComputedStyle); g.requestAnimationFrame = (f: FrameRequestCallback) => setTimeout(() => f(0), 0)
 g.cancelAnimationFrame = (h: number) => clearTimeout(h)
 g.IS_REACT_ACT_ENVIRONMENT = true
 
