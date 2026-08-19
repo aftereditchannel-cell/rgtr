@@ -9,6 +9,8 @@ import { DecisionCenter } from './pages/DecisionCenter'
 import { Analytics } from './pages/Analytics'
 import { Settings } from './pages/Settings'
 import { ModulePage } from './pages/ModulePage'
+import { SocialHub } from './pages/SocialHub'
+import { Automation } from './pages/Automation'
 import { Icon } from './components/ui/Primitives'
 import { BrandMark } from './components/ui/BrandMark'
 import { desktop } from './lib/desktop'
@@ -56,11 +58,18 @@ function Shell() {
   const [navOpen, setNavOpen] = useState(false)
   const toast = useApp(s => s.toast)
   const accent = useApp(s => s.data.settings.accent)
+  const branding = useApp(s => s.data.settings.branding)
   const { lang, rtl } = useT()
 
   useEffect(() => {
     document.documentElement.style.setProperty('--color-acc', accent)
   }, [accent])
+
+  // نام اپ در نوار عنوان و title مرورگر با برند سفارشی همگام می‌شود
+  useEffect(() => {
+    const name = branding.appName?.trim() || 'NEXUS HQ'
+    document.title = `${name} — ${branding.tagline?.trim() || 'Command Center'}`
+  }, [branding.appName, branding.tagline])
 
   // جهت و زبان کل سند با تنظیمات همگام می‌شود
   useEffect(() => {
@@ -81,7 +90,7 @@ function Shell() {
           <button onClick={() => setNavOpen(true)} className="text-[var(--color-dim)] p-1.5 -m-1 rounded-lg active:bg-[var(--hover)]" aria-label="menu">
             <Icon name="Menu" size={19} />
           </button>
-          <span className="text-[13px] font-semibold flex-1 truncate">NEXUS HQ</span>
+          <span className="text-[13px] font-semibold flex-1 truncate">{branding.appName || 'NEXUS HQ'}</span>
         </div>
 
         <main className="flex-1 scroll-y">
@@ -90,6 +99,8 @@ function Shell() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/decision" element={<DecisionCenter />} />
               <Route path="/analytics" element={<Analytics />} />
+              <Route path="/social" element={<SocialHub />} />
+              <Route path="/automation" element={<Automation />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/m/:key" element={<ModulePage />} />
               <Route path="*" element={<Navigate to="/" replace />} />

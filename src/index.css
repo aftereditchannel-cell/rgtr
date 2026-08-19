@@ -200,6 +200,23 @@ body.is-mobile .glass-strong { backdrop-filter: blur(16px) saturate(150%); -webk
 input, select, textarea, button { font-family: inherit; }
 input:focus, select:focus, textarea:focus { outline: none; }
 select option { background: var(--color-panel); color: var(--color-tx); }
+
+/*
+ * لیست‌های کشویی روی اندروید نباید تمام‌صفحه باز شوند.
+ * با این تنظیمات، منوی بومی به‌صورت یک پنجره‌ی کوچک سیستم ظاهر می‌شود.
+ * (کامپوننت <Select> سفارشی هم کاملاً داخل اپ popover می‌سازد.)
+ */
+select {
+  font-size: 16px;          /* جلوگیری از zoom خودکار iOS */
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: none;
+}
+select:focus-visible { outline: none; }
+@supports not (appearance: none) {
+  select { -webkit-appearance: menulist; appearance: menulist; }
+}
+/* در وب‌ویو اندروید، منوی بومی با این متا تگ محدود می‌شود (در index.html ست شده) */
 /* تقویم/ساعت مرورگر در تم تیره باید روشن دیده شود */
 input[type='date']::-webkit-calendar-picker-indicator { filter: invert(var(--cal-invert, 1)); opacity: .55; cursor: pointer; }
 html[data-theme='light'] { --cal-invert: 0; }

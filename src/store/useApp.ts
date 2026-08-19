@@ -1,5 +1,7 @@
 import { create } from 'zustand'
-import type { AppData, Entity, Settings } from './types'
+import type { AppData, Entity, Settings, SocialState, AIState } from './types'
+import type { SocialProfile } from '../domain/social'
+import type { AIProvider, AutomationTask } from '../domain/ai'
 import type { ModuleDef } from '../domain/schema'
 import { emptyRecord, CORE_MODULES } from '../domain/schema'
 import { seedData, emptyData } from '../domain/seed'
@@ -30,6 +32,15 @@ interface Store {
   restoreCoreModules: () => number
 
   setSettings: (patch: Partial<Settings>) => void
+  setSocial: (patch: Partial<SocialState>) => void
+  upsertProfile: (p: SocialProfile) => void
+  removeProfile: (id: string) => void
+  setAI: (patch: Partial<AIState>) => void
+  upsertProvider: (p: AIProvider) => void
+  removeProvider: (id: string) => void
+  addAutomation: (a: AutomationTask) => void
+  updateAutomation: (id: string, patch: Partial<AutomationTask>) => void
+  removeAutomation: (id: string) => void
   replaceAll: (d: AppData) => Promise<void>
   loadSeed: () => Promise<void>
   clearAll: () => Promise<void>
@@ -162,6 +173,84 @@ export const useApp = create<Store>((set, get) => {
 
     setSettings(patch) {
       set(s => ({ data: { ...s.data, settings: { ...s.data.settings, ...patch } } }))
+      touch()
+    },
+
+    setSocial(patch) {
+      set(s => ({ data: { ...s.data, settings: { ...s.data.settings, social: { ...s.data.settings.social, ...patch } } } }))
+      touch()
+    },
+
+    upsertProfile(p) {
+      set(s => {
+        const list = s.data.settings.social.profiles
+        const i = list.findIndex(x => x.id === p.id)
+        const profiles = i >= 0 ? list.map(x => (x.id === p.id ? p : x)) : [p, ...list]
+        return { data: { ...s.data, settings: { ...s.data.settings, social: { ...s.data.settings.social, profiles } } } }
+      })
+      touch()
+    },
+
+    removeProfile(id) {
+      set(s => ({
+        data: {
+          ...s.data,
+          settings: {
+            ...s.data.settings,
+            social: { ...s.data.settings.social, profiles: s.data.settings.social.profiles.filter(p => p.id !== id) },
+          },
+        },
+      }))
+      touch()
+    },
+
+    setAI(patch) {
+      set(s => ({ data: { ...s.data, settings: { ...s.data.settings, ai: { ...s.data.settings.ai, ...patch } } } }))
+      touch()
+    },
+
+    upsertProvider(p) {
+      set(s => {
+        const list = s.data.settings.ai.providers
+        const i = list.findIndex(x => x.id === p.id)
+        const providers = i >= 0 ? list.map(x => (x.id === p.id ? p : x)) : [...list, p]
+        return { data: { ...s.data, settings: { ...s.data.settings, ai: { ...s.data.settings.ai, providers } } } }
+      })
+      touch()
+    },
+
+    removeProvider(id) {
+      set(s => ({
+        data: { ...s.data, settings: { ...s.data.settings, ai: { ...s.data.settings.ai, providers: s.data.settings.ai.providers.filter(p => p.id !== id) } } },
+      }))
+      touch()
+    },
+
+    addAutomation(a) {
+      set(s => ({ data: { ...s.data, settings: { ...s.data.settings, ai: { ...s.data.settings.ai, automations: [a, ...s.data.settings.ai.automations] } } } }))
+      touch()
+    },
+
+    updateAutomation(id, patch) {
+      set(s => ({
+        data: {
+          ...s.data,
+          settings: {
+            ...s.data.settings,
+            ai: {
+              ...s.data.settings.ai,
+              automations: s.data.settings.ai.automations.map(a => (a.id === id ? { ...a, ...patch } : a)),
+            },
+          },
+        },
+      }))
+      touch()
+    },
+
+    removeAutomation(id) {
+      set(s => ({
+        data: { ...s.data, settings: { ...s.data.settings, ai: { ...s.data.settings.ai, automations: s.data.settings.ai.automations.filter(a => a.id !== id) } } },
+      }))
       touch()
     },
 

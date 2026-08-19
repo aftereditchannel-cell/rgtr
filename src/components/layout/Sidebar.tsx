@@ -9,11 +9,15 @@ const FIXED_TOP = [
   { to: '/', icon: 'LayoutDashboard', k: 'nav.dashboard' },
   { to: '/decision', icon: 'Target', k: 'nav.decision' },
   { to: '/analytics', icon: 'BarChart3', k: 'nav.analytics' },
+  { to: '/social', icon: 'Share2', k: 'nav.social' },
+  { to: '/automation', icon: 'Bot', k: 'nav.automation' },
 ]
 
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const modules = useApp(s => s.data.modules)
-  const org = useApp(s => s.data.settings.orgName)
+  const settings = useApp(s => s.data.settings)
+  const org = settings.orgName
+  const branding = settings.branding
   const dirty = useApp(s => s.dirty)
   const nav = useNavigate()
   const { t, m: ml, g: gl, lang, rtl } = useT()
@@ -47,12 +51,14 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
       }`}>
         {/* brand */}
         <div className="px-3.5 py-3.5 border-b border-[var(--color-line)] flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg grid place-items-center shrink-0"
-            style={{ background: 'linear-gradient(135deg, var(--color-acc), #a855f7)' }}>
-            <Icon name="Command" size={15} className="text-white" />
+          <div className="w-8 h-8 rounded-lg grid place-items-center shrink-0 overflow-hidden"
+            style={branding.logo ? undefined : { background: 'linear-gradient(135deg, var(--color-acc), #a855f7)' }}>
+            {branding.logo
+              ? <img src={branding.logo} alt="" className="w-full h-full object-cover" />
+              : <Icon name="Command" size={16} className="text-white" />}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-[13px] font-semibold tracking-tight truncate">{org || 'NEXUS HQ'}</div>
+            <div className="text-[13px] font-semibold tracking-tight truncate">{branding.appName || org || 'NEXUS HQ'}</div>
             <div className="text-[9.5px] text-[var(--color-dim2)] tracking-wider uppercase flex items-center gap-1">
               <span className={`w-1 h-1 rounded-full ${dirty ? 'bg-amber-400 pulse' : 'bg-emerald-500'}`} />
               {dirty ? t('nav.saving') : t('nav.synced')}

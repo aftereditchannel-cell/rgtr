@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useApp } from '../store/useApp'
+import type { Theme } from '../store/types'
 import { exportJSON, importJSON } from '../lib/backup'
 import { listSnapshots, getSnapshot, storageBackend, saveDoc } from '../lib/db'
 import type { Snapshot } from '../store/types'
@@ -94,10 +95,20 @@ export function Settings() {
         </div>
       </Card>
 
+      {/* ---------- شخصی‌سازی برند ---------- */}
+      <BrandingCard />
+
       {/* ---------- language / display ---------- */}
       <Card>
         <SectionTitle icon="Languages">{t('set.appearance')}</SectionTitle>
         <div className="grid sm:grid-cols-3 gap-4">
+          <Field label={t('set.theme')}>
+            <Toggle
+              value={s.theme}
+              options={[{ v: 'dark', l: t('set.themeDark') }, { v: 'light', l: t('set.themeLight') }, { v: 'auto', l: t('set.themeAuto') }]}
+              onChange={v => setSettings({ theme: v as Theme })}
+            />
+          </Field>
           <Field label={t('set.language')} help={t('set.languageHint')}>
             <Toggle
               value={s.lang}
@@ -253,6 +264,85 @@ export function Settings() {
 
       {editMod && <ModuleEditor module={editMod} onClose={() => setEditMod(null)} onSave={p => { updateModule(editMod.key, p); setEditMod(null) }} />}
     </div>
+  )
+}
+
+/* ---------- شخصی‌سازی برند ---------- */
+function BrandingCard() {
+  const { data, setSettings, setToast, persist } = useApp()
+  const { t } = useT()
+  const b = data.settings.branding
+  const logoRef = useRef<HTMLInputElement>(null)
+  const iconRef = useRef<HTMLInputElement>(null)
+
+  const readImage = (file: File, max: number): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const img = new Image()
+      const url = URL.createObjectURL(file)
+      img.onload = () => {
+        const scale = Math.min(1, max / Math.max(img.width, img.height))
+        const w = Math.round(img.width * scale), h = Math.round(img.height * scale)
+        const c = document.createElement('canvas')
+        c.width = w; c.height = h
+        c.getContext('2d')!.drawImage(img, 0, 0, w, h)
+        URL.revokeObjectURL(url)
+        resolve(c.toDataURL('image/png'))
+      }
+      img.onerror = e => { URL.revokeObjectURL(url); reject(e) }
+      img.src = url
+    })
+
+  const onLogo = async (f?: File) => {
+    if (!f) return
+    setSettings({ branding: { ...b, logo: await readImage(f, 256) } })
+    setToast(t('set.logoUpdated'))
+  }
+  const onIcon = async (f?: File) => {
+    if (!f) return
+    setSettings({ branding: { ...b, appIcon: await readImage(f, 512) } })
+    setToast(t('set.iconUpdated'))
+    void persist()
+  }
+
+  return (
+    <Card>
+      <SectionTitle icon="Palette">{t('set.branding')}</SectionTitle>
+      <p className="text-[12px] text-[var(--color-dim)] mb-3 leading-relaxed">{t('set.brandingNote')}</p>
+      <div className="grid sm:grid-cols-2 gap-4">
+        <Field label={t('set.appName')}>
+          <TextInput value={b.appName} onChange={e => setSettings({ branding: { ...b, appName: e.target.value } })} />
+        </Field>
+        <Field label={t('set.tagline')}>
+          <TextInput value={b.tagline ?? ''} onChange={e => setSettings({ branding: { ...b, tagline: e.target.value } })} />
+        </Field>
+      </div>
+      <div className="grid sm:grid-cols-2 gap-4 mt-4">
+        <Field label={t('set.logo')} help={t('set.logoHint')}>
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl overflow-hidden grid place-items-center border border-[var(--color-line2)]"
+              style={b.logo ? undefined : { background: 'linear-gradient(135deg, var(--color-acc), #a855f7)' }}>
+              {b.logo ? <img src={b.logo} alt="" className="w-full h-full object-cover" /> : <Icon name="Image" size={20} className="text-white" />}
+            </div>
+            <input ref={logoRef} type="file" accept="image/png,image/jpeg,image/svg+xml" hidden
+              onChange={e => void onLogo(e.target.files?.[0])} />
+            <Button size="sm" variant="outline" icon="Upload" onClick={() => logoRef.current?.click()}>{t('set.upload')}</Button>
+            {b.logo && <Button size="sm" variant="ghost" icon="X" onClick={() => setSettings({ branding: { ...b, logo: undefined } })} />}
+          </div>
+        </Field>
+        <Field label={t('set.appIcon')} help={t('set.appIconHint')}>
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl overflow-hidden grid place-items-center border border-[var(--color-line2)]"
+              style={b.appIcon ? undefined : { background: 'linear-gradient(135deg, var(--color-acc), #a855f7)' }}>
+              {b.appIcon ? <img src={b.appIcon} alt="" className="w-full h-full object-cover" /> : <Icon name="Image" size={20} className="text-white" />}
+            </div>
+            <input ref={iconRef} type="file" accept="image/png,image/jpeg" hidden
+              onChange={e => void onIcon(e.target.files?.[0])} />
+            <Button size="sm" variant="outline" icon="Upload" onClick={() => iconRef.current?.click()}>{t('set.upload')}</Button>
+            {b.appIcon && <Button size="sm" variant="ghost" icon="X" onClick={() => setSettings({ branding: { ...b, appIcon: undefined } })} />}
+          </div>
+        </Field>
+      </div>
+    </Card>
   )
 }
 

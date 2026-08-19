@@ -172,6 +172,34 @@ export function mobilePickFile(): Promise<File | null> {
 /* ---------- چرخه‌ی حیات برنامه ---------- */
 
 /**
+ * همگام‌سازی نوار وضعیت و کروم بومی با تم جاری.
+ * (نام قدیمی syncMobileChrome که در App استفاده می‌شود.)
+ */
+export async function syncMobileChrome(effective?: 'dark' | 'light'): Promise<void> {
+  if (!isMobile) return
+  try {
+    const { StatusBar, Style } = await import('@capacitor/status-bar')
+    const dark = effective === 'light' ? false : true
+    await StatusBar.setStyle({ style: dark ? Style.Dark : Style.Light })
+    if (isAndroid) await StatusBar.setBackgroundColor({ color: dark ? '#08090c' : '#f4f5f8' })
+    await StatusBar.setOverlaysWebView({ overlay: false })
+  } catch { /* بعضی دستگاه‌ها پشتیبانی نمی‌کنند */ }
+}
+
+/**
+ * هر بار که برنامه از پس‌زمینه به پیش‌زمینه برمی‌گردد (resume) صدا زده می‌شود.
+ */
+export function onMobileResume(handler: () => void): () => void {
+  if (!isMobile) return () => {}
+  let off: (() => void) | undefined
+  void import('@capacitor/app').then(({ App }) => {
+    void App.addListener('appStateChange', ({ isActive }) => { if (isActive) handler() })
+      .then(sub => { off = () => void sub.remove() })
+  })
+  return () => off?.()
+}
+
+/**
  * روی اندروید «بستن برنامه» با دکمه‌ی back اتفاق می‌افتد.
  * این تابع دکمه‌ی back را می‌گیرد: اگر تاریخچه‌ای هست برمی‌گردد،
  * وگرنه handler را صدا می‌زند تا دیالوگ ذخیره نشان داده شود.

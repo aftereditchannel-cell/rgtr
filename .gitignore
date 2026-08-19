@@ -1,0 +1,21 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+release/
+dist-bin/
+
+# native build
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+android/captures/
+android/.idea/
+
+# misc
+.DS_Store
+*.log
+.vscode/
+.idea/

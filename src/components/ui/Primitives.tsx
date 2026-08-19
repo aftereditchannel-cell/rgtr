@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from 'react'
 import type { ReactNode, CSSProperties } from 'react'
 import { ICONS } from './icons'
 import { useT } from '../../i18n'
@@ -145,17 +146,87 @@ export function Modal({ open, onClose, title, children, wide = false, footer }: 
 /* ---------- Inputs ---------- */
 const inputCls = 'w-full rounded-lg bg-[var(--color-bg)] border border-[var(--color-line2)] px-3 py-2 text-[13px] text-[var(--color-tx)] placeholder:text-[var(--color-dim2)] focus:border-[var(--color-acc)] transition-colors'
 
-export function TextInput(p: React.InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...p} className={`${inputCls} ${p.className ?? ''}`} />
+export const TextInput = (p: React.InputHTMLAttributes<HTMLInputElement> & { ref?: React.Ref<HTMLInputElement> }) => {
+  const { ref, className, ...rest } = p as any
+  return <input ref={ref} {...rest} className={`${inputCls} ${className ?? ''}`} />
 }
 export function TextArea(p: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea {...p} className={`${inputCls} resize-y min-h-[76px] leading-relaxed ${p.className ?? ''}`} />
 }
-export function Select({ options, ...p }: { options: string[] } & React.SelectHTMLAttributes<HTMLSelectElement>) {
+/**
+ * لیست کشویی سفارشی — روی اندروید به‌جای باز شدن تمام‌صفحه‌ی
+ * <select> بومی، یک popover کوچک داخل اپ باز می‌کند.
+ * روی ویندوز/وب هم ظاهر یکدست دارد.
+ */
+export function Select({
+  options,
+  value,
+  onChange,
+  disabled,
+  className = '',
+  placeholder,
+  renderOption,
+}: {
+  options: string[]
+  value?: string
+  onChange?: (e: { target: { value: string } }) => void
+  disabled?: boolean
+  className?: string
+  placeholder?: string
+  renderOption?: (o: string) => ReactNode
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const [above, setAbove] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', onDoc)
+    document.addEventListener('keydown', onKey)
+    // اگر فضای پایین کم است، منو بالا باز شود
+    const r = ref.current?.getBoundingClientRect()
+    if (r && window.innerHeight - r.bottom < 240) setAbove(true)
+    return () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onKey); setAbove(false) }
+  }, [open])
+
+  const current = value ?? ''
+  const label = current || placeholder || '—'
+
   return (
-    <select {...p} className={`${inputCls} cursor-pointer ${p.className ?? ''}`}>
-      {options.map(o => <option key={o} value={o}>{o || '—'}</option>)}
-    </select>
+    <div ref={ref} className={`relative ${className}`}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen(v => !v)}
+        className={`${inputCls} flex items-center justify-between gap-2 text-start cursor-pointer disabled:opacity-50`}>
+        <span className={`truncate ${!current ? 'text-[var(--color-dim2)]' : ''}`}>{label}</span>
+        <Icon name="ChevronDown" size={14} className={`text-[var(--color-dim2)] shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div
+          className={`absolute z-[90] min-w-full w-max max-w-[min(18rem,80vw)] max-h-64 overflow-y-auto rounded-lg border border-[var(--color-line2)] bg-[var(--color-bg2)] shadow-2xl py-1 anim ${
+            above ? 'bottom-full mb-1' : 'top-full mt-1'
+          }`}
+          style={{ insetInlineStart: 0 }}>
+          {options.map(o => (
+            <button
+              key={o}
+              type="button"
+              onClick={() => { onChange?.({ target: { value: o } }); setOpen(false) }}
+              className={`w-full text-start px-3 py-1.5 text-[12.5px] flex items-center gap-2 hover:bg-white/[.05] whitespace-nowrap ${
+                o === current ? 'text-[var(--color-acc)]' : 'text-[var(--color-tx)]'
+              }`}>
+              {o === current && <Icon name="Check" size={13} className="shrink-0" />}
+              <span className="truncate">{renderOption ? renderOption(o) : (o || '—')}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 export function Field({ label, children, help }: { label: string; children: ReactNode; help?: string }) {
