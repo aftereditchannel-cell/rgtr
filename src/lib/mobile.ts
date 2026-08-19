@@ -20,10 +20,19 @@ function cap(): CapGlobal['Capacitor'] | undefined {
   return (window as unknown as CapGlobal).Capacitor
 }
 
-export const isMobile: boolean = (() => {
+function detectMobile(): boolean {
   const c = cap()
-  return !!c?.isNativePlatform?.()
-})()
+  if (c?.isNativePlatform?.()) return true
+  if (typeof window === 'undefined') return false
+  try {
+    if (window.location.hostname === 'appassets.androidplatform.net') return true
+    const ua = navigator.userAgent || ''
+    if (/Android/i.test(ua) && (/;\s*wv\)/i.test(ua) || /WebView/i.test(ua))) return true
+  } catch { /* ignore */ }
+  return false
+}
+
+export const isMobile: boolean = detectMobile()
 
 export const mobilePlatform: string = cap()?.getPlatform?.() ?? 'web'
 export const isAndroid = mobilePlatform === 'android'
