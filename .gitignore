@@ -36,3 +36,7 @@ build-apk/resources.arsc
 build-apk-native/*.apk
 build-apk-native/classes.dex
 build-native/win-native/payload_native.cpp
+native-app/windows/payload.cpp
+native-app/windows/fonts.cpp
+native-app/android/*.apk
+native-app/android/classes.dex
