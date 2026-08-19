@@ -9,7 +9,9 @@ const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></
   url: 'http://localhost/', pretendToBeVisual: true,
 })
 const g = globalThis as Record<string, unknown>
-g.window = dom.window; g.document = dom.window.document; g.navigator = dom.window.navigator
+g.window = dom.window; g.document = dom.window.document
+// در Node ۲۲ به بعد، globalThis.navigator فقط‌خواندنی است؛ با defineProperty جایگزین می‌کنیم
+Object.defineProperty(g, 'navigator', { value: dom.window.navigator, configurable: true, writable: true })
 g.HTMLElement = dom.window.HTMLElement; g.Element = dom.window.Element; g.Node = dom.window.Node
 g.getComputedStyle = dom.window.getComputedStyle; g.requestAnimationFrame = (f: FrameRequestCallback) => setTimeout(() => f(0), 0)
 g.cancelAnimationFrame = (h: number) => clearTimeout(h)

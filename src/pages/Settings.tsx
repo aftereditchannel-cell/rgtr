@@ -14,6 +14,9 @@ import { isMobile, mobilePlatform, mobileDataPath } from '../lib/mobile'
 import type { AppInfo } from '../lib/desktop'
 import * as cloud from '../lib/cloud'
 import type { Lang } from '../store/types'
+import { readLock, setLockPin, setLockOptions, disableLock } from '../lib/lock'
+import type { LockSettings } from '../lib/lock'
+import { biometricAvailable } from '../lib/biometric'
 
 const ACCENTS = ['#6366f1', '#8b5cf6', '#06b6d4', '#22c55e', '#f59e0b', '#ef4444', '#ec4899', '#f97316']
 const FIELD_TYPES: FieldType[] = ['text', 'textarea', 'number', 'money', 'date', 'select', 'ref', 'url', 'progress', 'checklist', 'tags']
@@ -97,7 +100,7 @@ export function Settings() {
       {/* ---------- language / display ---------- */}
       <Card>
         <SectionTitle icon="Languages">{t('set.appearance')}</SectionTitle>
-        <div className="grid sm:grid-cols-3 gap-4">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Field label={t('set.language')} help={t('set.languageHint')}>
             <Toggle
               value={s.lang}
@@ -119,11 +122,25 @@ export function Settings() {
               onChange={v => setSettings({ digits: v as 'fa' | 'latn' })}
             />
           </Field>
+          <Field label={t('set.theme')}>
+            <Toggle
+              value={s.theme ?? 'dark'}
+              options={[
+                { v: 'dark', l: t('set.themeDark') },
+                { v: 'light', l: t('set.themeLight') },
+                { v: 'auto', l: t('set.themeAuto') },
+              ]}
+              onChange={v => setSettings({ theme: v as 'dark' | 'light' | 'auto' })}
+            />
+          </Field>
         </div>
       </Card>
 
       {/* ---------- cloud ---------- */}
       <CloudCard />
+
+      {/* ---------- security / lock ---------- */}
+      <LockCard />
 
       {/* ---------- backup ---------- */}
       <Card>
@@ -269,6 +286,140 @@ function Toggle({ value, options, onChange }: { value: string; options: { v: str
         </button>
       ))}
     </div>
+  )
+}
+
+/* ---------- کارت امنیت و قفل ---------- */
+const AUTO_OPTIONS: { v: string; k: string }[] = [
+  { v: '-1', k: 'set.lockAutoOpen' },
+  { v: '0', k: 'set.lockAutoImmediate' },
+  { v: '1', k: 'set.lockAuto1min' },
+  { v: '5', k: 'set.lockAuto5min' },
+  { v: '15', k: 'set.lockAuto15min' },
+]
+
+function LockCard() {
+  const { t } = useT()
+  const { setToast } = useApp()
+  const [lock, setLock] = useState<LockSettings>(() => readLock())
+  const [pinOpen, setPinOpen] = useState(false)
+  const [bioAvail, setBioAvail] = useState(false)
+
+  useEffect(() => { void biometricAvailable().then(setBioAvail) }, [])
+
+  const enabled = lock.enabled && !!lock.pinHash
+
+  const savePin = async (pin: string) => {
+    await setLockPin(pin, lock.autoLockMin, lock.biometric)
+    setLock(readLock())
+    setPinOpen(false)
+    setToast(t('set.lockEnabled'))
+  }
+
+  const opts = (patch: Partial<Pick<LockSettings, 'autoLockMin' | 'biometric'>>) => {
+    const next = { ...lock, ...patch }
+    setLock(next)
+    setLockOptions(next.autoLockMin, next.biometric)
+  }
+
+  const off = () => {
+    if (!confirm(t('set.lockConfirmOff'))) return
+    disableLock()
+    setLock(readLock())
+    setToast(t('set.lockDisabled'))
+  }
+
+  return (
+    <Card>
+      <SectionTitle icon="ShieldCheck"
+        right={
+          <span className={`text-[10.5px] ${enabled ? 'text-emerald-400' : 'text-[var(--color-dim2)]'}`}>
+            {enabled ? t('set.lockOn') : t('set.lockOff')}
+          </span>
+        }>
+        {t('set.security')}
+      </SectionTitle>
+
+      <p className="text-[12px] text-[var(--color-dim)] leading-relaxed mb-3">{t('set.securityNote')}</p>
+
+      <div className="flex gap-2 flex-wrap">
+        <Button size="sm" variant="primary" icon="KeyRound" onClick={() => setPinOpen(true)}>
+          {enabled ? t('set.lockSetPin') : t('set.lockSetPin')}
+        </Button>
+        {enabled && <Button size="sm" variant="ghost" icon="X" onClick={off}>{t('set.lockDisable')}</Button>}
+      </div>
+
+      {enabled && (
+        <div className="mt-4 pt-3 border-t border-[var(--color-line)] space-y-3.5">
+          <Field label={t('set.lockAuto')}>
+            <select value={String(lock.autoLockMin)} onChange={e => opts({ autoLockMin: Number(e.target.value) })}
+              className="w-full rounded-lg bg-[var(--color-bg)] border border-[var(--color-line2)] px-3 py-2 text-[13px] cursor-pointer focus:border-[var(--color-acc)]">
+              {AUTO_OPTIONS.map(o => <option key={o.v} value={o.v}>{t(o.k)}</option>)}
+            </select>
+          </Field>
+
+          {isMobile && (
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5"
+                disabled={!bioAvail}
+                checked={lock.biometric}
+                onChange={e => opts({ biometric: e.target.checked })} />
+              <span className="text-[12px] flex items-center gap-1.5">
+                <Icon name="Fingerprint" size={14} className={bioAvail ? 'text-[var(--color-acc)]' : 'text-[var(--color-dim2)]'} />
+                {t('set.lockBiometric')}
+              </span>
+              <span className="text-[10.5px] text-[var(--color-dim2)]">
+                — {bioAvail ? t('set.lockBiometricHint') : t('set.lockBiometricUnavailable')}
+              </span>
+            </label>
+          )}
+        </div>
+      )}
+
+      {pinOpen && (
+        <PinModal
+          onClose={() => setPinOpen(false)}
+          onSave={pin => void savePin(pin)}
+        />
+      )}
+    </Card>
+  )
+}
+
+function PinModal({ onClose, onSave }: { onClose: () => void; onSave: (pin: string) => void }) {
+  const { t } = useT()
+  const [a, setA] = useState('')
+  const [b, setB] = useState('')
+  const [err, setErr] = useState('')
+
+  const submit = () => {
+    if (!/^\d{4,6}$/.test(a)) { setErr(t('set.lockPinHint')); return }
+    if (a !== b) { setErr(t('set.lockMismatch')); return }
+    onSave(a)
+  }
+
+  return (
+    <Modal open onClose={onClose} title={t('set.lockSetTitle')}
+      footer={
+        <>
+          <Button variant="ghost" size="sm" onClick={onClose}>{t('common.cancel')}</Button>
+          <Button variant="primary" size="sm" icon="Check" onClick={submit}>{t('common.save')}</Button>
+        </>
+      }>
+      <div className="space-y-3">
+        <Field label={t('set.lockNewPin')}>
+          <TextInput type="password" inputMode="numeric" maxLength={6} autoFocus value={a}
+            className="ltr text-center tracking-[.4em] text-[18px]"
+            onChange={e => { setA(e.target.value.replace(/\D/g, '')); setErr('') }} />
+        </Field>
+        <Field label={t('set.lockRepeatPin')}>
+          <TextInput type="password" inputMode="numeric" maxLength={6} value={b}
+            className="ltr text-center tracking-[.4em] text-[18px]"
+            onChange={e => { setB(e.target.value.replace(/\D/g, '')); setErr('') }} />
+        </Field>
+        {err && <p className="text-[11.5px] text-red-400">{err}</p>}
+      </div>
+    </Modal>
   )
 }
 
@@ -517,6 +668,13 @@ function CloudCard() {
           onChange={e => setSettings({ cloud: { ...c, askOnExit: e.target.checked } })} />
         <span className="text-[12px]">{t('set.cloudAuto')}</span>
         <span className="text-[10.5px] text-[var(--color-dim2)]">— {t('set.cloudAutoHint')}</span>
+      </label>
+
+      <label className="mt-2.5 flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={c.autoSync}
+          onChange={e => setSettings({ cloud: { ...c, autoSync: e.target.checked } })} />
+        <span className="text-[12px]">{t('set.cloudAutoSync')}</span>
+        <span className="text-[10.5px] text-[var(--color-dim2)]">— {t('set.cloudAutoSyncHint')}</span>
       </label>
 
       <p className="text-[10.5px] text-[var(--color-dim2)] mt-3 leading-relaxed">

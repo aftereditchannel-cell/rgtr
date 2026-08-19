@@ -18,6 +18,8 @@ export interface CloudSettings {
   lastSync: string
   /** هنگام خروج از برنامه بپرسد */
   askOnExit: boolean
+  /** ذخیره‌ی خودکار هر تغییر روی گیت + بازیابی خودکار هنگام باز شدن */
+  autoSync: boolean
 }
 
 export interface Settings {
@@ -27,7 +29,7 @@ export interface Settings {
   accent: string
   focusCount: number
   weights: Weights
-  theme: 'dark' | 'light'
+  theme: 'dark' | 'light' | 'auto'
   /** زبان رابط کاربری — پیش‌فرض فارسی */
   lang: Lang
   /** تقویم نمایشی: شمسی یا میلادی (ذخیره‌سازی همیشه میلادی است) */

@@ -221,3 +221,29 @@ export async function initMobileChrome(): Promise<void> {
     await StatusBar.setOverlaysWebView({ overlay: false })
   } catch { /* بعضی دستگاه‌ها پشتیبانی نمی‌کنند */ }
 }
+
+/**
+ * هماهنگ‌کردن نوار وضعیت با تم مؤثر (روشن/تیره).
+ * بعد از تعویض تم از App صدا زده می‌شود.
+ */
+export async function syncMobileChrome(effective: 'dark' | 'light'): Promise<void> {
+  if (!isMobile) return
+  try {
+    const { StatusBar, Style } = await import('@capacitor/status-bar')
+    await StatusBar.setStyle({ style: effective === 'dark' ? Style.Dark : Style.Light })
+    if (isAndroid) {
+      await StatusBar.setBackgroundColor({ color: effective === 'dark' ? '#08090c' : '#eef1f7' })
+    }
+  } catch { /* بی‌اهمیت */ }
+}
+
+/**
+ * وقتی برنامه از پس‌زمینه برمی‌گردد (resume) handler صدا زده می‌شود.
+ * برای قفل خودکار هنگام بازگشت به برنامه استفاده می‌شود.
+ */
+export async function onMobileResume(handler: () => void): Promise<() => void> {
+  if (!isMobile) return () => {}
+  const { App } = await import('@capacitor/app')
+  const sub = await App.addListener('resume', handler)
+  return () => void sub.remove()
+}

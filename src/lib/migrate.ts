@@ -15,7 +15,7 @@ export const DEFAULT_SETTINGS: Settings = {
   calendar: 'jalali',
   digits: 'fa',
   weights: DEFAULT_WEIGHTS,
-  cloud: { provider: 'gist', gistId: '', lastSync: '', askOnExit: true },
+  cloud: { provider: 'gist', gistId: '', lastSync: '', askOnExit: true, autoSync: true },
 }
 
 /**

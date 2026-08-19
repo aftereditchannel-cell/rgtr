@@ -1,0 +1,20 @@
+# وابستگی‌ها
+node_modules/
+
+# خروجی بیلد
+dist/
+release/
+*.tsbuildinfo
+
+# لاگ و فایل‌های سیستم‌عامل
+*.log
+.DS_Store
+
+# فایل‌های محلی / محیط
+.env
+.env.*
+
+# دارایی‌های وبِ تولیدشده توسط `npx cap sync` (هر بیلد بازتولید می‌شوند)
+android/app/src/main/assets/public/
+android/capacitor-cordova-android-plugins/src/main/java/
+android/capacitor-cordova-android-plugins/src/main/res/

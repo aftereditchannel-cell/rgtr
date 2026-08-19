@@ -19,6 +19,7 @@ import { LockScreen } from './components/layout/LockScreen'
 import { applyTheme, watchSystemTheme } from './lib/theme'
 import { isLockEnabled, readLock } from './lib/lock'
 import { isMobile, syncMobileChrome, onMobileResume } from './lib/mobile'
+import { scheduleAutoPush, autoPullOnStart } from './lib/sync'
 
 /** پل منوی بومی ویندوز → روتر و اکشن‌های برنامه */
 function DesktopMenuBridge() {
@@ -153,7 +154,8 @@ function Root() {
     // رفتن به پس‌زمینه (تعویض برنامه در اندروید / کوچک کردن پنجره)
     const onHide = () => { if (document.visibilityState === 'hidden') lastActive.current = Date.now() }
     document.addEventListener('visibilitychange', onHide)
-    const offResume = onMobileResume(() => { if (shouldLock()) setLocked(true) })
+    let offResume = () => {}
+    void onMobileResume(() => { if (shouldLock()) setLocked(true) }).then(fn => { offResume = fn })
 
     return () => {
       for (const e of evts) window.removeEventListener(e, mark)
@@ -183,12 +185,19 @@ function Root() {
 export default function App() {
   const init = useApp(s => s.init)
   const ready = useApp(s => s.ready)
+  const dirty = useApp(s => s.dirty)
   const lang = useApp(s => s.data.settings.lang) ?? 'fa'
 
   useEffect(() => { void init() }, [init])
 
   // پوسته را پیش از آماده شدن داده هم اعمال می‌کنیم تا صفحه‌ی بارگذاری سفید/سیاه نپرد
   useEffect(() => { applyTheme(useApp.getState().data.settings.theme ?? 'dark') }, [])
+
+  // بازیابی خودکار از ابر هنگام باز شدن برنامه (اگر همگام‌سازی خودکار روشن باشد)
+  useEffect(() => { if (ready) void autoPullOnStart() }, [ready])
+
+  // بعد از هر ذخیره‌ی محلی، ارسال خودکار به گیت (در صورت فعال بودن)
+  useEffect(() => { if (ready && !dirty) scheduleAutoPush() }, [ready, dirty])
 
   // ذخیره‌ی نهایی هنگام بستن صفحه
   useEffect(() => {

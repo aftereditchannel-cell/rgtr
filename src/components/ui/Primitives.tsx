@@ -119,24 +119,32 @@ export function Empty({ icon = 'Inbox', title, hint, action }: { icon?: string; 
 }
 
 /* ---------- Modal ---------- */
+/*
+ * چیدمان با `min-h-full + items-center` نوشته شده تا روی موبایل، وقتی محتوا از
+ * صفحه بلندتر می‌شود، بالای کارت از کادر بیرون نزند و همیشه قابل اسکرول باشد.
+ * (الگوی `my-auto` روی یک فلکس‌باکسِ overflow-y-auto بالای کارت را می‌برید.)
+ */
 export function Modal({ open, onClose, title, children, wide = false, footer }: {
   open: boolean; onClose: () => void; title: string; children: ReactNode; wide?: boolean; footer?: ReactNode
 }) {
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:p-8"
+    <div className="fixed inset-0 z-50 overflow-y-auto"
       style={{ background: 'rgba(4,5,8,.72)', backdropFilter: 'blur(4px)' }}
       onClick={onClose}>
-      <div className={`anim w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} rounded-2xl border border-[var(--color-line2)] bg-[var(--color-bg2)] shadow-2xl my-auto`}
-        onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--color-line)]">
-          <h3 className="text-[14px] font-semibold">{title}</h3>
-          <button onClick={onClose} className="text-[var(--color-dim2)] hover:text-[var(--color-tx)] transition-colors p-1 rounded-md hover:bg-white/5">
-            <Icon name="X" size={17} />
-          </button>
+      <div className="flex min-h-full items-center justify-center"
+        style={{ padding: 'calc(0.75rem + var(--sat, 0px)) 0.75rem calc(0.75rem + var(--sab, 0px))' }}>
+        <div className={`anim w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} rounded-2xl border border-[var(--color-line2)] bg-[var(--color-bg2)] shadow-2xl`}
+          onClick={e => e.stopPropagation()}>
+          <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 border-b border-[var(--color-line)] gap-3">
+            <h3 className="text-[14px] font-semibold min-w-0 truncate">{title}</h3>
+            <button onClick={onClose} className="text-[var(--color-dim2)] hover:text-[var(--color-tx)] transition-colors p-1 rounded-md hover:bg-white/5 shrink-0" aria-label="close">
+              <Icon name="X" size={17} />
+            </button>
+          </div>
+          <div className="px-4 sm:px-5 py-4">{children}</div>
+          {footer && <div className="px-4 sm:px-5 py-3.5 border-t border-[var(--color-line)] flex flex-wrap justify-end gap-2">{footer}</div>}
         </div>
-        <div className="px-5 py-4">{children}</div>
-        {footer && <div className="px-5 py-3.5 border-t border-[var(--color-line)] flex justify-end gap-2">{footer}</div>}
       </div>
     </div>
   )
