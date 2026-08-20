@@ -18,7 +18,7 @@ files:
 compression: maximum
 asar: true
 removePackageScripts: true
-buildVersion: "1.0.0"
+buildVersion: "1.1.1"
 
 win:
   icon: electron/icons/icon.ico

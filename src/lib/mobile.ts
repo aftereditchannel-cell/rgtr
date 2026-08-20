@@ -221,3 +221,32 @@ export async function initMobileChrome(): Promise<void> {
     await StatusBar.setOverlaysWebView({ overlay: false })
   } catch { /* بعضی دستگاه‌ها پشتیبانی نمی‌کنند */ }
 }
+
+/* ---------- هماهنگی تم با نوار وضعیت ---------- */
+
+/**
+ * نوار وضعیت و سطح مرورگر را با تم فعلی هماهنگ می‌کند.
+ * هنگام تغییر تم یا بازگشت از پس‌زمینه صدا زده می‌شود.
+ */
+export async function syncMobileChrome(effective: 'dark' | 'light' = 'dark'): Promise<void> {
+  if (!isMobile) return
+  try {
+    const { StatusBar, Style } = await import('@capacitor/status-bar')
+    await StatusBar.setStyle({ style: effective === 'dark' ? Style.Dark : Style.Light })
+    if (isAndroid) {
+      await StatusBar.setBackgroundColor({ color: effective === 'dark' ? '#08090c' : '#eef1f7' })
+    }
+    await StatusBar.setOverlaysWebView({ overlay: false })
+  } catch { /* بی‌اهمیت */ }
+}
+
+/**
+ * اجرای callback هنگام بازگشت برنامه از پس‌زمینه ( resumed ).
+ * تابع لغو اشتراک برمی‌گرداند.
+ */
+export async function onMobileResume(handler: () => void): Promise<() => void> {
+  if (!isMobile) return () => {}
+  const { App } = await import('@capacitor/app')
+  const sub = await App.addListener('resume', handler)
+  return () => void sub.remove()
+}

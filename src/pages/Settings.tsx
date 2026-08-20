@@ -14,6 +14,7 @@ import { isMobile, mobilePlatform, mobileDataPath } from '../lib/mobile'
 import type { AppInfo } from '../lib/desktop'
 import * as cloud from '../lib/cloud'
 import type { Lang } from '../store/types'
+import { readLock, isLockEnabled, setPin, disableLock, setAutoLock, setBiometric, updateLock } from '../lib/lock'
 
 const ACCENTS = ['#6366f1', '#8b5cf6', '#06b6d4', '#22c55e', '#f59e0b', '#ef4444', '#ec4899', '#f97316']
 const FIELD_TYPES: FieldType[] = ['text', 'textarea', 'number', 'money', 'date', 'select', 'ref', 'url', 'progress', 'checklist', 'tags']
@@ -121,6 +122,9 @@ export function Settings() {
           </Field>
         </div>
       </Card>
+
+      {/* ---------- lock screen ---------- */}
+      <LockCard />
 
       {/* ---------- cloud ---------- */}
       <CloudCard />
@@ -283,7 +287,7 @@ function DesktopCard({ onSaved }: { onSaved: () => void }) {
   if (isMobile) {
     return (
       <Card>
-        <SectionTitle icon="Smartphone" right={<span className="text-[10.5px] text-[var(--color-dim2)] nums ltr">v1.0.0</span>}>
+        <SectionTitle icon="Smartphone" right={<span className="text-[10.5px] text-[var(--color-dim2)] nums ltr">v1.1.1</span>}>
           {t('set.mobile')}
         </SectionTitle>
         <div className="space-y-1.5 text-[11.5px] mb-3">
@@ -522,6 +526,124 @@ function CloudCard() {
       <p className="text-[10.5px] text-[var(--color-dim2)] mt-3 leading-relaxed">
         {t('set.cloudPrivacy')} {t('set.cloudLimits')}
       </p>
+    </Card>
+  )
+}
+
+/* ---------- کارت قفل صفحه ---------- */
+function LockCard() {
+  const { t, lang } = useT()
+  const { setToast } = useApp()
+  const lock = readLock()
+  const [pin, setPinInput] = useState('')
+  const [pin2, setPin2] = useState('')
+  const [phase, setPhase] = useState<'idle' | 'set' | 'change'>('idle')
+  const [err, setErr] = useState('')
+
+  const enabled = lock.enabled && !!lock.pinHash
+
+  const doSetPin = async () => {
+    if (pin.length !== 4 || !/^\d{4}$/.test(pin)) { setErr(t('lock.enterPin')); return }
+    if (phase === 'change' && pin2.length !== 4) { setErr(t('lock.confirmPin')); return }
+    if (phase === 'change' && pin !== pin2) { setErr(t('lock.pinMismatch')); return }
+    await setPin(pin)
+    updateLock({ enabled: true })
+    setPinInput('')
+    setPin2('')
+    setPhase('idle')
+    setErr('')
+    setToast(phase === 'change' ? t('lock.pinChanged') : t('lock.pinSet'))
+  }
+
+  const doDisable = () => {
+    if (!confirm(t('lock.disableLock') + '?')) return
+    disableLock()
+    setToast(t('lock.pinDisabled'))
+  }
+
+  return (
+    <Card>
+      <SectionTitle icon="Shield"
+        right={<span className={`text-[10.5px] ${enabled ? 'text-emerald-400' : 'text-[var(--color-dim2)]'}`}>
+          {enabled ? t('lock.locked') : t('common.none')}
+        </span>}>
+        {t('lock.title')}
+      </SectionTitle>
+      <p className="text-[12px] text-[var(--color-dim)] leading-relaxed mb-3">{t('lock.hint')}</p>
+
+      {/* تنظیم / تغییر رمز */}
+      {phase !== 'idle' ? (
+        <div className="space-y-3">
+          <Field label={t('lock.enterPin')}>
+            <TextInput type="password" inputMode="numeric" pattern="[0-9]*" maxLength={4}
+              value={pin} placeholder="••••" className="ltr text-center text-lg tracking-[0.5em] font-mono"
+              onChange={e => { setPinInput(e.target.value.replace(/\D/g, '').slice(0, 4)); setErr('') }} />
+          </Field>
+          {phase === 'change' && (
+            <Field label={t('lock.confirmPin')}>
+              <TextInput type="password" inputMode="numeric" pattern="[0-9]*" maxLength={4}
+                value={pin2} placeholder="••••" className="ltr text-center text-lg tracking-[0.5em] font-mono"
+                onChange={e => { setPin2(e.target.value.replace(/\D/g, '').slice(0, 4)); setErr('') }} />
+            </Field>
+          )}
+          {err && (
+            <div className="flex items-center gap-2 text-[11.5px] text-red-400">
+              <Icon name="AlertTriangle" size={13} /> {err}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={() => { setPhase('idle'); setPinInput(''); setPin2(''); setErr('') }}>{t('common.cancel')}</Button>
+            <Button variant="primary" size="sm" icon="Check" onClick={() => void doSetPin()}>{t('common.save')}</Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex gap-2 flex-wrap">
+          {!enabled ? (
+            <Button variant="primary" size="sm" icon="Shield" onClick={() => { setPhase('set'); setPinInput(''); setPin2('') }}>
+              {t('lock.setPin')}
+            </Button>
+          ) : (
+            <>
+              <Button variant="outline" size="sm" icon="KeyRound" onClick={() => { setPhase('change'); setPinInput(''); setPin2('') }}>
+                {t('lock.changePin')}
+              </Button>
+              <Button variant="ghost" size="sm" icon="ShieldOff" onClick={doDisable}>
+                {t('lock.disableLock')}
+              </Button>
+            </>
+          )}
+          <Button variant="ghost" size="sm" icon="Lock" onClick={() => window.dispatchEvent(new Event('nexus:lock'))}>
+            {t('lock.lockNow')}
+          </Button>
+        </div>
+      )}
+
+      {/* قفل خودکار */}
+      {enabled && (
+        <div className="mt-4 pt-3 border-t border-[var(--color-line)]">
+          <Field label={t('lock.autoLock')} help={t('lock.autoLockHint')}>
+            <Toggle
+              value={String(lock.autoLockMin)}
+              options={[
+                { v: '0', l: t('lock.autoLockNow') },
+                { v: '-1', l: t('lock.autoLockOn') },
+                { v: '5', l: '5 ' + t('lock.autoLockMin', { n: '' }).trim() },
+                { v: '15', l: '15 ' + t('lock.autoLockMin', { n: '' }).trim() },
+                { v: '30', l: '30 ' + t('lock.autoLockMin', { n: '' }).trim() },
+              ]}
+              onChange={v => setAutoLock(Number(v))} />
+          </Field>
+          <div className="mt-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5"
+                checked={lock.biometric}
+                onChange={e => setBiometric(e.target.checked)} />
+              <span className="text-[12px]">{t('lock.biometric')}</span>
+              <span className="text-[10.5px] text-[var(--color-dim2)]">— {t('lock.biometricHint')}</span>
+            </label>
+          </div>
+        </div>
+      )}
     </Card>
   )
 }
