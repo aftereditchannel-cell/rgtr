@@ -22,6 +22,7 @@ import {
   ShoppingCart, SlidersHorizontal, Sparkles, Star, Store, Sun,
   Table, Table2, Tag, Target, Timer, Trash2, TrendingDown, TrendingUp, Trophy, Truck, Tv,
   Upload, User, UserCog, Users, Video, Wallet, Wand2, Workflow, X, Zap, Circle,
+  Delete, Fingerprint, Lock, LockOpen,
 } from 'lucide-react'
 import type { ComponentType, CSSProperties } from 'react'
 
@@ -46,6 +47,7 @@ export const ICONS: Record<string, IconComp> = {
   ShoppingCart, SlidersHorizontal, Sparkles, Star, Store, Sun,
   Table, Table2, Tag, Target, Timer, Trash2, TrendingDown, TrendingUp, Trophy, Truck, Tv,
   Upload, User, UserCog, Users, Video, Wallet, Wand2, Workflow, X, Zap, Circle,
+  Delete, Fingerprint, Lock, LockOpen,
 }
 
 /** نام آیکون‌های پیشنهادی برای Module Builder */

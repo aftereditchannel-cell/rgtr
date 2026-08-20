@@ -221,3 +221,34 @@ export async function initMobileChrome(): Promise<void> {
     await StatusBar.setOverlaysWebView({ overlay: false })
   } catch { /* بعضی دستگاه‌ها پشتیبانی نمی‌کنند */ }
 }
+
+/** هماهنگ‌کردن نوار وضعیت اندروید با پوسته‌ی مؤثر (تیره/روشن) */
+export async function syncMobileChrome(eff: 'dark' | 'light'): Promise<void> {
+  if (!isMobile) return
+  try {
+    const { StatusBar, Style } = await import('@capacitor/status-bar')
+    await StatusBar.setStyle({ style: eff === 'dark' ? Style.Dark : Style.Light })
+    if (isAndroid) await StatusBar.setBackgroundColor({ color: eff === 'dark' ? '#08090c' : '#eef1f7' })
+  } catch { /* بی‌اهمیت */ }
+}
+
+/**
+ * رویداد بازگشت برنامه از پس‌زمینه (اندروید: دکمه‌ی هوم → برگشتن).
+ * برای قفل خودکار استفاده می‌شود. اشتراک به‌صورت ناهمگام برقرار می‌شود؛
+ * تابع لغو اشتراک فوراً برگردانده می‌شود تا تمیزکاری useEffect ساده بماند.
+ */
+export function onMobileResume(handler: () => void): () => void {
+  if (!isMobile) return () => {}
+  let off = () => {}
+  void (async () => {
+    const { App } = await import('@capacitor/app')
+    const sub = await App.addListener('resume', handler)
+    const vis = () => { if (document.visibilityState === 'visible') handler() }
+    document.addEventListener('visibilitychange', vis)
+    off = () => {
+      void sub.remove()
+      document.removeEventListener('visibilitychange', vis)
+    }
+  })()
+  return () => off()
+}

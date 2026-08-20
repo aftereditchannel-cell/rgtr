@@ -4,9 +4,9 @@ import { useT } from '../../i18n'
 import { useFmt } from '../../lib/useFmt'
 
 /* ---------- Icon ---------- */
-export function Icon({ name, size = 16, className = '', style }: { name: string; size?: number; className?: string; style?: CSSProperties }) {
+export function Icon({ name, size = 16, className = '', style, strokeWidth }: { name: string; size?: number; className?: string; style?: CSSProperties; strokeWidth?: number }) {
   const C = ICONS[name] ?? ICONS.Circle
-  return <C size={size} className={className} style={style} />
+  return <C size={size} className={className} style={style} strokeWidth={strokeWidth} />
 }
 
 /* ---------- Card ---------- */
@@ -126,12 +126,13 @@ export function Modal({ open, onClose, title, children, wide = false, footer }: 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:p-8"
       style={{ background: 'rgba(4,5,8,.72)', backdropFilter: 'blur(4px)' }}
+      role="dialog" aria-modal="true"
       onClick={onClose}>
       <div className={`anim w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} rounded-2xl border border-[var(--color-line2)] bg-[var(--color-bg2)] shadow-2xl my-auto`}
         onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--color-line)]">
           <h3 className="text-[14px] font-semibold">{title}</h3>
-          <button onClick={onClose} className="text-[var(--color-dim2)] hover:text-[var(--color-tx)] transition-colors p-1 rounded-md hover:bg-white/5">
+          <button aria-label="close" onClick={onClose} className="text-[var(--color-dim2)] hover:text-[var(--color-tx)] transition-colors p-1 rounded-md hover:bg-white/5">
             <Icon name="X" size={17} />
           </button>
         </div>

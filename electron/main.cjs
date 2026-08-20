@@ -137,6 +137,8 @@ function buildMenu() {
         { label: 'خروجی بکاپ JSON…', accelerator: 'CmdOrCtrl+S', click: send('menu:export') },
         { label: 'بازیابی از فایل…', accelerator: 'CmdOrCtrl+O', click: send('menu:import') },
         { type: 'separator' },
+        { label: 'قفل فوری', accelerator: 'CmdOrCtrl+L', click: send('menu:lock') },
+        { type: 'separator' },
         { label: 'باز کردن پوشه‌ی داده‌ها', click: () => shell.openPath(DATA_DIR) },
         { type: 'separator' },
         { role: 'quit', label: 'خروج' },

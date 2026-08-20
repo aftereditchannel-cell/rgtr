@@ -1,0 +1,18 @@
+# --- Node / build outputs ---
+node_modules/
+dist/
+release/
+*.tsbuildinfo
+*.log
+
+# --- Android: outputs & machine-specific ---
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/keystore/
+android/keystore.properties
+
+# --- OS noise ---
+.DS_Store
+Thumbs.db

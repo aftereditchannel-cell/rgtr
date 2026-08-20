@@ -27,7 +27,7 @@ export interface Settings {
   accent: string
   focusCount: number
   weights: Weights
-  theme: 'dark' | 'light'
+  theme: 'dark' | 'light' | 'auto'
   /** زبان رابط کاربری — پیش‌فرض فارسی */
   lang: Lang
   /** تقویم نمایشی: شمسی یا میلادی (ذخیره‌سازی همیشه میلادی است) */

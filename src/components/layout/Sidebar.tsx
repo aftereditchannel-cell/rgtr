@@ -42,9 +42,14 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
     <>
       {open && <div className="fixed inset-0 bg-black/60 z-30 lg:hidden" onClick={onClose} />}
       {/* در دسکتاپ همیشه ثابت است؛ در موبایل از لبه‌ی درست (چپ در LTR، راست در RTL) بیرون می‌رود */}
-      <aside className={`fixed lg:static inset-y-0 start-0 z-40 w-[228px] shrink-0 border-e border-[var(--color-line)] bg-[var(--color-bg2)] flex flex-col transition-transform duration-200 ${
+      <aside className={`fixed lg:static inset-y-0 start-0 z-40 w-[228px] shrink-0 border-e border-[var(--glass-brd)] flex flex-col transition-transform duration-200 ${
         open ? 'translate-x-0' : rtl ? 'max-lg:translate-x-full' : 'max-lg:-translate-x-full'
-      }`}>
+      }`}
+        style={{
+          background: 'var(--glass-bg-strong)',
+          backdropFilter: 'blur(26px) saturate(165%)',
+          WebkitBackdropFilter: 'blur(26px) saturate(165%)',
+        }}>
         {/* brand */}
         <div className="px-3.5 py-3.5 border-b border-[var(--color-line)] flex items-center gap-2.5">
           <div className="w-7 h-7 rounded-lg grid place-items-center shrink-0"

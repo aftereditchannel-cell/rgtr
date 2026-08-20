@@ -10,10 +10,15 @@ import { ICON_NAMES } from '../components/ui/icons'
 import { useT, cloudError } from '../i18n'
 import { useFmt } from '../lib/useFmt'
 import { desktop, isDesktop } from '../lib/desktop'
-import { isMobile, mobilePlatform, mobileDataPath } from '../lib/mobile'
+import { isMobile, isAndroid, mobilePlatform, mobileDataPath } from '../lib/mobile'
 import type { AppInfo } from '../lib/desktop'
 import * as cloud from '../lib/cloud'
 import type { Lang } from '../store/types'
+import {
+  readLock, hasPasscode, setPasscode, disableLock,
+  setAutoLock, setBiometric, lockNow,
+} from '../lib/lock'
+import type { ThemeChoice } from '../lib/theme'
 
 const ACCENTS = ['#6366f1', '#8b5cf6', '#06b6d4', '#22c55e', '#f59e0b', '#ef4444', '#ec4899', '#f97316']
 const FIELD_TYPES: FieldType[] = ['text', 'textarea', 'number', 'money', 'date', 'select', 'ref', 'url', 'progress', 'checklist', 'tags']
@@ -119,8 +124,22 @@ export function Settings() {
               onChange={v => setSettings({ digits: v as 'fa' | 'latn' })}
             />
           </Field>
+          <Field label={t('set.theme')} help={t('set.themeHint')}>
+            <Toggle
+              value={s.theme}
+              options={[
+                { v: 'dark', l: t('set.themeDark') },
+                { v: 'light', l: t('set.themeLight') },
+                { v: 'auto', l: t('set.themeAuto') },
+              ]}
+              onChange={v => setSettings({ theme: v as ThemeChoice })}
+            />
+          </Field>
         </div>
       </Card>
+
+      {/* ---------- lock & security ---------- */}
+      <SecurityCard />
 
       {/* ---------- cloud ---------- */}
       <CloudCard />
@@ -269,6 +288,167 @@ function Toggle({ value, options, onChange }: { value: string; options: { v: str
         </button>
       ))}
     </div>
+  )
+}
+
+/* ---------- قفل و امنیت ---------- */
+function SecurityCard() {
+  const { t } = useT()
+  const fmt = useFmt()
+  const setToast = useApp(s => s.setToast)
+  const [, setVer] = useState(0)
+  const [dlg, setDlg] = useState<'set' | 'change' | null>(null)
+
+  const cfg = readLock()
+  const active = hasPasscode()
+  const refresh = () => setVer(v => v + 1)
+
+  const AUTO_OPTS = [
+    { v: '-1', l: t('set.autoLockNever') },
+    { v: '0', l: t('set.autoLockAlways') },
+    { v: '1', l: t('set.autoLockMin', { n: fmt.dg(1) }) },
+    { v: '5', l: t('set.autoLockMin', { n: fmt.dg(5) }) },
+    { v: '15', l: t('set.autoLockMin', { n: fmt.dg(15) }) },
+    { v: '30', l: t('set.autoLockMin', { n: fmt.dg(30) }) },
+    { v: '60', l: t('set.autoLockMin', { n: fmt.dg(60) }) },
+  ]
+
+  const removeLock = () => {
+    if (!confirm(t('set.removePassConfirm'))) return
+    disableLock()
+    refresh()
+    setToast(t('set.lockRemoved'))
+  }
+
+  return (
+    <Card>
+      <SectionTitle
+        icon="Shield"
+        right={
+          <span className={`text-[10.5px] px-2 py-0.5 rounded-full border ${
+            active ? 'text-emerald-400 border-emerald-400/25 bg-emerald-400/10' : 'text-[var(--color-dim2)] border-[var(--color-line2)]'
+          }`}>
+            {active ? (cfg.biometric && isAndroid ? t('set.lockFinger') : t('set.lockActive')) : t('set.lockInactive')}
+          </span>
+        }>
+        {t('set.security')}
+      </SectionTitle>
+      <p className="text-[12px] text-[var(--color-dim)] leading-relaxed mb-3">{t('set.securityNote')}</p>
+
+      <div className="flex gap-2 flex-wrap">
+        {!active ? (
+          <Button variant="primary" size="sm" icon="KeyRound" onClick={() => setDlg('set')}>
+            {t('set.setPasscode')}
+          </Button>
+        ) : (
+          <>
+            <Button variant="primary" size="sm" icon="KeyRound" onClick={() => setDlg('change')}>
+              {t('set.changePasscode')}
+            </Button>
+            <Button variant="outline" size="sm" icon="Lock"
+              onClick={() => { lockNow(); setToast(t('set.lockedNow')) }}>
+              {t('set.lockNow')}
+            </Button>
+            <Button variant="ghost" size="sm" icon="Trash2" onClick={removeLock}>
+              {t('set.removePasscode')}
+            </Button>
+          </>
+        )}
+      </div>
+
+      {active && (
+        <div className="mt-4 pt-3 border-t border-[var(--color-line)] grid sm:grid-cols-2 gap-4">
+          <Field label={t('set.autoLock')}>
+            <select
+              value={String(cfg.autoLockMin)}
+              onChange={e => { setAutoLock(Number(e.target.value)); refresh() }}
+              className="w-full rounded-lg bg-[var(--color-bg)] border border-[var(--color-line2)] px-3 py-2 text-[13px] text-[var(--color-tx)] cursor-pointer focus:border-[var(--color-acc)] transition-colors">
+              {AUTO_OPTS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+            </select>
+          </Field>
+          <label className={`flex items-start gap-2.5 ${isAndroid ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
+            <input
+              type="checkbox"
+              className="accent-[var(--color-acc)] w-4 h-4 mt-0.5 shrink-0"
+              checked={!!cfg.biometric}
+              disabled={!isAndroid}
+              onChange={e => { setBiometric(e.target.checked); refresh() }} />
+            <span className="min-w-0">
+              <span className="block text-[12px] font-medium text-[var(--color-dim)]">{t('set.biometric')}</span>
+              <span className="block text-[10.5px] text-[var(--color-dim2)] mt-0.5 leading-relaxed">
+                {isAndroid ? t('set.biometricHint') : t('set.lockOnlyAndroid')}
+              </span>
+            </span>
+          </label>
+        </div>
+      )}
+
+      {dlg && (
+        <PasscodeDialog
+          mode={dlg}
+          onClose={() => setDlg(null)}
+          onDone={toastKey => { refresh(); setDlg(null); setToast(toastKey) }} />
+      )}
+    </Card>
+  )
+}
+
+/* ---------- دیالوگ تنظیم/تغییر رمز ---------- */
+function PasscodeDialog({ mode, onClose, onDone }: {
+  mode: 'set' | 'change'; onClose: () => void; onDone: (toast: string) => void
+}) {
+  const { t } = useT()
+  const [cur, setCur] = useState('')
+  const [p1, setP1] = useState('')
+  const [p2, setP2] = useState('')
+  const [hint, setHint] = useState('')
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const submit = async () => {
+    if (busy) return
+    setErr('')
+    if (p1 !== p2) { setErr(t('set.passcodeMismatch')); return }
+    setBusy(true)
+    const r = await setPasscode(p1, { hint, current: mode === 'change' ? cur : undefined })
+    setBusy(false)
+    if (r.ok) onDone(mode === 'change' ? t('set.lockChanged') : t('set.lockSet'))
+    else setErr(r.error === 'current' ? t('set.passcodeWrongCurrent') : t('set.passcodeShort'))
+  }
+
+  return (
+    <Modal open onClose={onClose} title={mode === 'change' ? t('set.passcodeTitleChange') : t('set.passcodeTitle')}
+      footer={<>
+        <Button variant="ghost" size="sm" onClick={onClose}>{t('common.cancel')}</Button>
+        <Button variant="primary" size="sm" icon="Check" disabled={busy || !p1 || !p2} onClick={() => void submit()}>
+          {t('common.save')}
+        </Button>
+      </>}>
+      <form className="space-y-3" onSubmit={e => { e.preventDefault(); void submit() }}>
+        {mode === 'change' && (
+          <Field label={t('set.passcodeCurrent')}>
+            <TextInput type="password" inputMode="numeric" autoFocus maxLength={6} className="ltr tracking-[.3em]"
+              value={cur} onChange={e => setCur(e.target.value.replace(/\D/g, ''))} />
+          </Field>
+        )}
+        <Field label={t('set.passcodeNew')}>
+          <TextInput type="password" inputMode="numeric" autoFocus={mode === 'set'} maxLength={6} className="ltr tracking-[.3em]"
+            value={p1} onChange={e => setP1(e.target.value.replace(/\D/g, ''))} />
+        </Field>
+        <Field label={t('set.passcodeRepeat')}>
+          <TextInput type="password" inputMode="numeric" maxLength={6} className="ltr tracking-[.3em]"
+            value={p2} onChange={e => setP2(e.target.value.replace(/\D/g, ''))} />
+        </Field>
+        <Field label={t('set.passcodeHint')}>
+          <TextInput value={hint} maxLength={80} onChange={e => setHint(e.target.value)} />
+        </Field>
+        {err && (
+          <p className="text-[11.5px] text-red-400 flex items-center gap-1.5 anim" role="alert">
+            <Icon name="AlertTriangle" size={13} /> {err}
+          </p>
+        )}
+      </form>
+    </Modal>
   )
 }
 

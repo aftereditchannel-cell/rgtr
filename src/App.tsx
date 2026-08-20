@@ -17,7 +17,7 @@ import { useT, tr } from './i18n'
 import { ExitSavePrompt } from './components/layout/ExitSavePrompt'
 import { LockScreen } from './components/layout/LockScreen'
 import { applyTheme, watchSystemTheme } from './lib/theme'
-import { isLockEnabled, readLock } from './lib/lock'
+import { isLockEnabled, readLock, LOCK_EVENT } from './lib/lock'
 import { isMobile, syncMobileChrome, onMobileResume } from './lib/mobile'
 
 /** پل منوی بومی ویندوز → روتر و اکشن‌های برنامه */
@@ -34,6 +34,8 @@ function DesktopMenuBridge() {
       } else if (name === 'export') {
         const path = await exportJSON(st.data)
         if (path) st.setToast(tr(lang, 'toast.savedTo', { f: path.split(/[\\/]/).pop() ?? '' }))
+      } else if (name === 'lock') {
+        window.dispatchEvent(new Event(LOCK_EVENT))
       } else if (name === 'import') {
         try {
           const d = await importViaDialog()
@@ -142,18 +144,26 @@ function Root() {
     const evts = ['pointerdown', 'keydown', 'wheel', 'touchstart'] as const
     for (const e of evts) window.addEventListener(e, mark, { passive: true })
 
-    const shouldLock = () => {
+    // بی‌کاری: فقط وقتی دقیقه‌ی قفل تعیین شده باشد
+    const idleLock = () => {
+      const mins = readLock().autoLockMin
+      if (mins < 0) return false // «فقط هنگام باز شدن برنامه»
+      if (mins === 0) return false // «همیشه» وسط کار مزاحم نمی‌شود
+      return Date.now() - lastActive.current >= mins * 60_000
+    }
+    // بازگشت از پس‌زمینه: «همیشه» یعنی با هر برگشتن قفل شود
+    const resumeLock = () => {
       const mins = readLock().autoLockMin
       if (mins < 0) return false // «فقط هنگام باز شدن برنامه»
       if (mins === 0) return true
       return Date.now() - lastActive.current >= mins * 60_000
     }
-    const tick = setInterval(() => { if (shouldLock()) setLocked(true) }, 20_000)
+    const tick = setInterval(() => { if (idleLock()) setLocked(true) }, 20_000)
 
     // رفتن به پس‌زمینه (تعویض برنامه در اندروید / کوچک کردن پنجره)
     const onHide = () => { if (document.visibilityState === 'hidden') lastActive.current = Date.now() }
     document.addEventListener('visibilitychange', onHide)
-    const offResume = onMobileResume(() => { if (shouldLock()) setLocked(true) })
+    const offResume = onMobileResume(() => { if (resumeLock()) setLocked(true) })
 
     return () => {
       for (const e of evts) window.removeEventListener(e, mark)

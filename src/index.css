@@ -213,6 +213,16 @@ html[data-theme='light'] { --cal-invert: 0; }
 @keyframes sheetUp { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
 .anim-sheet { animation: sheetUp .24s cubic-bezier(.16,1,.3,1) both; }
 
+/* لرزش هنگام رمز اشتباه در صفحه‌ی قفل */
+@keyframes shakeX {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-7px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(3px); }
+}
+.anim-shake { animation: shakeX .38s cubic-bezier(.36,.07,.19,.97) both; }
+
 @media (prefers-reduced-motion: reduce) {
   .anim, .anim-sheet, .pulse { animation: none !important; }
   * { transition-duration: .01ms !important; }
