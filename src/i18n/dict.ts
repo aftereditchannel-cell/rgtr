@@ -373,6 +373,28 @@ export const UI: Record<string, Pair> = {
   'lock.biometricReason': { fa: 'برای باز کردن قفل برنامه احراز هویت کنید', en: 'Authenticate to unlock the app' },
   'lock.lockNow':       { fa: 'قفل فوری', en: 'Lock now' },
   'lock.locked':        { fa: 'قفل شده', en: 'Locked' },
+
+  /* ---------- بروزرسانی ---------- */
+  'upd.title':          { fa: 'بروزرسانی برنامه', en: 'App Update' },
+  'upd.currentVer':     { fa: 'نسخه‌ی فعلی', en: 'Current version' },
+  'upd.latestVer':      { fa: 'نسخه‌ی جدید', en: 'Latest version' },
+  'upd.upToDate':       { fa: 'برنامه به‌روز است', en: 'App is up to date' },
+  'upd.hasUpdate':      { fa: 'نسخه‌ی جدیدتری موجود است', en: 'A newer version is available' },
+  'upd.checking':       { fa: 'در حال بررسی...', en: 'Checking...' },
+  'upd.checkNow':       { fa: 'بررسی بروزرسانی', en: 'Check for updates' },
+  'upd.download':       { fa: 'دانلود', en: 'Download' },
+  'upd.downloading':    { fa: 'در حال دانلود...', en: 'Downloading...' },
+  'upd.noRelease':      { fa: 'هنوز نسخه‌ای منتشر نشده است. با ساختن تگ (مثلاً v1.1.1) نسخه‌ی جدید (در GitHub Actions) ساخته می‌شود.', en: 'No releases yet. Create a tag (e.g. v1.1.1) to trigger a new build in GitHub Actions.' },
+  'upd.publishDate':    { fa: 'تاریخ انتشار', en: 'Published' },
+  'upd.notes':          { fa: 'یادداشت‌های نسخه', en: 'Release notes' },
+  'upd.autoUpdate':     { fa: 'بروزرسانی خودکار', en: 'Auto update' },
+  'upd.autoUpdateHint': { fa: 'در پس‌زمینه نسخه‌ی جدید بررسی می‌شود. فقط نصب با تأیید شما.', en: 'Checks for new versions in the background. Installation requires your approval.' },
+  'upd.install':        { fa: 'نصب', en: 'Install' },
+  'upd.openReleases':   { fa: 'مشاهده‌ی همه‌ی نسخه‌ها', en: 'View all releases' },
+  'upd.error':          { fa: 'خطا در بررسی', en: 'Check failed' },
+  'upd.platformHint':   { fa: 'نسخه‌ی {p} موجود است', en: '{p} version available' },
+  'upd.winAvailable':   { fa: 'نسخه‌ی ویندوز', en: 'Windows' },
+  'upd.androidAvailable': { fa: 'نسخه‌ی اندروید', en: 'Android' },
 }
 
 /** پیام‌های وضعیت اتصال ابری که خارج از React هم لازم می‌شوند */

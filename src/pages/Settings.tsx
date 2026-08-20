@@ -15,6 +15,7 @@ import type { AppInfo } from '../lib/desktop'
 import * as cloud from '../lib/cloud'
 import type { Lang } from '../store/types'
 import { readLock, isLockEnabled, setPin, disableLock, setAutoLock, setBiometric, updateLock } from '../lib/lock'
+import { checkForUpdate, CURRENT_VERSION, releasesPage, currentPlatform, type UpdateInfo } from '../lib/updater'
 
 const ACCENTS = ['#6366f1', '#8b5cf6', '#06b6d4', '#22c55e', '#f59e0b', '#ef4444', '#ec4899', '#f97316']
 const FIELD_TYPES: FieldType[] = ['text', 'textarea', 'number', 'money', 'date', 'select', 'ref', 'url', 'progress', 'checklist', 'tags']
@@ -125,6 +126,9 @@ export function Settings() {
 
       {/* ---------- lock screen ---------- */}
       <LockCard />
+
+      {/* ---------- app update ---------- */}
+      <UpdateCard />
 
       {/* ---------- cloud ---------- */}
       <CloudCard />
@@ -273,6 +277,133 @@ function Toggle({ value, options, onChange }: { value: string; options: { v: str
         </button>
       ))}
     </div>
+  )
+}
+
+/* ---------- کارت بروزرسانی ---------- */
+function UpdateCard() {
+  const { t, lang } = useT()
+  const fmt = useFmt()
+  const [info, setInfo] = useState<UpdateInfo | null>(null)
+  const [checking, setChecking] = useState(false)
+  const [autoUpdate, setAutoUpdate] = useState(() => {
+    try { return localStorage.getItem('nexus-hq-auto-update') === 'true' } catch { return false }
+  })
+
+  const doCheck = async () => {
+    setChecking(true)
+    const res = await checkForUpdate()
+    setInfo(res)
+    setChecking(false)
+  }
+
+  const toggleAutoUpdate = (on: boolean) => {
+    setAutoUpdate(on)
+    localStorage.setItem('nexus-hq-auto-update', String(on))
+  }
+
+  // بررسی خودکار هنگام باز شدن
+  useEffect(() => { void doCheck() }, [])
+
+  const platform = currentPlatform()
+  const hasUpdate = info?.hasUpdate ?? false
+
+  return (
+    <Card>
+      <SectionTitle icon="Rocket"
+        right={
+          <span className="text-[10.5px] text-[var(--color-dim2)] nums ltr">
+            v{CURRENT_VERSION}
+          </span>
+        }>
+        {t('upd.title')}
+      </SectionTitle>
+
+      {/* وضعیت */}
+      <div className="mb-3">
+        {checking ? (
+          <p className="text-[12px] text-[var(--color-dim)] flex items-center gap-2">
+            <Icon name="Loader" size={13} className="animate-spin" />
+            {t('upd.checking')}
+          </p>
+        ) : info?.error === 'no_release' ? (
+          <p className="text-[12px] text-[var(--color-dim)] leading-relaxed">{t('upd.noRelease')}</p>
+        ) : info?.error ? (
+          <p className="text-[12px] text-red-400 flex items-center gap-1.5">
+            <Icon name="AlertTriangle" size={13} />
+            {t('upd.error')}: {info.error}
+          </p>
+        ) : hasUpdate ? (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[12px] text-emerald-400 flex items-center gap-1.5">
+              <Icon name="CheckCircle2" size={13} />
+              {t('upd.hasUpdate')}
+            </span>
+            <span className="text-[11px] text-[var(--color-dim2)] ltr nums">v{info.latestVersion}</span>
+            {info.publishedAt && (
+              <span className="text-[10.5px] text-[var(--color-dim2)]">· {fmt.relTime(info.publishedAt)}</span>
+            )}
+          </div>
+        ) : (
+          <p className="text-[12px] text-emerald-400 flex items-center gap-1.5">
+            <Icon name="CheckCircle2" size={13} />
+            {t('upd.upToDate')}
+          </p>
+        )}
+      </div>
+
+      {/* دکمه‌ها */}
+      <div className="flex gap-2 flex-wrap">
+        <Button size="sm" variant="primary" icon={checking ? 'Loader' : 'RefreshCw'}
+          disabled={checking} onClick={() => void doCheck()}>
+          {t('upd.checkNow')}
+        </Button>
+
+        {hasUpdate && info.downloadUrl && (
+          <Button size="sm" variant="outline" icon="Download"
+            onClick={() => window.open(info.downloadUrl!, '_blank')}>
+            {t('upd.download')} {info.assetName ? `(${info.assetName})` : ''}
+          </Button>
+        )}
+
+        {hasUpdate && !info.downloadUrl && (
+          <Button size="sm" variant="outline" icon="ExternalLink"
+            onClick={() => window.open(releasesPage(), '_blank')}>
+            {t('upd.openReleases')}
+          </Button>
+        )}
+      </div>
+
+      {/* یادداشت‌های نسخه */}
+      {info?.notes && (
+        <div className="mt-3 pt-3 border-t border-[var(--color-line)]">
+          <p className="text-[10.5px] text-[var(--color-dim2)] mb-1">{t('upd.notes')}</p>
+          <p className="text-[11.5px] text-[var(--color-dim)] leading-relaxed whitespace-pre-line" style={{ display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+            {info.notes}
+          </p>
+        </div>
+      )}
+
+      {/* بروزرسانی خودکار */}
+      <div className="mt-4 pt-3 border-t border-[var(--color-line)]">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5"
+            checked={autoUpdate}
+            onChange={e => toggleAutoUpdate(e.target.checked)} />
+          <span className="text-[12px]">{t('upd.autoUpdate')}</span>
+          <span className="text-[10.5px] text-[var(--color-dim2)]">— {t('upd.autoUpdateHint')}</span>
+        </label>
+      </div>
+
+      {/* لینک ریلیزها */}
+      <div className="mt-3">
+        <a href={releasesPage()} target="_blank" rel="noreferrer"
+          className="text-[11px] text-[var(--color-acc)] hover:underline flex items-center gap-1">
+          <Icon name="ExternalLink" size={11} />
+          {t('upd.openReleases')}
+        </a>
+      </div>
+    </Card>
   )
 }
 
