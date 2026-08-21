@@ -16,6 +16,8 @@ def('HTMLElement', dom.window.HTMLElement); def('Element', dom.window.Element); 
 def('getComputedStyle', dom.window.getComputedStyle); g.requestAnimationFrame = (f: FrameRequestCallback) => setTimeout(() => f(0), 0)
 g.cancelAnimationFrame = (h: number) => clearTimeout(h)
 g.IS_REACT_ACT_ENVIRONMENT = true
+// localStorage هم باید سراسری باشد — قفل و توکن ابری از آن استفاده می‌کنند
+try { def('localStorage', dom.window.localStorage); def('sessionStorage', dom.window.sessionStorage) } catch { /* */ }
 
 const errors: string[] = []
 const origErr = console.error
@@ -65,7 +67,10 @@ async function go(hash: string, label: string, mustContain: string[]) {
 await go('#/', 'Dashboard fa', ['تمرکز امروز', 'بعداً'])
 await go('#/decision', 'Decision fa', ['اولویت بالا'])
 await go('#/analytics', 'Analytics fa', ['مجموع درآمد', 'سود خالص'])
-await go('#/settings', 'Settings fa', ['تنظیمات', 'JSON', 'همگام‌سازی ابری'])
+await go('#/social', 'Social Hub fa', ['شبکه‌های اجتماعی', 'افزودن'])
+await go('#/automation', 'Automation fa', ['هوش مصنوعی', 'گفت‌وگو'])
+await go('#/help', 'Help fa', ['راهنما'])
+await go('#/settings', 'Settings fa', ['تنظیمات', 'JSON', 'همگام‌سازی ابری', 'شخصی‌سازی برند', 'قفل و امنیت'])
 for (const m of st.data.modules) await go('#/m/' + m.key, m.label.padEnd(14), [])
 
 // ---- انگلیسی ----
@@ -118,6 +123,38 @@ await act(async () => {
 assert('runtime module creation', useApp.getState().data.modules.length === 17)
 await go('#/m/m_podcast_test', 'custom module route', [])
 await act(async () => { useApp.getState().removeModule('m_podcast_test'); await tick() })
+
+// ---- قفل (PIN) — تنظیم، قفل شدن، باز کردن ----
+console.log('\nLOCK SCREEN')
+const lock = await import('../src/lib/lock')
+await act(async () => { await lock.setPasscode('1234'); await tick() })
+assert('passcode set', lock.isLockEnabled() && lock.hasPasscode())
+await act(async () => {
+  lock.lockNow()
+  await tick(); await tick()
+})
+assert('lock screen appears', text().includes('رمز عبور را وارد کنید') || text().includes('باز کردن'))
+await act(async () => { await lock.verifyPasscode('9999'); await tick() })
+assert('wrong passcode counted', lock.attemptsLeft() <= 4)
+await act(async () => { const ok = await lock.verifyPasscode('1234'); await tick(); assert('correct passcode unlocks', ok) })
+lock.disableLock()
+assert('lock disabled', !lock.isLockEnabled())
+
+// ---- جریان‌های کاری و لاگ ----
+console.log('\nWORKFLOWS')
+const { uid } = await import('../src/lib/id')
+await act(async () => {
+  useApp.getState().upsertWorkflow({
+    id: uid(), name: 'WF TEST', enabled: true, targets: ['https://youtube.com/@test'],
+    steps: [{ type: 'fetch' }, { type: 'save' }], intervalMin: 0, createdAt: new Date().toISOString(),
+  })
+  await tick()
+})
+assert('workflow created', useApp.getState().getWorkflows().some(w => w.name === 'WF TEST'))
+await act(async () => { useApp.getState().pushLog({ kind: 'workflow', subject: 'WF TEST', ok: true, detail: 'ok' }); await tick() })
+assert('run log pushed', useApp.getState().getLogs().length >= 1)
+await act(async () => { useApp.getState().removeWorkflow(useApp.getState().getWorkflows().find(w => w.name === 'WF TEST')!.id); await tick() })
+assert('workflow removed', !useApp.getState().getWorkflows().some(w => w.name === 'WF TEST'))
 assert('module deletion', useApp.getState().data.modules.length === 16)
 
 console.log('\nPERSISTENCE')

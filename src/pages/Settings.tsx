@@ -7,7 +7,7 @@ import { makeCustomModule, CORE_MODULES } from '../domain/schema'
 import type { ModuleDef, FieldDef, FieldType } from '../domain/schema'
 import { Card, SectionTitle, Button, Field, TextInput, Icon, Modal, Badge, Empty } from '../components/ui/Primitives'
 import { Dropdown } from '../components/ui/Dropdown'
-import { ICON_NAMES } from '../components/ui/icons'
+import { ICON_NAMES } from '../components/ui/icons.tsx'
 import { useT, cloudError } from '../i18n'
 import { useFmt } from '../lib/useFmt'
 import { desktop, isDesktop } from '../lib/desktop'
@@ -17,10 +17,12 @@ import { checkForUpdates, cmpVersion, fmtDate, APP_VERSION } from '../lib/update
 import type { UpdateRelease, UpdateCheckResult, DownloadProgress } from '../lib/desktop'
 import * as cloud from '../lib/cloud'
 import {
-  readLock, setPasscode, disableLock, setHint, setAutoLockMin, setBiometric,
+  readLock, setPasscode, disableLock, setAutoLockMin, setBiometric,
   biometricAvailable, cryptoAvailable,
 } from '../lib/lock'
 import { getAiKey, setAiKey as storeAiKey, chat as aiChat, AiError } from '../lib/ai'
+import { getKey, setKey as setKeySecret } from '../lib/secrets'
+import { aiProviderById, AI_PROVIDERS, testAIConnection } from '../ai/providers'
 import type { Lang } from '../store/types'
 
 const ACCENTS = ['#6366f1', '#8b5cf6', '#06b6d4', '#22c55e', '#f59e0b', '#ef4444', '#ec4899', '#f97316']
@@ -154,6 +156,9 @@ export function Settings() {
           </Field>
         </div>
       </Card>
+
+      {/* ---------- branding ---------- */}
+      <BrandingCard />
 
       {/* ---------- security ---------- */}
       <SecurityCard />
@@ -588,6 +593,85 @@ function CloudCard() {
   )
 }
 
+/* ---------- برند (نام، لوگو، آیکون) ---------- */
+function BrandingCard() {
+  const { data, setSettings, setToast, persist } = useApp()
+  const { t } = useT()
+  const b = data.settings.branding
+  const logoRef = useRef<HTMLInputElement>(null)
+  const iconRef = useRef<HTMLInputElement>(null)
+
+  const readImage = (file: File, max: number): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const img = new Image()
+      const url = URL.createObjectURL(file)
+      img.onload = () => {
+        const scale = Math.min(1, max / Math.max(img.width, img.height))
+        const w = Math.round(img.width * scale), h = Math.round(img.height * scale)
+        const c = document.createElement('canvas')
+        c.width = w; c.height = h
+        c.getContext('2d')!.drawImage(img, 0, 0, w, h)
+        URL.revokeObjectURL(url)
+        resolve(c.toDataURL('image/png'))
+      }
+      img.onerror = e => { URL.revokeObjectURL(url); reject(e) }
+      img.src = url
+    })
+
+  const onLogo = async (f?: File) => {
+    if (!f) return
+    setSettings({ branding: { ...b, logo: await readImage(f, 256) } })
+    setToast(t('set.logoUpdated'))
+  }
+  const onIcon = async (f?: File) => {
+    if (!f) return
+    setSettings({ branding: { ...b, appIcon: await readImage(f, 512) } })
+    setToast(t('set.iconUpdated'))
+    void persist()
+  }
+
+  return (
+    <Card>
+      <SectionTitle icon="Palette">{t('set.branding')}</SectionTitle>
+      <p className="text-[12px] text-[var(--color-dim)] mb-3 leading-relaxed">{t('set.brandingNote')}</p>
+      <div className="grid sm:grid-cols-2 gap-4">
+        <Field label={t('set.appName')}>
+          <TextInput value={b.appName} onChange={e => setSettings({ branding: { ...b, appName: e.target.value } })} />
+        </Field>
+        <Field label={t('set.tagline')}>
+          <TextInput value={b.tagline ?? ''} onChange={e => setSettings({ branding: { ...b, tagline: e.target.value } })} />
+        </Field>
+      </div>
+      <div className="grid sm:grid-cols-2 gap-4 mt-4">
+        <Field label={t('set.logo')} help={t('set.logoHint')}>
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl overflow-hidden grid place-items-center border border-[var(--color-line2)]"
+              style={b.logo ? undefined : { background: 'linear-gradient(135deg, var(--color-acc), #a855f7)' }}>
+              {b.logo ? <img src={b.logo} alt="" className="w-full h-full object-cover" /> : <Icon name="Image" size={20} className="text-white" />}
+            </div>
+            <input ref={logoRef} type="file" accept="image/png,image/jpeg,image/svg+xml" hidden
+              onChange={e => void onLogo(e.target.files?.[0])} />
+            <Button size="sm" variant="outline" icon="Upload" onClick={() => logoRef.current?.click()}>{t('set.upload')}</Button>
+            {b.logo && <Button size="sm" variant="ghost" icon="X" onClick={() => setSettings({ branding: { ...b, logo: undefined } })} />}
+          </div>
+        </Field>
+        <Field label={t('set.appIcon')} help={t('set.appIconHint')}>
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl overflow-hidden grid place-items-center border border-[var(--color-line2)]"
+              style={b.appIcon ? undefined : { background: 'linear-gradient(135deg, var(--color-acc), #a855f7)' }}>
+              {b.appIcon ? <img src={b.appIcon} alt="" className="w-full h-full object-cover" /> : <Icon name="Image" size={20} className="text-white" />}
+            </div>
+            <input ref={iconRef} type="file" accept="image/png,image/jpeg" hidden
+              onChange={e => void onIcon(e.target.files?.[0])} />
+            <Button size="sm" variant="outline" icon="Upload" onClick={() => iconRef.current?.click()}>{t('set.upload')}</Button>
+            {b.appIcon && <Button size="sm" variant="ghost" icon="X" onClick={() => setSettings({ branding: { ...b, appIcon: undefined } })} />}
+          </div>
+        </Field>
+      </div>
+    </Card>
+  )
+}
+
 /* ---------- کارت قفل و امنیت ---------- */
 function SecurityCard() {
   const { t, lang } = useT()
@@ -595,6 +679,7 @@ function SecurityCard() {
   const [cfg, setCfg] = useState(readLock())
   const [edit, setEdit] = useState(false)
   const [code, setCode] = useState('')
+  const [currentCode, setCurrentCode] = useState('')
   const [confirmCode, setConfirmCode] = useState('')
   const [hint, setHintInput] = useState(cfg.hint)
   const [autoMin, setAutoMin] = useState(cfg.autoLockMin)
@@ -613,11 +698,15 @@ function SecurityCard() {
     if (clean.length < 4) { alert(t('set.passcodeShort')); return }
     if (clean !== confirmCode.replace(/[^\d]/g, '')) { alert(t('set.passcodeMismatch')); return }
     try {
-      await setPasscode(clean)
-      setHint(hint.trim())
+      const res = await setPasscode(clean, { hint: hint.trim(), biometric: bio && bioAvail, current: currentCode })
+      if (!res.ok) {
+        if (res.error === 'current') alert(lang === 'fa' ? 'رمز فعلی اشتباه است.' : 'Current passcode is wrong.')
+        else alert(t('set.passcodeShort'))
+        return
+      }
       setAutoLockMin(autoMin)
       setBiometric(bio && bioAvail)
-      refresh(); setEdit(false); setCode(''); setConfirmCode('')
+      refresh(); setEdit(false); setCode(''); setCurrentCode(''); setConfirmCode('')
       setToast(t('set.passcodeSet'))
     } catch (e) {
       alert(t('common.error') + ': ' + (e as Error).message)
@@ -652,7 +741,7 @@ function SecurityCard() {
       ) : (
         <>
           <div className="flex gap-2 flex-wrap mb-3">
-            <Button variant="outline" size="sm" icon="Pencil" onClick={() => { setHintInput(cfg.hint); setAutoMin(cfg.autoLockMin); setBio(cfg.biometric); setEdit(true) }}>
+            <Button variant="outline" size="sm" icon="Pencil" onClick={() => { setCurrentCode(''); setHintInput(cfg.hint); setAutoMin(cfg.autoLockMin); setBio(cfg.biometric); setEdit(true) }}>
               {t('set.changePasscode')}
             </Button>
             <Button variant="ghost" size="sm" icon="Trash2" onClick={remove}>{t('set.removePasscode')}</Button>
@@ -693,6 +782,12 @@ function SecurityCard() {
             <Button variant="primary" size="sm" icon="Check" onClick={save}>{t('common.save')}</Button>
           </>}>
           <div className="grid sm:grid-cols-2 gap-3">
+            {cfg.enabled && (
+              <Field label={lang === 'fa' ? 'رمز فعلی' : 'Current passcode'}>
+                <TextInput type="password" inputMode="numeric" value={currentCode} className="ltr"
+                  onChange={e => setCurrentCode(e.target.value)} />
+              </Field>
+            )}
             <Field label={t('set.passcode')}>
               <TextInput type="password" inputMode="numeric" value={code} className="ltr" onChange={e => setCode(e.target.value)} />
             </Field>
@@ -732,6 +827,13 @@ function AiCard() {
   const [model, setModel] = useState(ai.model)
   const [state, setState] = useState<'idle' | 'busy'>('idle')
 
+  /* کلید سرویس‌های جریان‌های کاری (OpenAI / Gemini / Claude) — در مخزن امن */
+  const [wfProvider, setWfProvider] = useState(ai.provider || 'openai')
+  const [wfModel, setWfModel] = useState(ai.model || 'gpt-4o-mini')
+  const [wfKey, setWfKey] = useState(getKey(aiProviderById(wfProvider as never)?.keyName ?? 'ai_openai') ?? '')
+  const [wfShow, setWfShow] = useState(false)
+  const [wfState, setWfState] = useState<'idle' | 'busy'>('idle')
+
   const save = async () => {
     if (!key.trim()) { alert(t('set.aiNeedKey')); return }
     storeAiKey(key.trim())
@@ -747,6 +849,21 @@ function AiCard() {
     }
   }
 
+  const saveWf = async () => {
+    const prov = aiProviderById(wfProvider as never)
+    if (!wfKey.trim()) { alert(t('set.aiNeedKey')); return }
+    setKeySecret(prov?.keyName ?? 'ai_openai', wfKey.trim())
+    setSettings({ ai: { ...ai, provider: wfProvider, model: wfModel, enabled: true } })
+    setWfState('busy')
+    try {
+      const r = await testAIConnection(wfProvider as never, wfModel, wfKey.trim())
+      if (r.ok) setToast(t('set.aiOk'))
+      else alert(t('common.error') + ': ' + r.detail)
+    } finally {
+      setWfState('idle')
+    }
+  }
+
   return (
     <Card id="ai">
       <SectionTitle icon="Bot"
@@ -754,6 +871,8 @@ function AiCard() {
         {t('set.ai')}
       </SectionTitle>
       <p className="text-[12px] text-[var(--color-dim)] leading-relaxed mb-3">{t('set.aiNote')}</p>
+
+      {/* Agent Runner — OpenAI-compatible */}
       <div className="grid sm:grid-cols-2 gap-4">
         <Field label={t('set.aiKey')} help={t('set.aiKeyHint')}>
           <div className="relative">
@@ -779,6 +898,41 @@ function AiCard() {
           {t('set.aiSave')}
         </Button>
       </div>
+
+      {/* جریان‌های کاری و تحلیل — OpenAI / Gemini / Claude */}
+      <div className="mt-5 pt-4 border-t border-[var(--color-line)]">
+        <div className="text-[12px] font-semibold mb-2 flex items-center gap-1.5">
+          <Icon name="Workflow" size={13} className="text-[var(--color-acc)]" />
+          {t('set.aiWorkflow')}
+        </div>
+        <div className="grid sm:grid-cols-3 gap-4">
+          <Field label={t('set.aiProvider')}>
+            <Dropdown value={wfProvider}
+              options={AI_PROVIDERS.map(p => ({ value: p.id, label: p.label }))}
+              onChange={v => { setWfProvider(v); setWfModel(aiProviderById(v as never)?.defaultModel ?? wfModel); setWfKey(getKey(aiProviderById(v as never)?.keyName ?? '') ?? '') }} />
+          </Field>
+          <Field label={t('set.aiModel')}>
+            <Dropdown value={wfModel}
+              options={aiProviderById(wfProvider as never)?.models.map(m => ({ value: m, label: m })) ?? []}
+              onChange={v => setWfModel(v)} />
+          </Field>
+          <Field label={t('set.aiKey')}>
+            <div className="relative">
+              <TextInput type={wfShow ? 'text' : 'password'} value={wfKey} placeholder="sk-..." className="ltr pe-9"
+                onChange={e => setWfKey(e.target.value)} />
+              <button type="button" onClick={() => setWfShow(v => !v)}
+                className="absolute end-2 top-1/2 -translate-y-1/2 text-[var(--color-dim2)] hover:text-[var(--color-tx)]">
+                <Icon name={wfShow ? 'EyeOff' : 'Eye'} size={14} />
+              </button>
+            </div>
+          </Field>
+        </div>
+        <div className="mt-3">
+          <Button size="sm" variant="outline" icon={wfState === 'busy' ? 'Loader' : 'Plug'} disabled={wfState === 'busy'} onClick={saveWf}>
+            {t('set.aiTestSave')}
+          </Button>
+        </div>
+      </div>
     </Card>
   )
 }
@@ -786,16 +940,51 @@ function AiCard() {
 /* ---------- کارت شبکه‌های اجتماعی ---------- */
 function SocialCard() {
   const { t } = useT()
-  const { data, setSettings } = useApp()
+  const { data, setSettings, setToast } = useApp()
   const social = data.settings.social
+  const [showKeys, setShowKeys] = useState<Record<string, boolean>>({})
+
+  const setKeyField = (k: keyof typeof social.keys, v: string) => {
+    setSettings({ social: { ...social, keys: { ...social.keys, [k]: v } } })
+  }
+
   return (
     <Card id="social">
-      <SectionTitle icon="Share2">{t('set.social')}</SectionTitle>
+      <SectionTitle icon="Share2"
+        right={social.profiles.length > 0 && (
+          <span className="text-[10.5px] text-[var(--color-dim2)] nums">{social.profiles.length} {t('social.profiles')}</span>
+        )}>
+        {t('set.social')}
+      </SectionTitle>
       <p className="text-[12px] text-[var(--color-dim)] leading-relaxed mb-3">{t('set.socialNote')}</p>
+
       <Field label={t('set.socialProxy')} help={t('set.socialProxyHint')}>
         <TextInput value={social.proxyUrl} className="ltr" placeholder="https://your-worker.workers.dev"
           onChange={e => setSettings({ social: { ...social, proxyUrl: e.target.value } })} />
       </Field>
+
+      <div className="mt-4 pt-4 border-t border-[var(--color-line)] grid sm:grid-cols-2 gap-4">
+        <Field label={t('social.interval')}>
+          <Dropdown value={String(social.intervalMin)}
+            options={['0', '5', '15', '30', '60'].map(v => ({ value: v, label: v === '0' ? t('social.onVisible') : v + ' ' + t('social.minutes') }))}
+            onChange={v => setSettings({ social: { ...social, intervalMin: Number(v) } })} />
+        </Field>
+        <Field label={t('social.optionalKeys')} help={t('social.keysHint')}>
+          <div className="space-y-2">
+            {(['youtube', 'instagram', 'rapidapi'] as const).map(k => (
+              <div key={k} className="relative">
+                <TextInput type={showKeys[k] ? 'text' : 'password'} value={social.keys[k] ?? ''} className="ltr pe-9 text-[12px]"
+                  placeholder={k} onChange={e => { setKeyField(k, e.target.value); setToast(t('social.saved')) }} />
+                <button type="button" onClick={() => setShowKeys(s => ({ ...s, [k]: !s[k] }))}
+                  className="absolute end-2 top-1/2 -translate-y-1/2 text-[var(--color-dim2)]">
+                  <Icon name={showKeys[k] ? 'EyeOff' : 'Eye'} size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </Field>
+      </div>
+
       <label className="mt-3 flex items-center gap-2 cursor-pointer">
         <input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={social.autoRefresh}
           onChange={e => setSettings({ social: { ...social, autoRefresh: e.target.checked } })} />

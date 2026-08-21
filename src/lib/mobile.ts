@@ -20,10 +20,19 @@ function cap(): CapGlobal['Capacitor'] | undefined {
   return (window as unknown as CapGlobal).Capacitor
 }
 
-export const isMobile: boolean = (() => {
+function detectMobile(): boolean {
   const c = cap()
-  return !!c?.isNativePlatform?.()
-})()
+  if (c?.isNativePlatform?.()) return true
+  if (typeof window === 'undefined') return false
+  try {
+    if (window.location.hostname === 'appassets.androidplatform.net') return true
+    const ua = navigator.userAgent || ''
+    if (/Android/i.test(ua) && (/;\s*wv\)/i.test(ua) || /WebView/i.test(ua))) return true
+  } catch { /* ignore */ }
+  return false
+}
+
+export const isMobile: boolean = detectMobile()
 
 export const mobilePlatform: string = cap()?.getPlatform?.() ?? 'web'
 export const isAndroid = mobilePlatform === 'android'
@@ -206,26 +215,6 @@ export function mobileDataPath(): string {
   return `Android/data/app.nexushq.mobile/files/${DATA_FILE}`
 }
 
-/** همگام‌سازی نوار وضعیت با پوسته‌ی فعال (تیره/روشن) */
-export async function syncMobileChrome(eff: 'dark' | 'light'): Promise<void> {
-  if (!isMobile) return
-  try {
-    const { StatusBar, Style } = await import('@capacitor/status-bar')
-    await StatusBar.setStyle({ style: eff === 'dark' ? Style.Dark : Style.Light })
-    if (isAndroid) await StatusBar.setBackgroundColor({ color: eff === 'dark' ? '#08090c' : '#eef1f7' })
-  } catch {
-    /* بعضی دستگاه‌ها پشتیبانی نمی‌کنند */
-  }
-}
-
-/** رویداد بازگشت برنامه از پس‌زمینه به پیش‌زمینه (resume) */
-export async function onMobileResume(handler: () => void): Promise<() => void> {
-  if (!isMobile) return () => {}
-  const { App } = await import('@capacitor/app')
-  const sub = await App.addListener('resume', handler)
-  return () => void sub.remove()
-}
-
 /* ---------- ظاهر بومی ---------- */
 
 /**
@@ -240,4 +229,31 @@ export async function initMobileChrome(): Promise<void> {
     if (isAndroid) await StatusBar.setBackgroundColor({ color: '#08090c' })
     await StatusBar.setOverlaysWebView({ overlay: false })
   } catch { /* بعضی دستگاه‌ها پشتیبانی نمی‌کنند */ }
+}
+
+/** هماهنگ‌کردن نوار وضعیت با پوسته‌ی مؤثر */
+export async function syncMobileChrome(theme: 'dark' | 'light'): Promise<void> {
+  if (!isMobile) return
+  try {
+    const { StatusBar, Style } = await import('@capacitor/status-bar')
+    await StatusBar.setStyle({ style: theme === 'light' ? Style.Light : Style.Dark })
+    if (isAndroid) await StatusBar.setBackgroundColor({ color: theme === 'light' ? '#eef1f7' : '#08090c' })
+    const meta = document.querySelector('meta[name="theme-color"]')
+    if (meta) meta.setAttribute('content', theme === 'light' ? '#eef1f7' : '#08090c')
+  } catch { /* بعضی دستگاه‌ها پشتیبانی نمی‌کنند */ }
+}
+
+/**
+ * وقتی برنامه از پس‌زمینه برمی‌گردد (اندروید resume).
+ * هم‌زمان برمی‌گرداند تا در useEffect تمیز جمع شود.
+ */
+export function onMobileResume(handler: () => void): () => void {
+  if (!isMobile) return () => {}
+  let remove = () => {}
+  void import('@capacitor/app').then(({ App }) => {
+    void App.addListener('resume', handler).then(sub => {
+      remove = () => { void sub.remove() }
+    })
+  })
+  return () => { remove() }
 }

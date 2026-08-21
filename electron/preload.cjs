@@ -58,6 +58,7 @@ contextBridge.exposeInMainWorld('hq', {
       'menu:palette': 'palette',
       'menu:navigate': 'navigate',
       'menu:exit': 'exit',
+      'menu:lock': 'lock',
     }
     const subs = Object.entries(map).map(([ch, name]) => {
       const fn = (_e, payload) => handler(name, payload)

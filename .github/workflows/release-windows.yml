@@ -1,0 +1,74 @@
+name: Build Windows installer
+
+# ساخت نسخه‌ی ویندوز روی سرورهای رایگان گیت‌هاب.
+# دو راه اجرا:
+#   ۱) دستی — از تب Actions دکمه‌ی «Run workflow»
+#   ۲) خودکار — با زدن یک تگ نسخه، مثلاً:  git tag v1.0.0 && git push --tags
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc -b --noEmit
+
+      - name: Headless tests
+        run: |
+          npm run smoke
+          npm run render
+
+      - name: Build web bundle
+        run: npm run build
+
+      - name: Build installer + portable
+        run: npm run dist:win
+        env:
+          # بدون گواهی امضای کد (پولی است) — ویندوز SmartScreen هشدار می‌دهد
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: NEXUS-HQ-windows
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            release/*Setup*.exe
+            release/*Portable*.exe
+            release/*.blockmap
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          generate_release_notes: true
+          files: |
+            release/*Setup*.exe
+            release/*Portable*.exe
+            release/*.blockmap
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

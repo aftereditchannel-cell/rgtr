@@ -10,6 +10,8 @@ import { Analytics } from './pages/Analytics'
 import { Settings } from './pages/Settings'
 import { ModulePage } from './pages/ModulePage'
 import { Help } from './pages/Help'
+import { SocialHub } from './pages/SocialHub'
+import { Automation } from './pages/Automation'
 import { Icon } from './components/ui/Primitives'
 import { BrandMark } from './components/ui/BrandMark'
 import { desktop } from './lib/desktop'
@@ -18,7 +20,7 @@ import { useT, tr } from './i18n'
 import { ExitSavePrompt } from './components/layout/ExitSavePrompt'
 import { LockScreen } from './components/layout/LockScreen'
 import { applyTheme, applyGlass, watchSystemTheme } from './lib/theme'
-import { isLockEnabled, readLock } from './lib/lock'
+import { isLockEnabled, readLock, LOCK_EVENT } from './lib/lock'
 import { isMobile, syncMobileChrome, onMobileResume } from './lib/mobile'
 import { autoPullIfEnabled } from './store/useApp'
 
@@ -45,6 +47,8 @@ function DesktopMenuBridge() {
       if (name === 'navigate' && payload) nav(payload)
       else if (name === 'palette') {
         window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true }))
+      } else if (name === 'lock') {
+        window.dispatchEvent(new Event(LOCK_EVENT))
       } else if (name === 'export') {
         const path = await exportJSON(st.data)
         if (path) st.setToast(tr(lang, 'toast.savedTo', { f: path.split(/[\\/]/).pop() ?? '' }))
@@ -70,6 +74,7 @@ function Shell() {
   const [navOpen, setNavOpen] = useState(false)
   const toast = useApp(s => s.toast)
   const accent = useApp(s => s.data.settings.accent)
+  const appName = useApp(s => s.data.settings.branding?.appName ?? 'NEXUS HQ')
   const { lang, rtl } = useT()
 
   useEffect(() => {
@@ -83,6 +88,11 @@ function Shell() {
     el.setAttribute('lang', lang)
   }, [lang, rtl])
 
+  // نام برنامه روی عنوان پنجره
+  useEffect(() => {
+    document.title = appName
+  }, [appName])
+
   return (
     /* h-dvh به‌جای h-full: نوار آدرس متغیر مرورگر موبایل نباید ته صفحه را ببرد زیر خط */
     <div className="flex h-full max-h-[100dvh]">
@@ -95,7 +105,7 @@ function Shell() {
           <button onClick={() => setNavOpen(true)} className="text-[var(--color-dim)] p-1.5 -m-1 rounded-lg active:bg-[var(--hover)]" aria-label="menu">
             <Icon name="Menu" size={19} />
           </button>
-          <span className="text-[13px] font-semibold flex-1 truncate">NEXUS HQ</span>
+          <span className="text-[13px] font-semibold flex-1 truncate">{appName}</span>
         </div>
 
         <main className="flex-1 scroll-y">
@@ -104,6 +114,8 @@ function Shell() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/decision" element={<DecisionCenter />} />
               <Route path="/analytics" element={<Analytics />} />
+              <Route path="/social" element={<SocialHub />} />
+              <Route path="/automation" element={<Automation />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/help" element={<Help />} />
               <Route path="/m/:key" element={<ModulePage />} />
@@ -158,8 +170,7 @@ function Root() {
     void autoPullIfEnabled()
     const onVis = () => { if (document.visibilityState === 'visible') void autoPullIfEnabled() }
     document.addEventListener('visibilitychange', onVis)
-    let offResume = () => {}
-    void onMobileResume(() => void autoPullIfEnabled()).then(fn => { offResume = fn })
+    const offResume = onMobileResume(() => void autoPullIfEnabled())
     return () => { document.removeEventListener('visibilitychange', onVis); offResume() }
   }, [])
 
@@ -170,19 +181,26 @@ function Root() {
     const evts = ['pointerdown', 'keydown', 'wheel', 'touchstart'] as const
     for (const e of evts) window.addEventListener(e, mark, { passive: true })
 
-    const shouldLock = () => {
+    // بی‌کاری: فقط وقتی دقیقه‌ی قفل تعیین شده باشد
+    const idleLock = () => {
+      const mins = readLock().autoLockMin
+      if (mins < 0) return false // «فقط هنگام باز شدن برنامه»
+      if (mins === 0) return false // «همیشه» وسط کار مزاحم نمی‌شود
+      return Date.now() - lastActive.current >= mins * 60_000
+    }
+    // بازگشت از پس‌زمینه: «همیشه» یعنی با هر برگشتن قفل شود
+    const resumeLock = () => {
       const mins = readLock().autoLockMin
       if (mins < 0) return false // «فقط هنگام باز شدن برنامه»
       if (mins === 0) return true
       return Date.now() - lastActive.current >= mins * 60_000
     }
-    const tick = setInterval(() => { if (shouldLock()) setLocked(true) }, 20_000)
+    const tick = setInterval(() => { if (idleLock()) setLocked(true) }, 20_000)
 
     // رفتن به پس‌زمینه (تعویض برنامه در اندروید / کوچک کردن پنجره)
     const onHide = () => { if (document.visibilityState === 'hidden') lastActive.current = Date.now() }
     document.addEventListener('visibilitychange', onHide)
-    let offResume = () => {}
-    void onMobileResume(() => { if (shouldLock()) setLocked(true) }).then(fn => { offResume = fn })
+    const offResume = onMobileResume(() => { if (resumeLock()) setLocked(true) })
 
     return () => {
       for (const e of evts) window.removeEventListener(e, mark)
@@ -192,11 +210,11 @@ function Root() {
     }
   }, [locked])
 
-  // درخواست قفل فوری از صفحه‌ی تنظیمات
+  // درخواست قفل فوری از صفحه‌ی تنظیمات و منوی ویندوز
   useEffect(() => {
     const h = () => setLocked(true)
-    window.addEventListener('nexus:lock', h)
-    return () => window.removeEventListener('nexus:lock', h)
+    window.addEventListener(LOCK_EVENT, h)
+    return () => window.removeEventListener(LOCK_EVENT, h)
   }, [])
 
   const unlock = useCallback(() => { lastActive.current = Date.now(); setLocked(false) }, [])

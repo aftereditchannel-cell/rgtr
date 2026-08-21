@@ -1,20 +1,59 @@
 # وابستگی‌ها و خروجی build
 node_modules/
 dist/
+dist-bin/
 release/
+release/*.blockmap
+release/builder-debug.yml
+release/builder-effective-config.yaml
+release/linux-unpacked/
+release/win-unpacked/
 
 # لاگ‌ها و فایل‌های موقت
 *.log
+*.tsbuildinfo
 .DS_Store
+Thumbs.db
 npm-debug.log*
+.env
+.env.*
+.env.local
+.idea/
+.vscode/
 
 # خروجی‌های گریدل اندروید
 android/.gradle/
+android/.idea/
 android/app/build/
 android/build/
 android/captures/
 android/app/release/
+android/*.iml
+android/local.properties
+android/app/src/main/assets/public/
 
 # فایل‌های محلی ماشین
 .env
 .env.local
+
+# کلید امضای اندروید — هرگز نباید در گیت برود
+android/keystore/
+android/keystore.properties
+*.jks
+*.keystore
+
+# خروجی‌های build دستی (اسکریپت‌های build-*)
+build-apk/*.apk
+build-apk/classes.dex
+build-apk/AndroidManifest.xml.bin
+build-apk/resources.arsc
+build-apk-native/*.apk
+build-apk-native/classes.dex
+build-native/win/*.pdb
+build-native/win/assets.cpp
+build-native/win/payload.cpp
+build-native/win-native/payload_native.cpp
+native-app/android/*.apk
+native-app/android/classes.dex
+native-app/windows/fonts.cpp
+native-app/windows/payload.cpp

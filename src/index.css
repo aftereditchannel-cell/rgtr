@@ -282,3 +282,13 @@ html[data-glass='1'] .glass-strong {
   80% { transform: translateX(5px); }
 }
 .lock-shake { animation: lockShake .42s cubic-bezier(.36,.07,.19,.97) both; }
+
+/* لرزش هنگام رمز اشتباه در صفحه‌ی قفل (نسخه‌ی جدید) */
+@keyframes shakeX {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-7px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(3px); }
+}
+.anim-shake { animation: shakeX .38s cubic-bezier(.36,.07,.19,.97) both; }

@@ -1,140 +1,248 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { BrandMark } from '../ui/BrandMark'
 import { Icon } from '../ui/Primitives'
-import { readLock, verifyPasscode, biometricAuth, biometricAvailable, canAttempt, cooldownSeconds } from '../../lib/lock'
-import { isMobile } from '../../lib/mobile'
 import { useT } from '../../i18n'
+import { useFmt } from '../../lib/useFmt'
+import {
+  readLock,
+  verifyPasscode,
+  normalizeDigits,
+  cooldownRemaining,
+  attemptsLeft,
+  isBiometricAvailable,
+  tryBiometricUnlock,
+} from '../../lib/lock'
+import { isMobile } from '../../lib/mobile'
 
-const FA = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹']
+const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'back']
 
 /**
- * صفحه‌ی قفل — مثل تلگرام: شماره‌گیر، نقطه‌های پرشونده، لرزش هنگام رمز اشتباه.
- * روی گوشی اگر اثر انگشت/چهره فعال باشد دکمه‌ی بیومتریک هم نشان داده می‌شود.
+ * صفحه‌ی قفل — تمام‌صفحه (z-100)، شیشه‌ای، با صفحه‌کلید عددی.
+ *  · ورود با رمز ۴ تا ۶ رقمی
+ *  · ۵ تلاش اشتباه → ۳۰ ثانیه قفل موقت
+ *  · میان‌بر اثر انگشت روی اندروید
+ *  · کلیدهای فیزیکی ۰-۹ / Backspace / Enter هم کار می‌کنند
  */
 export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
   const { t } = useT()
-  const [code, setCode] = useState('')
-  const [shake, setShake] = useState(false)
-  const [err, setErr] = useState('')
-  const [cooldown, setCooldown] = useState(cooldownSeconds())
-  const [bio, setBio] = useState(false)
-  const [bioPrompted, setBioPrompted] = useState(false)
-  const timer = useRef<ReturnType<typeof setInterval> | null>(null)
-
+  const fmt = useFmt()
   const cfg = readLock()
-  const useBio = cfg.biometric && isMobile
 
-  // شمارش معکوس دوره‌ی تأخیر پلکانی
+  const [entered, setEntered] = useState('')
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [cooldown, setCooldown] = useState(cooldownRemaining())
+  const [shake, setShake] = useState(0)
+  const [bioOk, setBioOk] = useState(false)
+  const [clock, setClock] = useState(() => new Date())
+
+  // ساعت زنده
   useEffect(() => {
-    timer.current = setInterval(() => setCooldown(cooldownSeconds()), 1000)
-    return () => { if (timer.current) clearInterval(timer.current) }
+    const t = setInterval(() => setClock(new Date()), 20_000)
+    return () => clearInterval(t)
   }, [])
 
-  // بررسی پشتیبانی بیومتریک + درخواست خودکار یک‌بار
+  // شمارش معکوس قفل موقت
   useEffect(() => {
-    if (!useBio) return
-    void biometricAvailable().then(ok => {
-      setBio(ok)
-      if (ok && !bioPrompted) {
-        setBioPrompted(true)
-        void tryBio()
-      }
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    if (cooldown <= 0) return
+    const t = setInterval(() => {
+      const r = cooldownRemaining()
+      setCooldown(r)
+      if (r <= 0) { setErr(''); setEntered('') }
+    }, 500)
+    return () => clearInterval(t)
+  }, [cooldown])
 
-  const tryBio = async () => {
-    if (!canAttempt()) return
-    const ok = await biometricAuth(t('lock.bioReason'))
-    if (ok) onUnlock()
-  }
+  // اثر انگشت — فقط وقتی در تنظیمات فعال باشد و سنسور در دسترس باشد
+  useEffect(() => {
+    if (!cfg.biometric) return
+    let alive = true
+    void isBiometricAvailable().then(ok => { if (alive) setBioOk(ok) })
+    return () => { alive = false }
+  }, [cfg.biometric])
 
-  const tap = (d: number) => {
-    if (!canAttempt()) return
+  const tryUnlock = useCallback(async (raw: string) => {
+    const n = normalizeDigits(raw)
+    if (!n || busy) return
+    setBusy(true)
     setErr('')
-    setCode(c => (c.length >= 6 ? c : c + String(d)))
-  }
-
-  const back = () => setCode(c => c.slice(0, -1))
-
-  const submit = async () => {
-    if (!canAttempt() || code.length < 4) return
-    const ok = await verifyPasscode(code)
-    if (ok) {
-      onUnlock()
-      return
+    const ok = await verifyPasscode(n)
+    setBusy(false)
+    if (ok) { onUnlock(); return }
+    setEntered('')
+    setShake(s => s + 1)
+    const r = cooldownRemaining()
+    if (r > 0) { setCooldown(r); setErr(t('lock.cooldown', { s: fmt.dg(r) })) }
+    else {
+      const left = attemptsLeft()
+      setErr(left <= 0 ? t('lock.tooMany') : t('lock.wrong', { n: fmt.dg(left) }))
     }
-    setShake(true)
-    setTimeout(() => setShake(false), 450)
-    setErr(t('lock.wrong'))
-    setCode('')
-    setCooldown(cooldownSeconds())
-  }
+  }, [busy, onUnlock, t, fmt])
+
+  const press = useCallback((k: string) => {
+    if (busy || cooldown > 0) return
+    setErr('')
+    if (k === 'back') { setEntered(e => e.slice(0, -1)); return }
+    if (k === 'enter') { void tryUnlock(entered); return }
+    if (entered.length >= 6) return
+    const next = entered + k
+    setEntered(next)
+    // پس از ۴ تا ۶ رقم، خودکار تلاش می‌کند
+    if (next.length >= 4) void tryUnlock(next)
+  }, [busy, cooldown, entered, tryUnlock])
+
+  // صفحه‌کلید فیزیکی
+  useEffect(() => {
+    const h = (ev: KeyboardEvent) => {
+      if (ev.key === 'Backspace') { press('back'); return }
+      if (ev.key === 'Enter') { press('enter'); return }
+      const d = normalizeDigits(ev.key)
+      if (d.length === 1) press(d)
+    }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [press])
+
+  const bio = useCallback(async () => {
+    if (busy) return
+    setBusy(true)
+    const ok = await tryBiometricUnlock(t('lock.fingerprintReason'))
+    setBusy(false)
+    if (ok) onUnlock()
+  }, [busy, onUnlock, t])
+
+  const timeStr = useMemo(() => {
+    const h = String(clock.getHours()).padStart(2, '0')
+    const m = String(clock.getMinutes()).padStart(2, '0')
+    return fmt.dg(`${h}:${m}`)
+  }, [clock, fmt])
+
+  const autoLockLabel = useMemo(() => {
+    if (cfg.autoLockMin < 0) return t('set.autoLockNever')
+    if (cfg.autoLockMin === 0) return t('set.autoLockAlways')
+    return t('set.autoLockMin', { n: fmt.dg(cfg.autoLockMin) })
+  }, [cfg.autoLockMin, t, fmt])
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center p-6"
-      style={{ background: 'linear-gradient(160deg, #0b0d13, #07080c)' }}>
-      {/* هاله */}
-      <div className="absolute inset-0 pointer-events-none" style={{
+    <div
+      className="fixed inset-0 z-[100] overflow-y-auto"
+      style={{
+        background: 'var(--scrim)',
+        backdropFilter: isMobile ? 'blur(8px)' : 'blur(14px) saturate(130%)',
+        WebkitBackdropFilter: isMobile ? 'blur(8px)' : 'blur(14px) saturate(130%)',
+      }}>
+      {/* هاله‌ی رنگی پشت شیشه — همان هاله‌ی بدنه، روی قفل هم */}
+      <div className="pointer-events-none fixed inset-0" aria-hidden="true" style={{
         background:
-          'radial-gradient(40rem 40rem at 50% -10%, rgba(99,102,241,.16), transparent 60%),' +
-          'radial-gradient(34rem 34rem at 50% 110%, rgba(168,85,247,.12), transparent 60%)',
+          'radial-gradient(46rem 46rem at 12% -6%, var(--aura1), transparent 62%),' +
+          'radial-gradient(38rem 38rem at 92% 8%, var(--aura2), transparent 60%),' +
+          'radial-gradient(42rem 42rem at 74% 104%, var(--aura3), transparent 62%)',
       }} />
 
-      <div className={`relative flex flex-col items-center w-full max-w-xs ${shake ? 'lock-shake' : ''}`}>
-        <div className="w-14 h-14 rounded-2xl grid place-items-center border border-[var(--glass-brd2)]"
-          style={{ background: 'linear-gradient(150deg, #16181f, #0b0d12)' }}>
-          <BrandMark size={30} />
-        </div>
-
-        <div className="mt-5 flex items-center gap-3 h-3.5">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <span key={i} className={`w-2.5 h-2.5 rounded-full transition-all ${i < code.length ? 'bg-[#FFC800] scale-100' : 'bg-white/15'}`} />
-          ))}
-        </div>
-
-        {cfg.hint && !err && (
-          <div className="mt-4 text-[12.5px] text-[#8b93a7] flex items-center gap-1.5">
-            <Icon name="Info" size={13} className="opacity-70" />
-            {cfg.hint}
+      <div className="relative min-h-full flex items-center justify-center p-4 sm:p-6">
+        <div
+          className="glass glass-sheen w-full max-w-[340px] rounded-3xl p-5 sm:p-6"
+          style={{ boxShadow: 'var(--glass-shadow)' }}>
+          {/* سربرگ */}
+          <div className="flex items-center gap-2.5 mb-5">
+            <BrandMark size={30} />
+            <div className="min-w-0">
+              <div className="text-[14px] font-semibold tracking-tight leading-tight">NEXUS HQ</div>
+              <div className="text-[10px] text-[var(--color-dim2)] leading-tight mt-0.5">{autoLockLabel}</div>
+            </div>
+            <div className="ms-auto text-end">
+              <div className="text-[22px] font-semibold nums leading-none">{timeStr}</div>
+              <div className="text-[9.5px] text-[var(--color-dim2)] mt-1">{fmt.dateLong(clock.toISOString())}</div>
+            </div>
           </div>
-        )}
-        {err && <div className="mt-4 text-[12.5px] text-red-400">{err}</div>}
-        {cooldown > 0 && (
-          <div className="mt-4 text-[12.5px] text-amber-400 nums">{t('lock.cooldown', { s: cooldown })}</div>
-        )}
 
-        {/* شماره‌گیر */}
-        <div className="grid grid-cols-3 gap-3 mt-8 w-full">
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(d => (
-            <button key={d} onClick={() => tap(d)} disabled={cooldown > 0}
-              className="aspect-square rounded-2xl glass grid place-items-center text-[22px] font-medium text-[#e8eaf0] active:bg-white/[.12] transition-colors disabled:opacity-40">
-              {FA[d]}
-            </button>
-          ))}
-          <div />
-          <button onClick={() => tap(0)} disabled={cooldown > 0}
-            className="aspect-square rounded-2xl glass grid place-items-center text-[22px] font-medium text-[#e8eaf0] active:bg-white/[.12] transition-colors disabled:opacity-40">
-            {FA[0]}
-          </button>
-          <button onClick={back} aria-label="backspace"
-            className="aspect-square rounded-2xl grid place-items-center text-[#8b93a7] hover:text-[#e8eaf0] active:bg-white/[.08] transition-colors">
-            <Icon name="CornerDownLeft" size={20} />
-          </button>
-        </div>
+          {/* راهنما / پیام خطا */}
+          <div className="min-h-[42px] flex items-center justify-center text-center mb-3">
+            {err ? (
+              <span className="text-[12px] text-red-400 flex items-center gap-1.5 anim" role="alert">
+                <Icon name="AlertTriangle" size={13} className="shrink-0" />
+                {err}
+              </span>
+            ) : (
+              <span className="text-[12px] text-[var(--color-dim)]">
+                {cfg.hint
+                  ? <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 bg-white/[.05] border border-[var(--glass-brd)]">
+                      <Icon name="HelpCircle" size={12} className="text-[var(--color-dim2)] shrink-0" />
+                      {cfg.hint}
+                    </span>
+                  : t('lock.enterPasscode')}
+              </span>
+            )}
+          </div>
 
-        {/* اقدام‌ها */}
-        <div className="mt-7 flex items-center gap-3 w-full justify-center">
-          {bio && (
-            <button onClick={tryBio} title={t('lock.bio')}
-              className="w-12 h-12 rounded-2xl glass grid place-items-center text-[#FFC800] active:bg-white/[.12] transition-colors">
-              <Icon name="Fingerprint" size={22} />
+          {/* نقطه‌های رمز */}
+          <div key={shake} className={`flex items-center justify-center gap-2.5 mb-5 h-4 ${err ? 'anim-shake' : ''}`} aria-hidden="true">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <span
+                key={i}
+                className={`w-2.5 h-2.5 rounded-full transition-all duration-150 ${
+                  i < entered.length
+                    ? 'bg-[var(--color-acc)] scale-110 shadow-[0_0_10px_-2px_var(--color-acc)]'
+                    : 'bg-white/[.12] border border-white/[.08]'
+                }`}
+              />
+            ))}
+          </div>
+
+          {/* صفحه‌کلید عددی */}
+          <div className="grid grid-cols-3 gap-2 mb-4" role="group" aria-label="numpad">
+            {KEYS.map(k => {
+              if (k === '') return <span key="spacer" />
+              if (k === 'back') {
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    aria-label={t('lock.delete')}
+                    disabled={busy || cooldown > 0 || !entered}
+                    onClick={() => press('back')}
+                    className="h-12 rounded-xl grid place-items-center text-[var(--color-dim)] hover:bg-white/[.06] active:scale-95 transition-all disabled:opacity-30">
+                    <Icon name="Delete" size={19} />
+                  </button>
+                )
+              }
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  disabled={busy || cooldown > 0}
+                  onClick={() => press(k)}
+                  className="h-12 rounded-xl text-[19px] font-semibold nums bg-white/[.05] border border-[var(--glass-brd)] hover:bg-white/[.09] active:scale-95 active:bg-[var(--color-acc)]/25 transition-all disabled:opacity-35">
+                  {fmt.dg(k)}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* ورود / اثر انگشت */}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => press('enter')}
+              disabled={busy || cooldown > 0 || !entered}
+              className="flex-1 h-11 rounded-xl inline-flex items-center justify-center gap-2 text-[13px] font-semibold bg-[var(--color-acc)] text-white hover:brightness-115 active:scale-[.98] transition-all disabled:opacity-35 disabled:pointer-events-none shadow-[0_2px_16px_-6px_var(--color-acc)]">
+              {busy
+                ? <Icon name="Loader" size={15} className="animate-spin" />
+                : <Icon name="LockOpen" size={15} />}
+              {t('lock.unlock')}
             </button>
-          )}
-          <button onClick={submit} disabled={code.length < 4 || cooldown > 0}
-            className="flex-1 max-w-[200px] py-3 rounded-xl bg-[var(--color-acc)] text-white text-[14px] font-medium disabled:opacity-40 shadow-[0_2px_18px_-4px_var(--color-acc)] transition-all">
-            {t('lock.unlock')}
-          </button>
+            {bioOk && (
+              <button
+                type="button"
+                onClick={() => void bio()}
+                disabled={busy}
+                title={t('lock.useFingerprint')}
+                aria-label={t('lock.useFingerprint')}
+                className="w-11 h-11 shrink-0 rounded-xl grid place-items-center border border-[var(--glass-brd)] bg-white/[.05] text-[var(--color-dim)] hover:text-[var(--color-tx)] hover:bg-white/[.09] active:scale-95 transition-all disabled:opacity-35">
+                {busy ? <Icon name="Loader" size={17} className="animate-spin" /> : <Icon name="Fingerprint" size={18} />}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

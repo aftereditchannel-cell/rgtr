@@ -4,13 +4,13 @@ import { useT } from '../../i18n'
 
 /**
  * ناوبری پایین — فقط موبایل (lg:hidden).
- * پنج مقصد اصلی در دسترس شست: داشبورد، کارها، پروژه‌ها، مرکز تصمیم، «بیشتر».
+ * چهار مقصد اصلی در دسترس شست + دکمه‌ی «بیشتر» که سایدبار را باز می‌کند.
  */
 const DEST = [
   { to: '/', icon: 'LayoutDashboard', k: 'nav.dashboard', end: true },
-  { to: '/m/tasks', icon: 'CheckSquare', k: 'nav.tasks' },
-  { to: '/m/projects', icon: 'FolderKanban', k: 'nav.projects' },
   { to: '/decision', icon: 'Target', k: 'nav.decision' },
+  { to: '/analytics', icon: 'BarChart3', k: 'nav.analytics' },
+  { to: '/social', icon: 'Share2', k: 'nav.social' },
 ]
 
 export function BottomNav({ onMore }: { onMore: () => void }) {

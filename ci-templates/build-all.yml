@@ -1,0 +1,146 @@
+# NEXUS HQ — ساخت APK اندروید + EXE ویندوز در یک ورک‌فلو
+# این فایل باید در مسیر .github/workflows/build-all.yml روی شاخه‌ی main باشد.
+# اجرا: تب Actions ← Build all (APK + EXE) ← Run workflow (در صورت نیاز نام شاخه را در input بدهید)
+name: Build all (APK + EXE)
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'شاخه/تگی که باید build شود'
+        required: false
+        default: 'main'
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+
+      - run: npm ci
+      - run: npx tsc -b --noEmit
+      - run: npm run smoke
+      - run: npm run render
+      - run: npm run build
+
+      - name: Build installer + portable
+        run: npm run dist:win
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ELECTRON_MIRROR: 'https://github.com/electron/electron/releases/download/v'
+
+      - name: Checksums
+        shell: pwsh
+        run: |
+          Get-ChildItem release -Filter *.exe | ForEach-Object {
+            $h = (Get-FileHash $_.FullName -Algorithm SHA256).Hash
+            "$($h.ToLower())  $($_.Name)" | Add-Content release/SHA256-win.txt
+          }
+          Get-Content release/SHA256-win.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NEXUS-HQ-windows
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            release/*.exe
+            release/SHA256-win.txt
+
+      - name: Push artifacts via git tag
+        shell: bash
+        run: |
+          git config user.name "arena-build-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f release/*.exe release/SHA256-win.txt
+          git commit -m "build: windows artifacts (run $GITHUB_RUN_NUMBER) [skip ci]"
+          git push origin HEAD:refs/tags/ci-win-$GITHUB_RUN_ID
+
+      - name: Publish GitHub Release (only for v* tags)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          generate_release_notes: true
+          files: |
+            release/*.exe
+            release/SHA256-win.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '21' }
+
+      - name: Android SDK pieces
+        run: |
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager --install "platforms;android-35" "build-tools;35.0.0" > /dev/null
+
+      - run: npm ci
+      - run: npm run cap:sync
+
+      - name: Build release APK (signed)
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease -x lint -x lintVitalRelease --no-daemon
+
+      - name: Collect APK
+        run: |
+          mkdir -p release
+          cp android/app/build/outputs/apk/release/app-release.apk release/NEXUS-HQ-1.0.0-android.apk
+          (cd release && sha256sum NEXUS-HQ-1.0.0-android.apk >> SHA256-apk.txt && cat SHA256-apk.txt && ls -la)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NEXUS-HQ-android
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            release/*.apk
+            release/SHA256-apk.txt
+
+      - name: Push artifacts via git tag
+        run: |
+          git config user.name "arena-build-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f release/*.apk release/SHA256-apk.txt
+          git commit -m "build: android apk (run $GITHUB_RUN_NUMBER) [skip ci]"
+          git push origin HEAD:refs/tags/ci-apk-$GITHUB_RUN_ID
+
+      - name: Publish GitHub Release (only for v* tags)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          generate_release_notes: true
+          files: |
+            release/*.apk
+            release/SHA256-apk.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

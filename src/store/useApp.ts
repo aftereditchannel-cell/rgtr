@@ -1,6 +1,9 @@
 import { create } from 'zustand'
-import type { AppData, Entity, Settings } from './types'
+import type { AppData, Entity, Settings, SocialAccount, Workflow, RunLog, SocialState } from './types'
 import type { ModuleDef } from '../domain/schema'
+import type { AIProvider, AutomationTask } from '../domain/ai'
+import type { SocialProfile } from '../domain/social'
+import type { SocialInfo } from '../social/types'
 import { emptyRecord, CORE_MODULES } from '../domain/schema'
 import { seedData, emptyData } from '../domain/seed'
 import { loadDoc, saveDoc, pushSnapshot } from '../lib/db'
@@ -29,6 +32,28 @@ interface Store {
   removeModule: (key: string) => void
   /** ماژول‌های پیش‌فرضِ حذف‌شده را برمی‌گرداند و تعدادشان را می‌دهد */
   restoreCoreModules: () => number
+
+  /* ---------- AI / اتوماسیون ---------- */
+  upsertProvider: (p: AIProvider) => void
+  removeProvider: (id: string) => void
+  addAutomation: (a: AutomationTask) => void
+  updateAutomation: (id: string, patch: Partial<AutomationTask>) => void
+  removeAutomation: (id: string) => void
+
+  /* ---------- Social Hub (مرکز شبکه‌های اجتماعی) ---------- */
+  setSocial: (patch: Partial<SocialState>) => void
+  upsertProfile: (p: SocialProfile) => void
+  removeProfile: (id: string) => void
+
+  /* ---------- Social Analyzer & Automation ---------- */
+  upsertSocial: (info: SocialInfo) => void
+  removeSocial: (id: string) => void
+  getSocial: () => SocialAccount[]
+  upsertWorkflow: (w: Workflow) => void
+  removeWorkflow: (id: string) => void
+  getWorkflows: () => Workflow[]
+  pushLog: (l: Omit<RunLog, 'id' | 'at'>) => void
+  getLogs: () => RunLog[]
 
   setSettings: (patch: Partial<Settings>) => void
   replaceAll: (d: AppData) => Promise<void>
@@ -184,6 +209,156 @@ export const useApp = create<Store>((set, get) => {
       touch()
       return missing.length
     },
+
+    /* ---------- AI / اتوماسیون ---------- */
+
+    upsertProvider(p) {
+      set(s => {
+        const list = s.data.settings.ai.providers
+        const next = list.some(x => x.id === p.id) ? list.map(x => x.id === p.id ? p : x) : [...list, p]
+        return { data: { ...s.data, settings: { ...s.data.settings, ai: { ...s.data.settings.ai, providers: next } } } }
+      })
+      touch()
+    },
+
+    removeProvider(id) {
+      set(s => ({
+        data: {
+          ...s.data,
+          settings: {
+            ...s.data.settings,
+            ai: { ...s.data.settings.ai, providers: s.data.settings.ai.providers.filter(p => p.id !== id) },
+          },
+        },
+      }))
+      touch()
+    },
+
+    addAutomation(a) {
+      set(s => ({
+        data: {
+          ...s.data,
+          settings: {
+            ...s.data.settings,
+            ai: { ...s.data.settings.ai, automations: [a, ...s.data.settings.ai.automations] },
+          },
+        },
+      }))
+      touch()
+    },
+
+    updateAutomation(id, patch) {
+      set(s => ({
+        data: {
+          ...s.data,
+          settings: {
+            ...s.data.settings,
+            ai: {
+              ...s.data.settings.ai,
+              automations: s.data.settings.ai.automations.map(a => a.id === id ? { ...a, ...patch } : a),
+            },
+          },
+        },
+      }))
+      touch()
+    },
+
+    removeAutomation(id) {
+      set(s => ({
+        data: {
+          ...s.data,
+          settings: {
+            ...s.data.settings,
+            ai: { ...s.data.settings.ai, automations: s.data.settings.ai.automations.filter(a => a.id !== id) },
+          },
+        },
+      }))
+      touch()
+    },
+
+    /* ---------- Social Hub (مرکز شبکه‌های اجتماعی) ---------- */
+
+    setSocial(patch) {
+      set(s => ({ data: { ...s.data, settings: { ...s.data.settings, social: { ...s.data.settings.social, ...patch } } } }))
+      touch()
+    },
+
+    upsertProfile(p) {
+      set(s => {
+        const list = s.data.settings.social.profiles
+        const next = list.some(x => x.id === p.id) ? list.map(x => x.id === p.id ? p : x) : [p, ...list]
+        return {
+          data: {
+            ...s.data,
+            settings: { ...s.data.settings, social: { ...s.data.settings.social, profiles: next.slice(0, 200) } },
+          },
+        }
+      })
+      touch()
+    },
+
+    removeProfile(id) {
+      set(s => ({
+        data: {
+          ...s.data,
+          settings: {
+            ...s.data.settings,
+            social: { ...s.data.settings.social, profiles: s.data.settings.social.profiles.filter(p => p.id !== id) },
+          },
+        },
+      }))
+      touch()
+    },
+
+    /* ---------- Social Analyzer & Automation ---------- */
+
+    upsertSocial(info) {
+      set(s => {
+        const list = s.data.socialAccounts ?? []
+        const existing = list.find(a => a.platform === info.platform && a.handle.toLowerCase() === info.handle.toLowerCase())
+        const acc: SocialAccount = existing
+          ? { ...existing, info }
+          : { id: uid(), platform: info.platform, handle: info.handle, info, addedAt: nowISO() }
+        const next = existing ? list.map(a => a.id === acc.id ? acc : a) : [acc, ...list]
+        return { data: { ...s.data, socialAccounts: next.slice(0, 200) } }
+      })
+      touch()
+    },
+
+    removeSocial(id) {
+      set(s => ({ data: { ...s.data, socialAccounts: (s.data.socialAccounts ?? []).filter(a => a.id !== id) } }))
+      touch()
+    },
+
+    getSocial() { return get().data.socialAccounts ?? [] },
+
+    upsertWorkflow(w) {
+      set(s => {
+        const list = s.data.workflows ?? []
+        const next = list.some(x => x.id === w.id) ? list.map(x => x.id === w.id ? w : x) : [w, ...list]
+        return { data: { ...s.data, workflows: next } }
+      })
+      touch()
+    },
+
+    removeWorkflow(id) {
+      set(s => ({ data: { ...s.data, workflows: (s.data.workflows ?? []).filter(w => w.id !== id) } }))
+      touch()
+    },
+
+    getWorkflows() { return get().data.workflows ?? [] },
+
+    pushLog(l) {
+      set(s => ({
+        data: {
+          ...s.data,
+          runLogs: [{ id: uid(), at: nowISO(), ...l }, ...(s.data.runLogs ?? [])].slice(0, 300),
+        },
+      }))
+      touch()
+    },
+
+    getLogs() { return get().data.runLogs ?? [] },
 
     setSettings(patch) {
       set(s => ({ data: { ...s.data, settings: { ...s.data.settings, ...patch } } }))

@@ -37,6 +37,29 @@ export function ExitSavePrompt() {
     })
   }, [])
 
+  // وب کلاسیک (مرورگر/بدون پل بومی): هنگام خروج/مخفی‌شدن، روی ابر ذخیره کن
+  useEffect(() => {
+    if (desktop || isMobile) return
+    const pushCloud = () => {
+      const st = useApp.getState()
+      if (!st.data.settings.cloud?.askOnExit || !hasToken()) return
+      // keepalive تا مرورگر در حال بستن‌شدن هم درخواست را کامل کند
+      void st.persist().then(async () => {
+        try {
+          const r = await ensureGist(st.data.settings.cloud.gistId ?? '', useApp.getState().data)
+          await pushGist(r.id, useApp.getState().data)
+        } catch { /* بی‌صدا — خطا در بار بعدی نشان داده می‌شود */ }
+      })
+    }
+    const onHide = () => { if (document.visibilityState === 'hidden') pushCloud() }
+    document.addEventListener('visibilitychange', onHide)
+    window.addEventListener('pagehide', pushCloud)
+    return () => {
+      document.removeEventListener('visibilitychange', onHide)
+      window.removeEventListener('pagehide', pushCloud)
+    }
+  }, [])
+
   // اندروید: دکمه‌ی back در ریشه‌ی تاریخچه + ذخیره‌ی خودکار در پس‌زمینه
   useEffect(() => {
     if (!isMobile) return

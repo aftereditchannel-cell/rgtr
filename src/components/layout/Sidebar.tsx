@@ -10,11 +10,14 @@ const FIXED_TOP = [
   { to: '/', icon: 'LayoutDashboard', k: 'nav.dashboard' },
   { to: '/decision', icon: 'Target', k: 'nav.decision' },
   { to: '/analytics', icon: 'BarChart3', k: 'nav.analytics' },
+  { to: '/social', icon: 'Share2', k: 'nav.social' },
+  { to: '/automation', icon: 'Bot', k: 'nav.automation' },
 ]
 
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const modules = useApp(s => s.data.modules)
   const org = useApp(s => s.data.settings.orgName)
+  const brand = useApp(s => s.data.settings.branding)
   const dirty = useApp(s => s.dirty)
   const nav = useNavigate()
   const { t, m: ml, g: gl, lang, rtl } = useT()
@@ -49,11 +52,11 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         {/* brand */}
         <div className="px-3.5 py-3.5 border-b border-[var(--color-line)] flex items-center gap-2.5">
           <div className="w-7 h-7 rounded-lg grid place-items-center shrink-0 border border-[var(--glass-brd2)]"
-            style={{ background: 'linear-gradient(150deg, #16181f, #0b0d12)' }}>
-            <BrandMark size={17} />
+            style={brand.logo ? undefined : { background: 'linear-gradient(150deg, #16181f, #0b0d12)' }}>
+            {brand.logo ? <img src={brand.logo} alt="" className="w-full h-full object-cover rounded-lg" /> : <BrandMark size={17} />}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-[13px] font-semibold tracking-tight truncate">{org || 'NEXUS HQ'}</div>
+            <div className="text-[13px] font-semibold tracking-tight truncate">{brand.appName || org || 'NEXUS HQ'}</div>
             <div className="text-[9.5px] text-[var(--color-dim2)] tracking-wider uppercase flex items-center gap-1">
               <span className={`w-1 h-1 rounded-full ${dirty ? 'bg-amber-400 pulse' : 'bg-emerald-500'}`} />
               {dirty ? t('nav.saving') : t('nav.synced')}

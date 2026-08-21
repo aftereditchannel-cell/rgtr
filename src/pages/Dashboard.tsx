@@ -31,6 +31,14 @@ export function Dashboard() {
       : t('dec.reasonTop', { top: x.reasonTop ? wl(x.reasonTop) : '—' })
   const cur = data.settings.currency
   const o = useMemo(() => overview(data), [data])
+  const socialCount = (data.socialAccounts ?? []).length
+  const socialLast = (data.socialAccounts ?? [])[0]?.info?.fetchedAt
+    ? new Date((data.socialAccounts ?? [])[0].info.fetchedAt).toLocaleDateString() : ''
+  const aiOn = data.settings.ai?.enabled
+  const aiModel = data.settings.ai?.model ?? ''
+  const wfActive = (data.workflows ?? []).filter(w => w.enabled).length
+  const wfTotal = (data.workflows ?? []).length
+  const logsErr = (data.runLogs ?? []).filter(l => !l.ok).length
   const scored = useMemo(() => scoreProjects(data.records.projects ?? [], data.settings.weights), [data])
   const { focus, later } = useMemo(
     () => buildFocus(data.records.tasks ?? [], data.records.projects ?? [], scored, data.settings.focusCount),
@@ -171,6 +179,9 @@ export function Dashboard() {
         <Stat label={t('dash.kpiAutomation')} value={<span className="ltr">{fmt.dg(o.automationsActive)}<span className="text-[var(--color-dim2)] text-[15px]"> / </span>{fmt.dg(o.agentsActive)}</span>}
           sub={o.automationsError ? t('dash.kpiErrors', { n: fmt.dg(o.automationsError) }) : t('dash.kpiNoErrors')} icon="Workflow" tone={o.automationsError ? '#ef4444' : undefined}
           onClick={() => nav('/m/automations')} />
+        <Stat label={t('dash.kpiSocial')} value={fmt.dg(socialCount)} sub={socialLast ? t('dash.kpiLastFetch') + ': ' + socialLast : t('social.noLogs')} icon="Share2" onClick={() => nav('/social')} />
+        <Stat label={t('dash.kpiAI')} value={aiOn ? t('dash.aiOn') : t('dash.aiOff')} sub={aiModel} icon="Bot" tone={aiOn ? '#22c55e' : undefined} />
+        <Stat label={t('dash.kpiWf')} value={fmt.dg(wfActive) + ' / ' + fmt.dg(wfTotal)} sub={logsErr ? t('dash.kpiErrors', { n: fmt.dg(logsErr) }) : t('dash.kpiNoErrors')} icon="Zap" onClick={() => nav('/automation')} />
       </div>
 
       {/* ===== priorities + signals ===== */}

@@ -145,7 +145,7 @@ export function Modal({ open, onClose, title, children, wide = false, footer }: 
 /* ---------- Inputs ---------- */
 const inputCls = 'w-full rounded-lg bg-[var(--color-bg)] border border-[var(--color-line2)] px-3 py-2 text-[13px] text-[var(--color-tx)] placeholder:text-[var(--color-dim2)] focus:border-[var(--color-acc)] transition-colors'
 
-export function TextInput(p: React.InputHTMLAttributes<HTMLInputElement>) {
+export function TextInput(p: React.InputHTMLAttributes<HTMLInputElement> & { ref?: React.Ref<HTMLInputElement> }) {
   return <input {...p} className={`${inputCls} ${p.className ?? ''}`} />
 }
 export function TextArea(p: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
