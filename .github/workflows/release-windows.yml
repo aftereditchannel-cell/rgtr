@@ -6,6 +6,12 @@ on:
       - 'v*'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
+env:
+  NODE_VERSION: '22'
+
 jobs:
   build-windows:
     runs-on: windows-latest
@@ -14,12 +20,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
       - run: npm ci
       - run: npm run build
+        env:
+          VITE_DEV_SERVER_URL: ''
       - run: npm run dist:win
-      - uses: softprops/action-gh-release@v2
+      - uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ github.ref_name }}
-          files: release/NEXUS-HQ-*-Setup.exe release/NEXUS-HQ-*-Portable.exe
+          name: windows-exe
+          path: release/*.exe
