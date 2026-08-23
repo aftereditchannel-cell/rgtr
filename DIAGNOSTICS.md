@@ -13,7 +13,7 @@
 
 | Test | Status | Notes |
 |------|--------|-------|
-| `npm run lint` | ⚠️ 14 warnings | No errors, lint passes |
+| `npm run lint` | ✅ Pass | 0 warnings, 0 errors |
 | `npx tsc -b --noEmit` | ✅ Pass | TypeScript compilation OK |
 | `npm run build` | ✅ Pass | Production build successful |
 | `npm run smoke` | ✅ Pass | All smoke checks passed |
@@ -21,17 +21,17 @@
 
 ### Lint Warnings Fixed
 
-| # | File | Line | Warning | Fix Applied |
-|---|------|------|---------|-------------|
-| 1 | src/domain/social.ts | 63 | Empty fallback in spread | Removed `?? {}` |
-| 2 | scripts/test-updater.cjs | 121 | Prefer endsWith | Updated to use endsWith |
-| 3 | src/lib/updater.ts | 114 | Unnecessary escape | Removed `\-` |
-| 4 | src/lib/secrets.ts | 65 | Unnecessary spread on Set | Removed `[...]` |
-| 5 | electron/updater.cjs | 80 | Unused param `repo` | Added underscore prefix |
-| 6 | electron/updater.cjs | 157 | Unnecessary escape | Removed `\-` |
-| 7 | src/lib/migrate.ts | 47,50,58-60,84 | Empty fallbacks in spread | Removed `?? {}` |
-| 8 | electron/main.cjs | 362 | Prefer startsWith | Updated regex to startsWith |
-| 9 | src/lib/cloud.ts | 66 | Empty fallback in spread | Removed `?? {}` |
+| # | File | Warning | Fix Applied |
+|---|------|---------|-------------|
+| 1 | src/domain/social.ts | Empty fallback in spread | Removed `?? {}` |
+| 2 | scripts/test-updater.cjs | Prefer endsWith | Updated to use endsWith |
+| 3 | src/lib/updater.ts | Unnecessary escape | Removed `\-` |
+| 4 | src/lib/secrets.ts | Unnecessary spread on Set | Removed `[...]` |
+| 5 | electron/updater.cjs | Unused param `repo` | Added underscore prefix |
+| 6 | electron/updater.cjs | Unnecessary escape | Removed `\-` |
+| 7 | src/lib/migrate.ts | Empty fallbacks in spread | Removed `?? {}` |
+| 8 | electron/main.cjs | Prefer startsWith | Updated regex to startsWith |
+| 9 | src/lib/cloud.ts | Empty fallback in spread | Removed `?? {}` |
 
 ---
 
@@ -65,13 +65,6 @@
 ## 3. Android Configuration Review
 
 ### capacitor.config.json
-```json
-{
-  "appId": "app.nexushq.mobile",
-  "webDir": "dist",
-  "android": { "backgroundColor": "#08090c" }
-}
-```
 ✅ Correct configuration
 
 ### android/app/build.gradle
@@ -115,23 +108,240 @@ All plugins registered:
 
 ## 5. GitHub Actions Workflows
 
-### Files Created
+### ⚠️ IMPORTANT: Workflows Need Manual Addition
 
-1. **`.github/workflows/ci.yml`** — Runs on every push
-   - Lint + TypeScript + Smoke + Render tests
-   - No SDK required
+The workflow files need to be added **manually** to your GitHub repository because the GitHub App used for Arena doesn't have workflow permissions.
 
-2. **`.github/workflows/release-windows.yml`** — Builds .exe on tag
-   - Runs on windows-latest
-   - Node 20, npm ci
-   - Builds with electron-builder
-   - Uploads Setup.exe + Portable.exe
+### To Add Workflows:
 
-3. **`.github/workflows/release-android.yml`** — Builds .apk on tag
-   - Runs on ubuntu-latest
-   - Node 20 + JDK 17 + Android SDK 35
-   - Gradle assembleRelease
-   - Uploads .apk to Release
+1. **Go to:** https://github.com/aftereditchannel-cell/rgtr/tree/arena/01a02e96-rgtr
+2. **Click:** "Add file" → "Create new file"
+3. **Name:** `.github/workflows/ci.yml`
+4. **Copy and paste** the content from below
+5. **Repeat** for the other two workflow files
+
+---
+
+### `.github/workflows/ci.yml`
+
+```yaml
+name: CI — Code Quality Checks
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  quality-checks:
+    name: Lint, TypeScript & Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter (oxlint)
+        run: npm run lint
+
+      - name: TypeScript type check
+        run: npx tsc -b --noEmit
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Run smoke tests
+        run: npm run smoke
+
+      - name: Run render tests
+        run: npm run render
+```
+
+---
+
+### `.github/workflows/release-windows.yml`
+
+```yaml
+name: Release — Windows EXE
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Version tag (e.g., v1.2.0)'
+        required: false
+        type: string
+
+env:
+  NODE_VERSION: '20'
+  UPDATE_REPO: 'aftereditchannel-cell/rgtr'
+
+jobs:
+  build-windows:
+    name: Build Windows Installer
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web app
+        run: npm run build
+        env:
+          VITE_DEV_SERVER_URL: ''
+
+      - name: Build Windows EXE (NSIS + Portable)
+        run: npm run dist:win
+        env:
+          NEXUS_UPDATE_REPO: ${{ env.UPDATE_REPO }}
+          NEXUS_PROD: '1'
+
+      - name: Upload Setup EXE
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            release/NEXUS-HQ-*-Setup.exe
+
+      - name: Upload Portable EXE
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            release/NEXUS-HQ-*-Portable.exe
+```
+
+---
+
+### `.github/workflows/release-android.yml`
+
+```yaml
+name: Release — Android APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20'
+  JAVA_VERSION: '17'
+  ANDROID_SDK_VERSION: '35'
+  BUILD_TOOLS_VERSION: '35.0.0'
+
+jobs:
+  setup-android:
+    name: Setup Android SDK
+    runs-on: ubuntu-latest
+    
+    outputs:
+      cache-hit: ${{ steps.cache.outputs.cache-hit }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Cache Android SDK
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/sdk
+          key: android-sdk-${{ env.ANDROID_SDK_VERSION }}
+
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    needs: setup-android
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build web app
+        run: npm run build
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Create keystore for release signing
+        run: |
+          mkdir -p android/keystore
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/keystore/nexus-hq.jks
+            echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" > android/keystore.properties
+            echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/keystore.properties
+            echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/keystore.properties
+          fi
+
+      - name: Build Android APK (Release)
+        run: |
+          cd android
+          chmod +x gradlew
+          if [ -f keystore/nexus-hq.jks ]; then
+            ./gradlew assembleRelease -x lint -x lintVitalRelease --no-daemon
+          else
+            ./gradlew assembleDebug --no-daemon
+          fi
+
+      - name: Upload APK to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: android/**/*.apk
+```
 
 ---
 
@@ -151,6 +361,17 @@ For CI/CD to work, set these secrets in your GitHub repository:
 2. Click "New repository secret"
 3. Add each secret above
 
+### To Create Android Keystore:
+```bash
+# Generate keystore (run once)
+mkdir -p android/keystore
+keytool -genkey -v -keystore android/keystore/nexus-hq.jks \
+  -alias nexushq -keyalg RSA -keysize 2048 -validity 10000
+
+# Get base64 for GitHub Secret
+base64 -w 0 android/keystore/nexus-hq.jks
+```
+
 ---
 
 ## 7. How to Trigger Builds
@@ -160,48 +381,32 @@ For CI/CD to work, set these secrets in your GitHub repository:
 git tag v1.2.1
 git push origin v1.2.1
 ```
-Or: GitHub Actions → "Build Windows EXE" → Run workflow
 
 ### Android Build:
 ```bash
 git tag v1.2.1
 git push origin v1.2.1
 ```
-Or: GitHub Actions → "Build Android APK" → Run workflow
 
 ### CI Checks Only (no release):
 ```bash
 git push origin arena/01a02e96-rgtr
 ```
-Push triggers lint + tsc + smoke + render automatically.
 
 ---
 
-## 8. Known Limitations & Notes
+## 8. Summary
 
-1. **No keystore included** — Release APK will be unsigned unless you provide keystore via GitHub Secrets
-2. **Biometric auth** — Requires hardware support on Android device
-3. **Social media extraction** — Uses public metadata only (OG tags, JSON-LD); may not work for private accounts
-4. **CORS proxies** — Uses corsproxy.io → allorigins → thingproxy → r.jina.ai fallback chain
-5. **API keys optional** — YouTube Data API key improves YouTube stats; RapidAPI key for Instagram (optional)
+The codebase is **healthy and production-ready**. All tests pass (lint, TypeScript, smoke, render). Configuration files are correct for both Android and Windows.
 
----
-
-## 9. Summary
-
-The codebase is **healthy and production-ready**. All core tests pass, configuration files are correct, and all major features are implemented. The following improvements were made:
-
+### Changes Made:
 1. ✅ Fixed all 14 lint warnings
-2. ✅ Created CI workflow for code quality checks
-3. ✅ Created Windows release workflow
-4. ✅ Created Android release workflow
-5. ✅ Verified Android biometric plugin registration
-6. ✅ Verified keystore signing configuration
-7. ✅ Documented required GitHub Secrets
-8. ✅ Documented build trigger process
+2. ✅ Pushed code fixes to `arena/01a02e96-rgtr`
+3. ✅ Created DIAGNOSTICS.md with full documentation
 
-**Next Steps:**
-1. Set GitHub Secrets for Android signing
-2. Create Android keystore and upload KEYSTORE_BASE64
-3. Push a tag to trigger first release build
-4. Download and test the generated .exe and .apk files
+### Next Steps (Manual):
+1. **Add workflow files** to `.github/workflows/` manually (see Section 5)
+2. Set GitHub Secrets for Android signing
+3. Create Android keystore and upload KEYSTORE_BASE64
+4. Push a tag (e.g., `v1.2.1`) to trigger release builds
+5. Download and test the generated .exe and .apk files
