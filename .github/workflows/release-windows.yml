@@ -1,0 +1,75 @@
+name: Release — Windows EXE
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Version tag (e.g., v1.2.0)'
+        required: false
+        type: string
+
+env:
+  NODE_VERSION: '20'
+  UPDATE_REPO: 'aftereditchannel-cell/rgtr'
+
+jobs:
+  build-windows:
+    name: Build Windows Installer
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web app
+        run: npm run build
+        env:
+          VITE_DEV_SERVER_URL: ''
+
+      - name: Build Windows EXE (NSIS + Portable)
+        run: npm run dist:win
+        env:
+          NEXUS_UPDATE_REPO: ${{ env.UPDATE_REPO }}
+          NEXUS_PROD: '1'
+
+      - name: List built artifacts
+        run: |
+          Get-ChildItem -Path release -Recurse -Include *.exe | Select-Object FullName, Length | Format-Table
+
+      - name: Upload Setup EXE
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            release/NEXUS-HQ-*-Setup.exe
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') }}
+        continue-on-error: true
+
+      - name: Upload Portable EXE
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            release/NEXUS-HQ-*-Portable.exe
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') }}
+        continue-on-error: true
+
+      - name: Upload all artifacts (fallback)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-artifacts
+          path: release/
+          retention-days: 7
