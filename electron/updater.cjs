@@ -77,7 +77,7 @@ async function fetchRetry(fetchImpl, url, opts = {}, { tries = 3, timeoutMs = 20
 /* ---------------- نرمال‌سازی پاسخ GitHub ---------------- */
 
 /** از میان asset های یک release، نصب‌کننده و پرتابل را جدا کن */
-function pickAssets(assets, repo) {
+function pickAssets(assets, _repo) {
   const out = { setup: null, portable: null, apk: null, other: [] }
   for (const a of assets || []) {
     const n = (a.name || '').toLowerCase()
@@ -154,7 +154,7 @@ function createUpdater(deps) {
       const res = await fetchRetry(fetchImpl, `${HTTPS_GH}/${repo}/releases/latest`,
         { headers: { 'User-Agent': 'NEXUS-HQ-Updater' }, redirect: 'follow' }, { signal: outerSignal })
       // بعد از follow، res.url باید .../tag/vX.Y.Z باشد
-      const m = /\/releases\/tag\/(v?[\w.\-]+)$/.exec(res.url || '')
+      const m = /\/releases\/tag\/(v?[\w.]+)$/.exec(res.url || '')
       if (m) {
         const tag = m[1]
         const rel = normalizeRelease({ tag_name: tag, name: tag, assets: [] }, repo)

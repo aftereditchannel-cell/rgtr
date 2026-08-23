@@ -44,10 +44,10 @@ export function migrate(input: unknown): AppData {
     settings: {
       ...DEFAULT_SETTINGS,
       ...rawSettings,
-      weights: { ...DEFAULT_WEIGHTS, ...(rawSettings.weights ?? {}) },
+      weights: { ...DEFAULT_WEIGHTS, ...rawSettings.weights },
       ai: {
         ...DEFAULT_SETTINGS.ai,
-        ...(rawSettings.ai ?? {}),
+        ...rawSettings.ai,
         providers: Array.isArray((rawSettings.ai as { providers?: unknown })?.providers)
           ? (rawSettings.ai as { providers: typeof DEFAULT_PROVIDERS }).providers
           : DEFAULT_PROVIDERS,
@@ -55,9 +55,9 @@ export function migrate(input: unknown): AppData {
           ? (rawSettings.ai as { automations: typeof DEFAULT_AUTOMATIONS }).automations
           : DEFAULT_AUTOMATIONS,
       },
-      social: { ...DEFAULT_SETTINGS.social, ...(rawSettings.social ?? {}) },
-      branding: { ...DEFAULT_SETTINGS.branding, ...(rawSettings.branding ?? {}) },
-      cloud: { ...DEFAULT_SETTINGS.cloud, ...(rawSettings.cloud ?? {}) },
+      social: { ...DEFAULT_SETTINGS.social, ...rawSettings.social },
+      branding: { ...DEFAULT_SETTINGS.branding, ...rawSettings.branding },
+      cloud: { ...DEFAULT_SETTINGS.cloud, ...rawSettings.cloud },
     },
     modules: Array.isArray(raw.modules) && raw.modules.length ? raw.modules : CORE_MODULES,
     records: (raw.records ?? {}) as AppData['records'],
@@ -81,7 +81,7 @@ export function migrate(input: unknown): AppData {
   // v2 → v3 : برند، مرکز شبکه‌های اجتماعی، AI/اتوماسیون و جریان‌های کاری اضافه شد
   if (v < 3) {
     const s = data.settings
-    s.branding = { ...(s.branding ?? {}), appName: s.branding?.appName || 'NEXUS HQ' }
+    s.branding = { ...s.branding, appName: s.branding?.appName || 'NEXUS HQ' }
     s.social = {
       ...s.social,
       autoRefresh: s.social?.autoRefresh ?? true,

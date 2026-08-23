@@ -62,7 +62,7 @@ export function deleteKey(name: string): void {
 }
 
 export function listKeyNames(): string[] {
-  return Array.from(new Set([...Object.keys(readLocal())]))
+  return Array.from(new Set(Object.keys(readLocal())))
 }
 
 /** نمایش ماسک‌شده برای UI — هرگز کلید کامل را نشان نده */

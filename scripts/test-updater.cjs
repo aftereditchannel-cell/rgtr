@@ -118,7 +118,7 @@ async function main() {
   ok(events.length >= 2 && events[events.length - 1].percent === 100, `پیشرفت گزارش شد (${events.length} رویداد، آخرین: 100%)`)
   ok(fs.existsSync(out.path) && fs.statSync(out.path).size === 3_000_000, 'فایل روی دیسک کامل است')
   ok(!fs.existsSync(out.path + '.part'), 'فایل .part پاک/تبدیل شد')
-  ok(/NEXUS-HQ-1\.2\.0-Setup\.exe$/.test(out.path), 'نام فایل امن')
+  ok(out.path.endsWith('NEXUS-HQ-1.2.0-Setup.exe'), 'نام فایل امن')
 
   console.log('— cancel')
   const p2 = upd.download({ url: `http://127.0.0.1:${port}/slow/cancel-test.exe`, filename: 'cancel-test.exe' }, () => {})

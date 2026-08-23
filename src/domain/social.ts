@@ -60,7 +60,7 @@ async function fetchText(url: string, opts: RequestInit = {}): Promise<string> {
     headers: {
       'User-Agent': GENERIC_UA,
       Accept: 'text/html,application/json;q=0.9,*/*;q=0.8',
-      ...(opts.headers ?? {}),
+      ...opts.headers,
     },
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)

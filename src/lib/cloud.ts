@@ -63,7 +63,7 @@ async function req(path: string, init: RequestInit = {}): Promise<Response> {
         Authorization: `Bearer ${token}`,
         'X-GitHub-Api-Version': '2022-11-28',
         ...(init.body ? { 'Content-Type': 'application/json' } : {}),
-        ...(init.headers ?? {}),
+        ...init.headers,
       },
     })
   } catch {

@@ -111,7 +111,7 @@ export async function checkForUpdates(currentVersion: string): Promise<UpdateChe
 
   try {
     const res = await fetch(`https://github.com/${UPDATE_REPO}/releases/latest`, { redirect: 'follow' })
-    const m = /\/releases\/tag\/(v?[\w.\-]+)$/.exec(res.url || '')
+    const m = /\/releases\/tag\/(v?[\w.]+)$/.exec(res.url || '')
     if (m) {
       const rel = normalize({ tag_name: m[1] })
       if (rel) {

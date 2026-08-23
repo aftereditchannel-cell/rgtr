@@ -359,7 +359,7 @@ ipcMain.handle('update:check', async () => {
 })
 
 ipcMain.handle('update:download', async (_e, { url, filename, size }) => {
-  if (typeof url !== 'string' || !/^https:\/\//.test(url)) throw new Error('bad url')
+  if (typeof url !== 'string' || !url.startsWith('https://')) throw new Error('bad url')
   if (typeof filename !== 'string' || !filename) throw new Error('bad filename')
   return updater.download(
     { url, filename, expectedSize: size || 0 },
