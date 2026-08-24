@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "222910675316-v3aulvl7hc9ou1pn52v6agvl18f422kd.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "app.nexushq.mobile",
+            "certificate_hash": "ad1419ccfa3ed8929a9f71c1266352a202779824"
+          }
+        },
+        {
           "client_id": "222910675316-jkirp67hglsvrts31ssp80dfkd9fjlnh.apps.googleusercontent.com",
           "client_type": 3
         }
