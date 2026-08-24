@@ -439,7 +439,7 @@ Never add a service-account JSON, private key, OAuth client secret, or Firebase 
 
 ### Firebase Console authentication configuration
 
-Add every production web host to **Authentication → Settings → Authorized domains**. For Capacitor Android, authorise the origin used by the packaged WebView (normally `localhost` with Capacitor's HTTPS scheme) and configure the Android package/SHA fingerprints in the Google/Firebase OAuth configuration when Firebase requests them. For Electron, use the packaged app's Firebase redirect/authorised web host; do not hard-code a `localhost` API endpoint in NEXUS HQ. The app intentionally uses Firebase Auth redirect flow in Capacitor/Electron because popup windows are often blocked there; it uses a popup in regular browsers and falls back to redirect if blocked.
+Add every production web host to **Authentication → Settings → Authorized domains**. For Capacitor Android, authorise the origin used by the packaged WebView (normally `localhost` with Capacitor's HTTPS scheme) and configure the Android package/SHA fingerprints in the Google/Firebase OAuth configuration when Firebase requests them. For Electron, use the packaged app's Firebase redirect/authorised web host; do not hard-code a `localhost` API endpoint in NEXUS HQ. Android uses native Google Sign-In and does not redirect the WebView; Electron uses Firebase Auth redirect because popup windows are often blocked there, while regular browsers use a popup and can fall back to redirect.
 
 ### Firestore Rules
 
@@ -480,3 +480,12 @@ cd android
 ```
 
 Copy the values shown for the `debug` variant while testing debug APKs, and the `release` values for the keystore used to ship release APKs. Download a fresh `google-services.json` after registering fingerprints and place it in `android/app/` before running `npm run cap:sync` / building the APK.
+
+### Downloading SHA fingerprints from GitHub Actions
+
+Run **Actions → Release — Android APK → Run workflow** manually. The workflow uses Temurin Java 21, runs `./gradlew signingReport --no-daemon`, and uploads the full output as the `android-signing-report` artifact. Open the downloaded `android-signing-report.txt` and register the fingerprints from:
+
+- **`debug` variant** — when installing/testing the debug APK produced by the workflow.
+- **`release` variant** — when distributing the final APK signed with the configured release keystore.
+
+The project loads `android/keystore.properties` and `android/keystore/nexus-hq.jks` when present, so `signingReport` reports the actual release keystore fingerprints in a release-signing build. For GitHub Actions, add optional repository secrets `ANDROID_KEYSTORE_BASE64`, `NEXUS_STORE_PASSWORD`, `NEXUS_KEY_PASSWORD`, and `NEXUS_KEY_ALIAS`; the workflow restores that key only for the run, and the report will then include the real `release` SHA values.

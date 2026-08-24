@@ -37,6 +37,16 @@ export const isMobile: boolean = detectMobile()
 export const mobilePlatform: string = cap()?.getPlatform?.() ?? 'web'
 export const isAndroid = mobilePlatform === 'android'
 
+/**
+ * تشخیص لحظه‌ای پلتفرم بومی. برخلاف `isAndroid` ثابت، این تابع باید درست پیش از
+ * شروع OAuth صدا زده شود؛ در برخی WebViewها پل Capacitor بعد از load اولیه آماده
+ * می‌شود و مقدار ثابت می‌تواند اشتباهاً web باشد.
+ */
+export function isNativeAndroid(): boolean {
+  const c = cap()
+  return c?.isNativePlatform?.() === true && c.getPlatform?.() === 'android'
+}
+
 /* ---------- ذخیره‌سازی روی حافظه‌ی داخلی گوشی ---------- */
 
 const DATA_FILE = 'nexus-hq.json'

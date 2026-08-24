@@ -617,12 +617,14 @@ export const UI: Record<string, Pair> = {
 
 /** پیام‌های وضعیت اتصال ابری که خارج از React هم لازم می‌شوند */
 export const CLOUD_ERR: Record<string, Pair> = {
-  not_configured: { fa: 'تنظیمات Firebase کامل نیست. فایل .env.local را بررسی کنید.', en: 'Firebase configuration is incomplete. Check .env.local.' },
+  not_configured: { fa: 'تنظیمات Firebase در این نسخه موجود نیست.', en: 'Firebase configuration is unavailable in this app build.' },
   not_signed_in: { fa: 'ابتدا با حساب Google وارد شوید.', en: 'Sign in with Google first.' },
   popup_blocked: { fa: 'پنجرهٔ ورود مسدود شد. دوباره تلاش کنید یا popup blocker را خاموش کنید.', en: 'The sign-in popup was blocked. Try again or allow popups.' },
   cancelled: { fa: 'ورود لغو شد.', en: 'Sign-in was cancelled.' },
   unauthorized_domain: { fa: 'دامنهٔ برنامه در Firebase مجاز نیست. Authorized domains را بررسی کنید.', en: 'This app domain is not authorised in Firebase. Check Authorized domains.' },
   network: { fa: 'اتصال اینترنت یا Firebase برقرار نشد. داده‌های محلی محفوظ هستند.', en: 'Could not reach Firebase. Your local data is safe.' },
   too_large: { fa: 'حجم داده برای یک سند Firestore زیاد است. فایل یا عکس بزرگ را از داده‌ها حذف کنید.', en: 'Data is too large for one Firestore document. Remove large files or images.' },
+  android_config: { fa: 'تنظیمات ورود Android ناقص است: SHA-1 و SHA-256 را در Firebase ثبت کنید، سپس google-services.json جدید را دانلود کرده و APK جدید بسازید.', en: 'Android Google sign-in is not configured: register SHA-1 and SHA-256 in Firebase, download a new google-services.json, then build a new APK.' },
+  android_sign_in: { fa: 'ورود بومی Google در Android کامل نشد. اتصال اینترنت و Google Play services را بررسی کنید و APK جدید را نصب کنید.', en: 'Native Android Google sign-in did not complete. Check your internet, Google Play services, and install the newly built APK.' },
   unknown: { fa: 'عملیات ابری انجام نشد. دوباره تلاش کنید.', en: 'Cloud operation failed. Please try again.' },
 }

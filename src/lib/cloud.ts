@@ -13,14 +13,15 @@ import {
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import type { AppData } from '../store/types'
 import { auth, firestore, isFirebaseConfigured } from './firebase'
-import { isAndroid, isMobile } from './mobile'
+import { isMobile, isNativeAndroid } from './mobile'
 import { isDesktop } from './desktop'
 
 const MAX_DOCUMENT_BYTES = 900 * 1024
 
 export type CloudCode =
   | 'not_configured' | 'not_signed_in' | 'popup_blocked' | 'cancelled'
-  | 'unauthorized_domain' | 'network' | 'too_large' | 'unknown'
+  | 'unauthorized_domain' | 'network' | 'too_large' | 'android_config'
+  | 'android_sign_in' | 'unknown'
 
 export class CloudError extends Error {
   code: CloudCode
@@ -44,12 +45,23 @@ function requireUser(): User {
 }
 
 function mapError(error: unknown): CloudError {
-  const code = String((error as { code?: string })?.code ?? '')
-  if (code.includes('popup-blocked')) return new CloudError('popup_blocked')
-  if (code.includes('popup-closed-by-user') || code.includes('cancelled-popup-request')) return new CloudError('cancelled')
-  if (code.includes('unauthorized-domain')) return new CloudError('unauthorized_domain')
-  if (code.includes('network') || code.includes('timeout') || code.includes('unavailable')) return new CloudError('network')
   if (error instanceof CloudError) return error
+  // پلاگین Android در نسخه‌ها/دستگاه‌های مختلف code یا message متفاوتی می‌دهد.
+  // هر دو را بررسی می‌کنیم تا خطای SHA/OAuth به پیام مبهم «عملیات انجام نشد» تبدیل نشود.
+  const detail = `${String((error as { code?: string })?.code ?? '')} ${String((error as Error)?.message ?? '')}`.toLowerCase()
+  if (detail.includes('popup-blocked')) return new CloudError('popup_blocked')
+  if (detail.includes('popup-closed-by-user') || detail.includes('cancelled-popup-request') || detail.includes('cancel')) return new CloudError('cancelled')
+  if (detail.includes('unauthorized-domain')) return new CloudError('unauthorized_domain')
+  if (detail.includes('network') || detail.includes('timeout') || detail.includes('unavailable')) return new CloudError('network')
+  // کد 10 / DEVELOPER_ERROR معمولاً یعنی package name، SHA یا google-services.json درست نیست.
+  if (detail.includes('developer_error') || detail.includes('developer error') || detail.includes('code 10') || detail.includes('status: 10') || detail.includes('12500')) {
+    return new CloudError('android_config')
+  }
+  if (detail.includes('sign_in_failed') || detail.includes('sign in failed') || detail.includes('credential manager')) {
+    return new CloudError('android_sign_in')
+  }
+  // جزئیات فنی فقط در log است و هیچ token یا داده‌ی کاربر در UI نمایش داده نمی‌شود.
+  console.warn('[NEXUS HQ] Google sign-in failed', error)
   return new CloudError('unknown')
 }
 
@@ -61,7 +73,7 @@ export async function initCloudAuth(): Promise<void> {
       const { auth: activeAuth } = requireFirebase()
       await setPersistence(activeAuth, browserLocalPersistence)
       // Android از ورود بومی استفاده می‌کند و هرگز نباید redirect وب به localhost اجرا شود.
-      if (!isAndroid) {
+      if (!isNativeAndroid()) {
         try { await getRedirectResult(activeAuth) } catch { /* خطا در کارت تنظیمات نشان داده می‌شود */ }
       }
     })()
@@ -89,17 +101,25 @@ export function watchCloudUser(callback: (user: CloudUser | null) => void): () =
  * is ever opened. Other platforms retain their existing web authentication flow.
  */
 async function signInWithNativeGoogle(activeAuth: NonNullable<typeof auth>): Promise<void> {
-  const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication')
-  const result = await FirebaseAuthentication.signInWithGoogle({ skipNativeAuth: true })
-  const idToken = result.credential?.idToken
-  if (!idToken) throw new CloudError('unknown')
-  await signInWithCredential(activeAuth, GoogleAuthProvider.credential(idToken))
+  try {
+    const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication')
+    const result = await FirebaseAuthentication.signInWithGoogle({
+      // انتخاب حساب کاملاً بومی است؛ Firebase Web SDK فقط ID token را برای Firestore می‌پذیرد.
+      skipNativeAuth: true,
+      useCredentialManager: true,
+    })
+    const idToken = result.credential?.idToken
+    if (!idToken) throw new CloudError('android_sign_in')
+    await signInWithCredential(activeAuth, GoogleAuthProvider.credential(idToken))
+  } catch (error) {
+    throw mapError(error)
+  }
 }
 
 export async function signInWithGoogle(): Promise<'signed-in' | 'redirecting'> {
   try {
     const { auth: activeAuth } = requireFirebase()
-    if (isAndroid) {
+    if (isNativeAndroid()) {
       await signInWithNativeGoogle(activeAuth)
       return 'signed-in'
     }
@@ -114,7 +134,7 @@ export async function signInWithGoogle(): Promise<'signed-in' | 'redirecting'> {
   } catch (error) {
     const mapped = mapError(error)
     // Browsers can still block a popup; redirect is the reliable fallback.
-    if (!isAndroid && mapped.code === 'popup_blocked' && auth) {
+    if (!isNativeAndroid() && mapped.code === 'popup_blocked' && auth) {
       try {
         await signInWithRedirect(auth, new GoogleAuthProvider())
         return 'redirecting'
@@ -127,7 +147,7 @@ export async function signInWithGoogle(): Promise<'signed-in' | 'redirecting'> {
 export async function signOutCloud(): Promise<void> {
   try {
     const { auth: activeAuth } = requireFirebase()
-    if (isAndroid) {
+    if (isNativeAndroid()) {
       const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication')
       await FirebaseAuthentication.signOut()
     }
