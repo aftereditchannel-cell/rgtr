@@ -602,13 +602,27 @@ export const UI: Record<string, Pair> = {
   'set.aiWorkflow':    { fa: 'AI برای جریان‌های کاری (OpenAI / Gemini / Claude)', en: 'Workflow AI (OpenAI / Gemini / Claude)' },
   'set.aiTestSave':    { fa: 'ذخیره و تست اتصال', en: 'Save & test connection' },
   'social.profiles':   { fa: 'پروفایل', en: 'profiles' },
+
+  'set.firebaseTitle': { fa: 'همگام‌سازی ابری با Google', en: 'Google cloud sync' },
+  'set.firebaseIntro': { fa: 'داده‌های کاری شما با حساب Google خودتان ذخیره می‌شود و بین ویندوز و اندروید همگام می‌ماند. ابتدا همیشه روی همین دستگاه ذخیره می‌شود.', en: 'Your work data is stored under your own Google account and syncs between Windows and Android. It is always saved locally first.' },
+  'set.firebaseNotConfigured': { fa: 'Firebase هنوز تنظیم نشده است. مقادیر VITE_FIREBASE_* را در فایل .env.local وارد کنید و برنامه را دوباره بسازید.', en: 'Firebase is not configured yet. Add VITE_FIREBASE_* values to .env.local and rebuild the app.' },
+  'set.firebaseSignIn': { fa: 'ورود با Google', en: 'Sign in with Google' },
+  'set.firebaseSigningIn': { fa: 'در حال ورود…', en: 'Signing in…' },
+  'set.firebaseRedirecting': { fa: 'مرورگر ورود Google باز می‌شود؛ پس از ورود به برنامه برگردید.', en: 'Google sign-in is opening; return to the app after signing in.' },
+  'set.firebaseSignOut': { fa: 'خروج از حساب', en: 'Sign out' },
+  'set.firebaseSignedOut': { fa: 'از حساب Google خارج شدید', en: 'Signed out of Google' },
+  'set.firebaseGoogleUser': { fa: 'کاربر Google', en: 'Google user' },
+  'set.firebaseAutoSyncHint': { fa: 'چند ثانیه بعد در Firestore ذخیره می‌شود', en: 'Saves to Firestore a few seconds after each change' },
 }
 
 /** پیام‌های وضعیت اتصال ابری که خارج از React هم لازم می‌شوند */
 export const CLOUD_ERR: Record<string, Pair> = {
-  bad_token:   { fa: 'توکن نامعتبر است یا دسترسی gist ندارد', en: 'Invalid token or missing “gist” scope' },
-  not_found:   { fa: 'Gist با این شناسه پیدا نشد', en: 'No gist found with that ID' },
-  network:     { fa: 'اتصال به گیت‌هاب برقرار نشد', en: 'Could not reach GitHub' },
-  rate:        { fa: 'محدودیت درخواست گیت‌هاب — کمی بعد دوباره تلاش کنید', en: 'GitHub rate limit — try again shortly' },
-  bad_payload: { fa: 'محتوای ابری قابل خواندن نیست', en: 'Cloud content is unreadable' },
+  not_configured: { fa: 'تنظیمات Firebase کامل نیست. فایل .env.local را بررسی کنید.', en: 'Firebase configuration is incomplete. Check .env.local.' },
+  not_signed_in: { fa: 'ابتدا با حساب Google وارد شوید.', en: 'Sign in with Google first.' },
+  popup_blocked: { fa: 'پنجرهٔ ورود مسدود شد. دوباره تلاش کنید یا popup blocker را خاموش کنید.', en: 'The sign-in popup was blocked. Try again or allow popups.' },
+  cancelled: { fa: 'ورود لغو شد.', en: 'Sign-in was cancelled.' },
+  unauthorized_domain: { fa: 'دامنهٔ برنامه در Firebase مجاز نیست. Authorized domains را بررسی کنید.', en: 'This app domain is not authorised in Firebase. Check Authorized domains.' },
+  network: { fa: 'اتصال اینترنت یا Firebase برقرار نشد. داده‌های محلی محفوظ هستند.', en: 'Could not reach Firebase. Your local data is safe.' },
+  too_large: { fa: 'حجم داده برای یک سند Firestore زیاد است. فایل یا عکس بزرگ را از داده‌ها حذف کنید.', en: 'Data is too large for one Firestore document. Remove large files or images.' },
+  unknown: { fa: 'عملیات ابری انجام نشد. دوباره تلاش کنید.', en: 'Cloud operation failed. Please try again.' },
 }

@@ -23,6 +23,7 @@ import { applyTheme, applyGlass, watchSystemTheme } from './lib/theme'
 import { isLockEnabled, readLock, LOCK_EVENT } from './lib/lock'
 import { isMobile, syncMobileChrome, onMobileResume } from './lib/mobile'
 import { autoPullIfEnabled } from './store/useApp'
+import { initCloudAuth, watchCloudUser } from './lib/cloud'
 
 /** پل منوی بومی ویندوز → روتر و اکشن‌های برنامه */
 function DesktopMenuBridge() {
@@ -233,6 +234,13 @@ export default function App() {
   const lang = useApp(s => s.data.settings.lang) ?? 'fa'
 
   useEffect(() => { void init() }, [init])
+
+  // احراز هویت مستقل از ذخیره‌سازی محلی آماده می‌شود؛ ورود کاربر می‌تواند
+  // دریافت خودکار Firebase را بدون منتظر ماندن برای رفرش صفحه فعال کند.
+  useEffect(() => {
+    void initCloudAuth()
+    return watchCloudUser(user => { if (user) void autoPullIfEnabled() })
+  }, [])
 
   // پوسته را پیش از آماده شدن داده هم اعمال می‌کنیم تا صفحه‌ی بارگذاری سفید/سیاه نپرد
   useEffect(() => { applyTheme(useApp.getState().data.settings.theme ?? 'dark') }, [])

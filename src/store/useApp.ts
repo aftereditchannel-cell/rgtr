@@ -65,30 +65,28 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null
 let syncTimer: ReturnType<typeof setTimeout> | null = null
 
 export const useApp = create<Store>((set, get) => {
-  /** ذخیره‌ی خودکار روی ابر (Gist) بعد از هر تغییر — اگر autoSync روشن و توکن موجود باشد */
+  /** ذخیره‌ی خودکار Firebase بعد از هر تغییر؛ ذخیره‌ی محلی همیشه اول انجام می‌شود. */
   const scheduleCloudPush = () => {
     const c = get().data.settings.cloud
-    if (!c.autoSync || !cloud.hasToken()) return
+    if (!c.autoSync || !cloud.isCloudReady()) return
     if (syncTimer) clearTimeout(syncTimer)
-    syncTimer = setTimeout(() => { void autoPush() }, 3000)
+    syncTimer = setTimeout(() => { void autoPush() }, 3500)
   }
 
   const autoPush = async () => {
-    const st = get()
-    await st.persist()
-    const fresh = get().data
+    await get().persist()
     try {
-      const { id } = await cloud.ensureGist(fresh.settings.cloud.gistId, fresh)
-      await cloud.pushGist(id, fresh)
-      // مستقیم با set (نه setSettings) تا دوباره touch نشود و حلقه‌ی بی‌پایان نسازد
-      set(s => ({
-        data: { ...s.data, settings: { ...s.data.settings, cloud: { ...s.data.settings.cloud, gistId: id, lastSync: new Date().toISOString() } } },
-      }))
-    } catch { /* بی‌صدا — دفعه‌ی بعد دوباره تلاش می‌شود */ }
+      const updatedAt = await cloud.pushCloudData(get().data)
+      // مستقیم با set تا sync دوباره زمان‌بندی و حلقه ایجاد نکند.
+      set(s => ({ data: { ...s.data, settings: { ...s.data.settings, cloud: { ...s.data.settings.cloud, lastSync: updatedAt } } } }))
+    } catch { /* آفلاین بودن نباید کار محلی کاربر را متوقف کند */ }
   }
 
   const touch = () => {
-    set({ dirty: true })
+    // زمان تغییر محلی جدا از lastSync است؛ auto-pull فقط داده‌ای را جایگزین می‌کند
+    // که واقعاً از آخرین ویرایش این دستگاه جدیدتر باشد.
+    const changedAt = new Date().toISOString()
+    set(s => ({ dirty: true, data: { ...s.data, settings: { ...s.data.settings, cloud: { ...s.data.settings.cloud, lastLocalChange: changedAt } } } }))
     if (saveTimer) clearTimeout(saveTimer)
     saveTimer = setTimeout(() => { void get().persist() }, 400)
     scheduleCloudPush()
@@ -381,26 +379,21 @@ export const useApp = create<Store>((set, get) => {
   }
 })
 
-/**
- * دریافت خودکار از ابر هنگام باز شدن/بازگشت برنامه — فقط اگر remote جدیدتر باشد
- * (last-write-wins بر اساس updated_at گیت‌هاب).
- */
+/** دریافت خودکار Firebase در شروع/بازگشت؛ آخرین تغییر جدیدتر برنده است. */
 export async function autoPullIfEnabled(): Promise<void> {
   const st = useApp.getState()
   const c = st.data.settings.cloud
-  if (!c.autoPull || !c.gistId || !cloud.hasToken()) return
+  if (!c.autoPull || !cloud.isCloudReady()) return
   try {
-    const res = await cloud.pullGist(c.gistId)
+    const res = await cloud.pullCloudData()
     if (!res) return
-    const remoteT = new Date(res.updatedAt).getTime()
-    const localT = c.lastSync ? new Date(c.lastSync).getTime() : 0
-    if (Number.isFinite(remoteT) && remoteT > localT) {
-      // دریافت خودکار نیز باید افزایشی باشد؛ نسخه‌ی ابر نباید رکورد یا ماژول
-      // محلیِ جدیدی را که هنوز push نشده پاک کند.
-      await st.replaceAll(cloud.mergeCloudData(st.data, res.data))
-      useApp.getState().setSettings({ cloud: { ...useApp.getState().data.settings.cloud, lastSync: res.updatedAt } })
+    const remoteT = Date.parse(res.updatedAt) || 0
+    const localT = Math.max(Date.parse(c.lastSync) || 0, Date.parse(c.lastLocalChange) || 0)
+    if (remoteT > localT) {
+      await st.replaceAll(migrate(res.data))
+      useApp.setState(s => ({ data: { ...s.data, settings: { ...s.data.settings, cloud: { ...s.data.settings.cloud, lastSync: res.updatedAt } } } }))
     }
-  } catch { /* بی‌صدا */ }
+  } catch { /* آفلاین بودن نباید برنامه را متوقف کند */ }
 }
 
 /* ---------- selectors ---------- */

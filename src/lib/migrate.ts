@@ -3,7 +3,7 @@ import { CORE_MODULES } from '../domain/schema'
 import { DEFAULT_WEIGHTS } from '../domain/scoring'
 import { DEFAULT_PROVIDERS, DEFAULT_AUTOMATIONS } from '../domain/ai'
 
-export const CURRENT_VERSION = 3
+export const CURRENT_VERSION = 4
 
 export const DEFAULT_SETTINGS: Settings = {
   ownerName: '',
@@ -27,7 +27,7 @@ export const DEFAULT_SETTINGS: Settings = {
     baseUrl: 'https://api.openai.com/v1',
     enabled: true,
   },
-  cloud: { provider: 'gist', gistId: '', lastSync: '', askOnExit: true, autoSync: false, autoPull: false },
+  cloud: { provider: 'firebase', lastSync: '', lastLocalChange: '', autoSync: false, autoPull: false },
 }
 
 /**
@@ -57,7 +57,15 @@ export function migrate(input: unknown): AppData {
       },
       social: { ...DEFAULT_SETTINGS.social, ...rawSettings.social },
       branding: { ...DEFAULT_SETTINGS.branding, ...rawSettings.branding },
-      cloud: { ...DEFAULT_SETTINGS.cloud, ...rawSettings.cloud },
+      // Gist token/id هرگز وارد داده‌ی Firebase یا بکاپ جدید نمی‌شود.
+      cloud: {
+        provider: 'firebase',
+        lastSync: typeof rawSettings.cloud?.lastSync === 'string' ? rawSettings.cloud.lastSync : '',
+        lastLocalChange: typeof (rawSettings.cloud as { lastLocalChange?: unknown } | undefined)?.lastLocalChange === 'string'
+          ? (rawSettings.cloud as { lastLocalChange: string }).lastLocalChange : '',
+        autoSync: rawSettings.cloud?.autoSync === true,
+        autoPull: rawSettings.cloud?.autoPull === true,
+      },
     },
     modules: Array.isArray(raw.modules) && raw.modules.length ? raw.modules : CORE_MODULES,
     records: (raw.records ?? {}) as AppData['records'],

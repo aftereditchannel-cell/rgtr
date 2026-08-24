@@ -16,6 +16,8 @@ import type { AppInfo } from '../lib/desktop'
 import { checkForUpdates, cmpVersion, fmtDate, APP_VERSION } from '../lib/updater'
 import type { UpdateRelease, UpdateCheckResult, DownloadProgress } from '../lib/desktop'
 import * as cloud from '../lib/cloud'
+import { isFirebaseConfigured } from '../lib/firebase'
+import { migrate } from '../lib/migrate'
 import {
   readLock, setPasscode, disableLock, setAutoLockMin, setBiometric,
   biometricAvailable, cryptoAvailable,
@@ -389,48 +391,7 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
   )
 }
 
-/* ---------- راهنمای ساخت توکن ---------- */
-const TOKENS_URL = 'https://github.com/settings/tokens'
-
-function TokenHowTo() {
-  const { t } = useT()
-  const fmt = useFmt()
-  const [open, setOpen] = useState(false)
-  const steps = ['set.cloudHow1', 'set.cloudHow2', 'set.cloudHow3', 'set.cloudHow4', 'set.cloudHow5', 'set.cloudHow6'] as const
-
-  return (
-    <div className="mb-4 rounded-xl border border-[var(--color-line)] bg-[var(--color-bg2)]/50 overflow-hidden">
-      <button type="button" onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center gap-2 px-3 py-2.5 text-start hover:bg-white/[.03] transition-colors">
-        <Icon name="HelpCircle" size={14} className="text-[var(--color-acc)] shrink-0" />
-        <span className="text-[12px] flex-1">{t('set.cloudHowTo')}</span>
-        <Icon name={open ? 'ChevronUp' : 'ChevronDown'} size={14} className="text-[var(--color-dim2)]" />
-      </button>
-
-      {open && (
-        <div className="px-3 pb-3 pt-1 border-t border-[var(--color-line)]">
-          <ol className="space-y-2 mt-2">
-            {steps.map((k, i) => (
-              <li key={k} className="flex gap-2.5">
-                <span className="mt-0.5 shrink-0 w-5 h-5 rounded-md bg-[var(--color-acc)]/15 text-[var(--color-acc)] text-[10.5px] font-semibold flex items-center justify-center nums">
-                  {fmt.dg(i + 1)}
-                </span>
-                <span className="text-[11.5px] text-[var(--color-dim)] leading-relaxed">{t(k)}</span>
-              </li>
-            ))}
-          </ol>
-          <a href={TOKENS_URL} target="_blank" rel="noreferrer"
-            className="mt-3 inline-flex items-center gap-1.5 text-[11.5px] text-[var(--color-acc)] hover:underline">
-            <Icon name="ExternalLink" size={12} />
-            {t('set.cloudHowOpen')}
-          </a>
-        </div>
-      )}
-    </div>
-  )
-}
-
-/* ---------- کارت همگام‌سازی ابری ---------- */
+/* ---------- کارت همگام‌سازی Firebase / Google ---------- */
 type CloudState = 'idle' | 'busy'
 
 function CloudCard() {
@@ -438,32 +399,28 @@ function CloudCard() {
   const fmt = useFmt()
   const { data, setSettings, replaceAll, setToast, persist } = useApp()
   const c = data.settings.cloud
-  const [token, setTokenInput] = useState(cloud.getToken())
-  const [showToken, setShowToken] = useState(false)
-  const [gistId, setGistId] = useState(c.gistId)
+  const [user, setUser] = useState<cloud.CloudUser | null>(() => cloud.getCurrentUser())
   const [state, setState] = useState<CloudState>('idle')
   const [err, setErr] = useState('')
-
-  useEffect(() => { setGistId(c.gistId) }, [c.gistId])
-
-  const connected = !!cloud.getToken() && !!c.gistId
+  const configured = isFirebaseConfigured()
   const size = cloud.payloadSize(data)
 
+  useEffect(() => {
+    void cloud.initCloudAuth().finally(() => setUser(cloud.getCurrentUser()))
+    return cloud.watchCloudUser(setUser)
+  }, [])
+
   const fail = (e: unknown) => {
-    const code = (e as { code?: string }).code
-    setErr(code ? cloudError(lang, code) : (e as Error).message)
+    const code = e instanceof cloud.CloudError ? e.code : 'unknown'
+    setErr(cloudError(lang, code))
     setState('idle')
   }
 
-  const connect = async () => {
-    if (!token.trim()) { setErr(t('set.cloudNeedToken')); return }
+  const signIn = async () => {
     setErr(''); setState('busy')
     try {
-      cloud.setToken(token.trim())
-      await cloud.verifyToken()
-      const { id, created } = await cloud.ensureGist(gistId.trim(), data)
-      setSettings({ cloud: { ...c, gistId: id, lastSync: created ? new Date().toISOString() : c.lastSync } })
-      setToast(created ? t('set.cloudOkNew') : t('set.cloudOkExisting'))
+      const result = await cloud.signInWithGoogle()
+      if (result === 'redirecting') setToast(t('set.firebaseRedirecting'))
       setState('idle')
     } catch (e) { fail(e) }
   }
@@ -472,10 +429,8 @@ function CloudCard() {
     setErr(''); setState('busy')
     try {
       await persist()
-      const fresh = useApp.getState().data
-      const { id } = await cloud.ensureGist(c.gistId, fresh)
-      await cloud.pushGist(id, fresh)
-      setSettings({ cloud: { ...c, gistId: id, lastSync: new Date().toISOString() } })
+      const updatedAt = await cloud.pushCloudData(useApp.getState().data)
+      useApp.setState(s => ({ data: { ...s.data, settings: { ...s.data.settings, cloud: { ...s.data.settings.cloud, lastSync: updatedAt } } } }))
       setToast(t('set.cloudPushed'))
       setState('idle')
     } catch (e) { fail(e) }
@@ -484,114 +439,65 @@ function CloudCard() {
   const pull = async () => {
     setErr(''); setState('busy')
     try {
-      const res = await cloud.pullGist(c.gistId)
+      const res = await cloud.pullCloudData()
       if (!res) { setErr(t('set.cloudNoRemote')); setState('idle'); return }
       if (!confirm(t('set.cloudConfirmPull'))) { setState('idle'); return }
-      // بازیابی ابر نباید تغییرات محلیِ هنوز ارسال‌نشده (مثل ماژول/دپارتمان
-      // اضافه‌شده) را حذف کند؛ رکوردها و ماژول‌ها با نسخه‌ی ابری ادغام می‌شوند.
-      const merged = cloud.mergeCloudData(useApp.getState().data, res.data)
-      await replaceAll(merged)
-      useApp.getState().setSettings({ cloud: { ...useApp.getState().data.settings.cloud, gistId: c.gistId, lastSync: res.updatedAt || new Date().toISOString() } })
+      // replaceAll یک Snapshot می‌سازد و migrate سازگاری بکاپ‌های قدیمی را حفظ می‌کند.
+      await replaceAll(migrate(res.data))
+      useApp.setState(s => ({ data: { ...s.data, settings: { ...s.data.settings, cloud: { ...s.data.settings.cloud, lastSync: res.updatedAt || new Date().toISOString() } } } }))
       setToast(t('set.cloudPulled'))
       setState('idle')
     } catch (e) { fail(e) }
   }
 
-  const disconnect = () => {
-    if (!confirm(t('set.cloudConfirmDisconnect'))) return
-    cloud.setToken('')
-    setTokenInput('')
-    setSettings({ cloud: { ...c, gistId: '', lastSync: '' } })
-    setToast(t('set.cloudDisconnected'))
+  const signOut = async () => {
+    setErr(''); setState('busy')
+    try {
+      await cloud.signOutCloud()
+      setToast(t('set.firebaseSignedOut'))
+      setState('idle')
+    } catch (e) { fail(e) }
   }
 
   return (
     <Card>
-      <SectionTitle icon={connected ? 'CloudCheck' : 'CloudOff'}
-        right={
-          <span className={`text-[10.5px] ${connected ? 'text-emerald-400' : 'text-[var(--color-dim2)]'}`}>
-            {connected ? t('set.cloudOn') : t('set.cloudOff')}
-          </span>
-        }>
-        {t('set.cloud')}
-      </SectionTitle>
+      <SectionTitle icon={user ? 'CloudCheck' : 'CloudOff'} right={
+        <span className={`text-[10.5px] ${user ? 'text-emerald-400' : 'text-[var(--color-dim2)]'}`}>
+          {user ? t('set.cloudOn') : t('set.cloudOff')}
+        </span>
+      }>{t('set.firebaseTitle')}</SectionTitle>
+      <p className="text-[12px] text-[var(--color-dim)] leading-relaxed mb-3">{t('set.firebaseIntro')}</p>
 
-      <p className="text-[12px] text-[var(--color-dim)] leading-relaxed mb-3">{t('set.cloudIntro')}</p>
-
-      <TokenHowTo />
-
-      <div className="grid sm:grid-cols-2 gap-4">
-        <Field label={t('set.cloudToken')} help={t('set.cloudTokenHint')}>
-          <div className="relative">
-            <TextInput type={showToken ? 'text' : 'password'} value={token} placeholder="ghp_..." className="ltr pe-9"
-              onChange={e => setTokenInput(e.target.value)} />
-            <button type="button" onClick={() => setShowToken(v => !v)}
-              className="absolute end-2 top-1/2 -translate-y-1/2 text-[var(--color-dim2)] hover:text-[var(--color-tx)]">
-              <Icon name={showToken ? 'EyeOff' : 'Eye'} size={14} />
-            </button>
-          </div>
-        </Field>
-        <Field label={t('set.cloudGistId')} help={t('set.cloudGistHint')}>
-          <div className="flex gap-2">
-            <TextInput value={gistId} placeholder={t('common.optional')} className="ltr flex-1"
-              onChange={e => setGistId(e.target.value)} />
-            {c.gistId && (
-              <Button size="sm" variant="ghost" icon="Copy" title={t('set.cloudCopyId')}
-                onClick={() => { void navigator.clipboard?.writeText(c.gistId); setToast(t('set.copied')) }} />
-            )}
-          </div>
-        </Field>
-      </div>
-
-      <div className="flex gap-2 flex-wrap mt-4">
-        <Button size="sm" variant="primary" icon={state === 'busy' ? 'Loader' : 'KeyRound'} disabled={state === 'busy'} onClick={() => void connect()}>
-          {state === 'busy' ? t('set.cloudTesting') : t('set.cloudConnect')}
-        </Button>
-        <Button size="sm" variant="outline" icon="CloudUpload" disabled={!connected || state === 'busy'} onClick={() => void push()}>
-          {t('set.cloudPush')}
-        </Button>
-        <Button size="sm" variant="outline" icon="CloudDownload" disabled={!connected || state === 'busy'} onClick={() => void pull()}>
-          {t('set.cloudPull')}
-        </Button>
-        {connected && <Button size="sm" variant="ghost" icon="X" onClick={disconnect}>{t('set.cloudDisconnect')}</Button>}
-      </div>
-
-      {err && (
-        <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/25 bg-red-500/[.07] px-3 py-2 text-[11.5px] text-red-300">
-          <Icon name="AlertTriangle" size={13} className="mt-0.5 shrink-0" />
-          <span>{err}</span>
+      {!configured ? (
+        <div className="rounded-lg border border-amber-500/25 bg-amber-500/[.07] px-3 py-2 text-[11.5px] text-amber-300">
+          {t('set.firebaseNotConfigured')}
         </div>
+      ) : !user ? (
+        <Button size="sm" variant="primary" icon={state === 'busy' ? 'Loader' : 'LogIn'} disabled={state === 'busy'} onClick={() => void signIn()}>
+          {state === 'busy' ? t('set.firebaseSigningIn') : t('set.firebaseSignIn')}
+        </Button>
+      ) : (
+        <>
+          <div className="flex items-center gap-3 rounded-xl border border-[var(--color-line)] px-3 py-2.5">
+            {user.photoURL ? <img src={user.photoURL} alt="" className="w-9 h-9 rounded-full object-cover" referrerPolicy="no-referrer" /> :
+              <div className="w-9 h-9 rounded-full grid place-items-center bg-[var(--color-acc)]/15 text-[var(--color-acc)]"><Icon name="User" size={16} /></div>}
+            <div className="min-w-0 flex-1"><div className="text-[12.5px] font-medium truncate">{user.displayName || t('set.firebaseGoogleUser')}</div><div className="text-[11px] text-[var(--color-dim2)] truncate" dir="ltr">{user.email || '—'}</div></div>
+          </div>
+          <div className="flex gap-2 flex-wrap mt-4">
+            <Button size="sm" variant="outline" icon="CloudUpload" disabled={state === 'busy'} onClick={() => void push()}>{t('set.cloudPush')}</Button>
+            <Button size="sm" variant="outline" icon="CloudDownload" disabled={state === 'busy'} onClick={() => void pull()}>{t('set.cloudPull')}</Button>
+            <Button size="sm" variant="ghost" icon="LogOut" disabled={state === 'busy'} onClick={() => void signOut()}>{t('set.firebaseSignOut')}</Button>
+          </div>
+        </>
       )}
 
+      {err && <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/25 bg-red-500/[.07] px-3 py-2 text-[11.5px] text-red-300"><Icon name="AlertTriangle" size={13} className="mt-0.5 shrink-0" /><span>{err}</span></div>}
       <div className="mt-4 pt-3 border-t border-[var(--color-line)] grid sm:grid-cols-2 gap-2 text-[11.5px]">
         <Row label={t('set.cloudLastSync')} value={c.lastSync ? fmt.relTime(c.lastSync) : t('common.never')} />
         <Row label={t('set.cloudSize')} value={`${fmt.dg((size / 1024).toFixed(1))} KB`} />
       </div>
-
-      <label className="mt-3 flex items-center gap-2 cursor-pointer">
-        <input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={c.askOnExit}
-          onChange={e => setSettings({ cloud: { ...c, askOnExit: e.target.checked } })} />
-        <span className="text-[12px]">{t('set.cloudAuto')}</span>
-        <span className="text-[10.5px] text-[var(--color-dim2)]">— {t('set.cloudAutoHint')}</span>
-      </label>
-
-      <label className="mt-2.5 flex items-center gap-2 cursor-pointer">
-        <input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={c.autoSync}
-          onChange={e => setSettings({ cloud: { ...c, autoSync: e.target.checked } })} />
-        <span className="text-[12px]">{t('set.cloudAutoSync')}</span>
-        <span className="text-[10.5px] text-[var(--color-dim2)]">— {t('set.cloudAutoSyncHint')}</span>
-      </label>
-
-      <label className="mt-2.5 flex items-center gap-2 cursor-pointer">
-        <input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={c.autoPull}
-          onChange={e => setSettings({ cloud: { ...c, autoPull: e.target.checked } })} />
-        <span className="text-[12px]">{t('set.cloudAutoPull')}</span>
-        <span className="text-[10.5px] text-[var(--color-dim2)]">— {t('set.cloudAutoPullHint')}</span>
-      </label>
-
-      <p className="text-[10.5px] text-[var(--color-dim2)] mt-3 leading-relaxed">
-        {t('set.cloudPrivacy')} {t('set.cloudLimits')}
-      </p>
+      <label className="mt-3 flex items-center gap-2 cursor-pointer"><input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={c.autoSync} onChange={e => setSettings({ cloud: { ...c, autoSync: e.target.checked } })} /><span className="text-[12px]">{t('set.cloudAutoSync')}</span><span className="text-[10.5px] text-[var(--color-dim2)]">— {t('set.firebaseAutoSyncHint')}</span></label>
+      <label className="mt-2.5 flex items-center gap-2 cursor-pointer"><input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={c.autoPull} onChange={e => setSettings({ cloud: { ...c, autoPull: e.target.checked } })} /><span className="text-[12px]">{t('set.cloudAutoPull')}</span><span className="text-[10.5px] text-[var(--color-dim2)]">— {t('set.cloudAutoPullHint')}</span></label>
     </Card>
   )
 }

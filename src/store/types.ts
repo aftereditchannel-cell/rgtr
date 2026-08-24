@@ -64,14 +64,13 @@ export interface AIState {
   enabled: boolean
 }
 
-/** تنظیمات همگام‌سازی ابری — توکن اینجا ذخیره نمی‌شود (جدا و خارج از بکاپ) */
+/** تنظیمات همگام‌سازی Firebase. اطلاعات ورود در Firebase Auth نگه‌داری می‌شود. */
 export interface CloudSettings {
-  provider: 'gist'
-  gistId: string
+  provider: 'firebase'
   /** آخرین همگام‌سازی موفق (ISO) */
   lastSync: string
-  /** هنگام خروج از برنامه بپرسد */
-  askOnExit: boolean
+  /** آخرین تغییر محلی؛ برای جلوگیری از overwrite ناخواسته در auto-pull */
+  lastLocalChange: string
   /** ذخیره‌ی خودکار روی ابر بعد از هر تغییر (debounced) */
   autoSync: boolean
   /** دریافت خودکار از ابر هنگام باز شدن/بازگشت برنامه */
