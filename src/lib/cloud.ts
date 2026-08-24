@@ -1,4 +1,5 @@
 import type { AppData } from '../store/types'
+import { migrate } from './migrate'
 
 /**
  * همگام‌سازی ابری رایگان با «GitHub Secret Gist».
@@ -20,6 +21,20 @@ const API = 'https://api.github.com'
 const FILENAME = 'nexus-hq-data.json'
 const TOKEN_KEY = 'nexus_hq_gist_token'
 const DESCRIPTION = 'NEXUS HQ — backup (do not delete)'
+// در بعضی WebViewهای اندروید، درخواست شبکه هنگام قطع/اختلال اینترنت ممکن است
+// مدت بسیار طولانی معلق بماند. محدودیت زمانی باعث می‌شود دکمه‌ی «دریافت از ابر»
+// در حالت «در حال بررسی» گیر نکند و کاربر بتواند دوباره تلاش کند.
+const REQUEST_TIMEOUT_MS = 25_000
+
+async function fetchWithTimeout(url: string, init: RequestInit = {}): Promise<Response> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  try {
+    return await fetch(url, { ...init, signal: controller.signal })
+  } finally {
+    clearTimeout(timer)
+  }
+}
 
 export type CloudCode = 'bad_token' | 'not_found' | 'network' | 'rate' | 'bad_payload'
 
@@ -56,7 +71,7 @@ async function req(path: string, init: RequestInit = {}): Promise<Response> {
   if (!token) throw new CloudError('bad_token')
   let res: Response
   try {
-    res = await fetch(API + path, {
+    res = await fetchWithTimeout(API + path, {
       ...init,
       headers: {
         Accept: 'application/vnd.github+json',
@@ -79,7 +94,12 @@ async function req(path: string, init: RequestInit = {}): Promise<Response> {
 }
 
 interface GistFile { content?: string; truncated?: boolean; raw_url?: string }
-interface GistResponse { id: string; updated_at: string; files: Record<string, GistFile> }
+interface GistResponse {
+  id: string
+  updated_at: string
+  description?: string | null
+  files: Record<string, GistFile>
+}
 
 /* ---------- عملیات ---------- */
 
@@ -128,7 +148,7 @@ export async function pullGist(gistId: string): Promise<{ data: unknown; updated
   // gist های بزرگ‌تر از ۱ مگابایت بریده می‌شوند و باید از raw_url خوانده شوند
   if (file.truncated && file.raw_url) {
     try {
-      const r = await fetch(file.raw_url)
+      const r = await fetchWithTimeout(file.raw_url)
       if (!r.ok) throw new CloudError('network')
       text = await r.text()
     } catch { throw new CloudError('network') }
@@ -142,14 +162,76 @@ export async function pullGist(gistId: string): Promise<{ data: unknown; updated
   }
 }
 
-/** اطمینان از وجود gist: اگر شناسه نبود می‌سازد. خروجی: شناسه و اینکه تازه ساخته شد یا نه */
+/**
+ * Gist قبلیِ همین حساب را پیدا می‌کند. این کار برای دستگاه دوم مهم است: وارد کردن
+ * همان توکن نباید یک Gist خالیِ جدید بسازد و بکاپ قبلی را گم‌شده نشان دهد.
+ */
+async function findExistingGist(): Promise<string | null> {
+  const res = await req('/gists?per_page=100')
+  const gists = (await res.json()) as GistResponse[]
+  const matches = gists.filter(g =>
+    Boolean(g.id) && Boolean(g.files?.[FILENAME]) && g.description === DESCRIPTION,
+  )
+  if (!matches.length) return null
+  // API معمولاً تازه‌ترین را اول می‌دهد؛ مرتب‌سازی صریح، رفتار را پایدار می‌کند.
+  matches.sort((a, b) => Date.parse(b.updated_at || '') - Date.parse(a.updated_at || ''))
+  return matches[0].id
+}
+
+/** اطمینان از وجود gist: اگر شناسه نبود، اول بکاپ قبلی همین توکن را پیدا می‌کند. */
 export async function ensureGist(gistId: string, data: AppData): Promise<{ id: string; created: boolean }> {
   if (gistId) {
-    await req(`/gists/${gistId}`) // اگر پیدا نشود CloudError('not_found')
+    await req(`/gists/${encodeURIComponent(gistId)}`) // اگر پیدا نشود CloudError('not_found')
     return { id: gistId, created: false }
   }
+  const existing = await findExistingGist()
+  if (existing) return { id: existing, created: false }
   const id = await createGist(data)
   return { id, created: true }
+}
+
+/**
+ * داده‌ی ابر را بدون حذف داده‌ی محلی ادغام می‌کند. رکوردها با شناسه یکتا هستند و
+ * در تعارض، نسخه‌ای که updatedAt جدیدتری دارد نگه داشته می‌شود. این محافظ مخصوص
+ * همگام‌سازی است؛ import دستی همچنان می‌تواند جایگزینی کامل انجام دهد.
+ */
+export function mergeCloudData(local: AppData, remote: unknown): AppData {
+  const localData = migrate(local)
+  const remoteData = migrate(remote)
+  const moduleByKey = new Map(remoteData.modules.map(m => [m.key, m]))
+  for (const module of localData.modules) moduleByKey.set(module.key, module)
+
+  const records: AppData['records'] = {}
+  const keys = new Set([...Object.keys(remoteData.records), ...Object.keys(localData.records), ...moduleByKey.keys()])
+  for (const key of keys) {
+    const byId = new Map<string, AppData['records'][string][number]>()
+    for (const row of remoteData.records[key] ?? []) byId.set(row.id, row)
+    for (const row of localData.records[key] ?? []) {
+      const old = byId.get(row.id)
+      const oldTime = Date.parse(String(old?.updatedAt ?? '')) || 0
+      const localTime = Date.parse(String(row.updatedAt ?? '')) || 0
+      if (!old || localTime >= oldTime) byId.set(row.id, row)
+    }
+    records[key] = [...byId.values()]
+  }
+
+  const mergeById = <T extends { id: string }>(a: T[] = [], b: T[] = []): T[] => {
+    const all = new Map(a.map(item => [item.id, item]))
+    for (const item of b) all.set(item.id, item)
+    return [...all.values()]
+  }
+
+  return {
+    ...remoteData,
+    // تنظیمات دستگاه (از جمله شناسه‌ی Gist و تنظیمات شخصی) محلی می‌مانند.
+    settings: localData.settings,
+    modules: [...moduleByKey.values()],
+    records,
+    removedCore: Array.from(new Set([...(remoteData.removedCore ?? []), ...(localData.removedCore ?? [])])),
+    socialAccounts: mergeById(remoteData.socialAccounts, localData.socialAccounts),
+    workflows: mergeById(remoteData.workflows, localData.workflows),
+    runLogs: mergeById(remoteData.runLogs, localData.runLogs),
+  }
 }
 
 /** توکن به همراه داده ذخیره نمی‌شود؛ این تابع نسخه‌ی امن برای ارسال می‌سازد */

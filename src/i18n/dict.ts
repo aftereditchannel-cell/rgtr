@@ -264,7 +264,7 @@ export const UI: Record<string, Pair> = {
   'set.cloudPushed': { fa: 'روی ابر ذخیره شد', en: 'Saved to cloud' },
   'set.cloudPulled': { fa: 'از ابر بازیابی شد', en: 'Restored from cloud' },
   'set.cloudNoRemote': { fa: 'روی ابر داده‌ای نیست', en: 'No data in the cloud yet' },
-  'set.cloudConfirmPull': { fa: 'داده‌ی این دستگاه با نسخه‌ی ابری جایگزین شود؟ (نقطه بازیابی ساخته می‌شود)', en: 'Replace this device’s data with the cloud version? (a restore point is created)' },
+  'set.cloudConfirmPull': { fa: 'داده‌های ابر با داده‌های این دستگاه ادغام شوند؟ (نقطهٔ بازیابی ساخته می‌شود)', en: 'Merge cloud data with this device’s data? (a restore point is created)' },
   'set.cloudNeedToken': { fa: 'اول توکن را وارد کنید', en: 'Enter a token first' },
   'set.cloudHowTo': { fa: 'چطور توکن بسازم؟ (راهنمای ۲ دقیقه‌ای)', en: 'How do I create a token? (2-minute guide)' },
   'set.cloudHow1': { fa: 'وارد github.com شوید و آدرس github.com/settings/tokens را باز کنید.', en: 'Sign in to github.com and open github.com/settings/tokens' },

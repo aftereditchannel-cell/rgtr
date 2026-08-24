@@ -487,8 +487,11 @@ function CloudCard() {
       const res = await cloud.pullGist(c.gistId)
       if (!res) { setErr(t('set.cloudNoRemote')); setState('idle'); return }
       if (!confirm(t('set.cloudConfirmPull'))) { setState('idle'); return }
-      await replaceAll(res.data as never)
-      useApp.getState().setSettings({ cloud: { ...useApp.getState().data.settings.cloud, gistId: c.gistId, lastSync: new Date().toISOString() } })
+      // بازیابی ابر نباید تغییرات محلیِ هنوز ارسال‌نشده (مثل ماژول/دپارتمان
+      // اضافه‌شده) را حذف کند؛ رکوردها و ماژول‌ها با نسخه‌ی ابری ادغام می‌شوند.
+      const merged = cloud.mergeCloudData(useApp.getState().data, res.data)
+      await replaceAll(merged)
+      useApp.getState().setSettings({ cloud: { ...useApp.getState().data.settings.cloud, gistId: c.gistId, lastSync: res.updatedAt || new Date().toISOString() } })
       setToast(t('set.cloudPulled'))
       setState('idle')
     } catch (e) { fail(e) }

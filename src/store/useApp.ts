@@ -366,8 +366,13 @@ export const useApp = create<Store>((set, get) => {
     },
 
     async replaceAll(d) {
+      // هر داده‌ی ورودی (بکاپ، نقطه‌ی بازیابی یا Gist) باید قبل از ورود به state
+      // migrate شود. در غیر این صورت یک Gist ساخته‌شده با نسخه‌ی قدیمی‌تر ممکن
+      // است تنظیمات یا آرایه‌های جدید را نداشته باشد و WebView اندروید هنگام render
+      // با صفحه‌ی خالی/کرش مواجه شود.
+      const restored = migrate(d)
       await pushSnapshot(get().data)
-      set({ data: d })
+      set({ data: restored })
       await get().persist()
     },
 
@@ -390,7 +395,9 @@ export async function autoPullIfEnabled(): Promise<void> {
     const remoteT = new Date(res.updatedAt).getTime()
     const localT = c.lastSync ? new Date(c.lastSync).getTime() : 0
     if (Number.isFinite(remoteT) && remoteT > localT) {
-      await st.replaceAll(res.data as never)
+      // دریافت خودکار نیز باید افزایشی باشد؛ نسخه‌ی ابر نباید رکورد یا ماژول
+      // محلیِ جدیدی را که هنوز push نشده پاک کند.
+      await st.replaceAll(cloud.mergeCloudData(st.data, res.data))
       useApp.getState().setSettings({ cloud: { ...useApp.getState().data.settings.cloud, lastSync: res.updatedAt } })
     }
   } catch { /* بی‌صدا */ }
