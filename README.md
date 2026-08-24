@@ -431,21 +431,11 @@ MIT · ساخته‌شده برای یک نفر: شما.
 
 Cloud sync uses **Firebase Authentication (Google)** and **Cloud Firestore**. It is local-first: NEXUS HQ writes to its normal local storage first, then sends the complete `AppData` to `users/{uid}/appData/main` when the signed-in device is online.
 
-1. Create/select a Firebase project in the [Firebase Console](https://console.firebase.google.com/), add a **Web app**, and copy its normal `firebaseConfig` values. A normal Firebase web configuration is intended for client applications; it is **not** a private key.
+1. The Firebase Web configuration is embedded in `src/lib/firebase.ts` so Windows, Android and render tooling use the same Firebase project without `.env.local` or build-time environment variables. It is a normal public Firebase client configuration, **not** a private key.
 2. Enable **Authentication → Sign-in method → Google**.
 3. Create a Cloud Firestore database and publish the rules below in **Firestore Database → Rules**.
-4. Copy `.env.example` to `.env.local`, then fill in the values:
 
-```dotenv
-VITE_FIREBASE_API_KEY=...
-VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=your-project-id
-VITE_FIREBASE_STORAGE_BUCKET=your-project-id.appspot.com
-VITE_FIREBASE_MESSAGING_SENDER_ID=...
-VITE_FIREBASE_APP_ID=...
-```
-
-Never add a service-account JSON, private key, OAuth client secret, or Firebase Admin SDK credential to this project. **Do not commit `.env.local`**. After changing it, restart the Vite dev server or run a new build/APK/EXE so Vite embeds the public Firebase configuration.
+Never add a service-account JSON, private key, OAuth client secret, or Firebase Admin SDK credential to this project. Firebase Security Rules—not hiding the public web configuration—protect user data.
 
 ### Firebase Console authentication configuration
 

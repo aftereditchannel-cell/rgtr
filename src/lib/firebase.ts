@@ -2,28 +2,27 @@ import { getApp, getApps, initializeApp, type FirebaseApp } from 'firebase/app'
 import { getAuth, type Auth } from 'firebase/auth'
 import { getFirestore, type Firestore } from 'firebase/firestore'
 
-const config = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY?.trim(),
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN?.trim(),
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID?.trim(),
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET?.trim(),
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID?.trim(),
-  appId: import.meta.env.VITE_FIREBASE_APP_ID?.trim(),
+/**
+ * Public Firebase Web configuration for the NEXUS HQ client.
+ * This is intentionally embedded so Electron, Capacitor and render tooling use the
+ * same configuration without requiring .env.local or build-time environment values.
+ * It is not an Admin SDK credential and must be protected by Firebase Rules.
+ */
+const firebaseConfig = {
+  apiKey: 'AIzaSyByoWZR-6Gna7LerhD2UEMKiP-HbTmLt0Y',
+  authDomain: 'nexus-hq-c42cd.firebaseapp.com',
+  projectId: 'nexus-hq-c42cd',
+  storageBucket: 'nexus-hq-c42cd.firebasestorage.app',
+  messagingSenderId: '222910675316',
+  appId: '1:222910675316:web:4e3cbcd6abfd36045e5421',
 }
 
-/** Firebase فقط وقتی همه‌ی مقادیر محیطی موجود هستند راه‌اندازی می‌شود. */
 export function isFirebaseConfigured(): boolean {
-  return Object.values(config).every(value => typeof value === 'string' && value.length > 0)
+  return true
 }
 
-let app: FirebaseApp | null = null
-let auth: Auth | null = null
-let firestore: Firestore | null = null
+const app: FirebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig)
+const auth: Auth = getAuth(app)
+const firestore: Firestore = getFirestore(app)
 
-if (isFirebaseConfigured()) {
-  app = getApps().length ? getApp() : initializeApp(config)
-  auth = getAuth(app)
-  firestore = getFirestore(app)
-}
-
-export { app, auth, firestore }
+export { app, auth, firestore, firebaseConfig }

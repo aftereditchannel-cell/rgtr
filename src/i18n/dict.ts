@@ -603,9 +603,9 @@ export const UI: Record<string, Pair> = {
   'set.aiTestSave':    { fa: 'ذخیره و تست اتصال', en: 'Save & test connection' },
   'social.profiles':   { fa: 'پروفایل', en: 'profiles' },
 
-  'set.firebaseTitle': { fa: 'همگام‌سازی ابری با Google', en: 'Google cloud sync' },
+  'set.firebaseTitle': { fa: 'همگام‌سازی ابری با Google', en: 'Cloud sync with Google' },
   'set.firebaseIntro': { fa: 'داده‌های کاری شما با حساب Google خودتان ذخیره می‌شود و بین ویندوز و اندروید همگام می‌ماند. ابتدا همیشه روی همین دستگاه ذخیره می‌شود.', en: 'Your work data is stored under your own Google account and syncs between Windows and Android. It is always saved locally first.' },
-  'set.firebaseNotConfigured': { fa: 'Firebase هنوز تنظیم نشده است. مقادیر VITE_FIREBASE_* را در فایل .env.local وارد کنید و برنامه را دوباره بسازید.', en: 'Firebase is not configured yet. Add VITE_FIREBASE_* values to .env.local and rebuild the app.' },
+  'set.firebaseNotConfigured': { fa: 'تنظیمات Firebase در نسخهٔ برنامه موجود نیست.', en: 'Firebase configuration is unavailable in this app build.' },
   'set.firebaseSignIn': { fa: 'ورود با Google', en: 'Sign in with Google' },
   'set.firebaseSigningIn': { fa: 'در حال ورود…', en: 'Signing in…' },
   'set.firebaseRedirecting': { fa: 'مرورگر ورود Google باز می‌شود؛ پس از ورود به برنامه برگردید.', en: 'Google sign-in is opening; return to the app after signing in.' },
