@@ -465,3 +465,18 @@ These rules prevent unauthenticated access and restrict every user to their own 
 When auto-save is enabled, writes are debounced by a few seconds and only one Firestore write is sent at a time. At startup/return, auto-pull replaces the local document only if the remote `updatedAt` is newer; this is the documented **last-write-wins** conflict policy. Pull creates a local recovery snapshot first and runs the existing migration process. Offline errors never block local work and the next open/change retries sync.
 
 Firestore has a 1 MiB document limit. NEXUS HQ stops cloud push before roughly 900 KiB and shows an explanatory error. It is suitable for ordinary text data; do not place large files or large image data directly in this Firestore document.
+
+### Android native Google Sign-In
+
+Android uses `@capacitor-firebase/authentication` with the native Android Credential Manager. It does **not** use `signInWithRedirect` on Android, so the Google account chooser returns directly to the app rather than navigating the WebView to `https://localhost`.
+
+Place the Firebase Android configuration at `android/app/google-services.json`. The Android Gradle module detects that file and applies `com.google.gms.google-services`, which creates the Google client resource used by the native plugin. Ensure its Android client package name is exactly `app.nexushq.mobile`.
+
+In Firebase Console, enable Google under **Authentication → Sign-in method** and register both SHA-1 and SHA-256 certificate fingerprints for the debug and release signing certificates under **Project settings → Your apps → Android app**. Obtain the exact values from your build machine with:
+
+```bash
+cd android
+./gradlew signingReport
+```
+
+Copy the values shown for the `debug` variant while testing debug APKs, and the `release` values for the keystore used to ship release APKs. Download a fresh `google-services.json` after registering fingerprints and place it in `android/app/` before running `npm run cap:sync` / building the APK.

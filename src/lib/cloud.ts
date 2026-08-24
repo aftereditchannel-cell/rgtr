@@ -4,6 +4,7 @@ import {
   getRedirectResult,
   onAuthStateChanged,
   setPersistence,
+  signInWithCredential,
   signInWithPopup,
   signInWithRedirect,
   signOut,
@@ -12,7 +13,7 @@ import {
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import type { AppData } from '../store/types'
 import { auth, firestore, isFirebaseConfigured } from './firebase'
-import { isMobile } from './mobile'
+import { isAndroid, isMobile } from './mobile'
 import { isDesktop } from './desktop'
 
 const MAX_DOCUMENT_BYTES = 900 * 1024
@@ -59,8 +60,10 @@ export async function initCloudAuth(): Promise<void> {
     authReady = (async () => {
       const { auth: activeAuth } = requireFirebase()
       await setPersistence(activeAuth, browserLocalPersistence)
-      // redirect ممکن است در اجراهای قبل از Android/Electron آغاز شده باشد.
-      try { await getRedirectResult(activeAuth) } catch { /* خطا در کارت تنظیمات نشان داده می‌شود */ }
+      // Android از ورود بومی استفاده می‌کند و هرگز نباید redirect وب به localhost اجرا شود.
+      if (!isAndroid) {
+        try { await getRedirectResult(activeAuth) } catch { /* خطا در کارت تنظیمات نشان داده می‌شود */ }
+      }
     })()
   }
   return authReady
@@ -80,13 +83,26 @@ export function watchCloudUser(callback: (user: CloudUser | null) => void): () =
 }
 
 /**
- * Web uses a popup. Capacitor and Electron use redirect because popup windows are
- * commonly blocked by WebView/BrowserWindow policies; Firebase restores the session
- * after the redirect when the configured Auth domain is authorised.
+ * Android uses the native Credential Manager through Capawesome's Capacitor plugin.
+ * The plugin supplies a Google ID token which is then exchanged with Firebase Web
+ * Auth, so Firestore receives the same authenticated uid and no localhost redirect
+ * is ever opened. Other platforms retain their existing web authentication flow.
  */
+async function signInWithNativeGoogle(activeAuth: NonNullable<typeof auth>): Promise<void> {
+  const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication')
+  const result = await FirebaseAuthentication.signInWithGoogle({ skipNativeAuth: true })
+  const idToken = result.credential?.idToken
+  if (!idToken) throw new CloudError('unknown')
+  await signInWithCredential(activeAuth, GoogleAuthProvider.credential(idToken))
+}
+
 export async function signInWithGoogle(): Promise<'signed-in' | 'redirecting'> {
   try {
     const { auth: activeAuth } = requireFirebase()
+    if (isAndroid) {
+      await signInWithNativeGoogle(activeAuth)
+      return 'signed-in'
+    }
     const provider = new GoogleAuthProvider()
     provider.setCustomParameters({ prompt: 'select_account' })
     if (isMobile || isDesktop) {
@@ -98,7 +114,7 @@ export async function signInWithGoogle(): Promise<'signed-in' | 'redirecting'> {
   } catch (error) {
     const mapped = mapError(error)
     // Browsers can still block a popup; redirect is the reliable fallback.
-    if (mapped.code === 'popup_blocked' && auth) {
+    if (!isAndroid && mapped.code === 'popup_blocked' && auth) {
       try {
         await signInWithRedirect(auth, new GoogleAuthProvider())
         return 'redirecting'
@@ -111,6 +127,10 @@ export async function signInWithGoogle(): Promise<'signed-in' | 'redirecting'> {
 export async function signOutCloud(): Promise<void> {
   try {
     const { auth: activeAuth } = requireFirebase()
+    if (isAndroid) {
+      const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication')
+      await FirebaseAuthentication.signOut()
+    }
     await signOut(activeAuth)
   } catch (error) { throw mapError(error) }
 }
