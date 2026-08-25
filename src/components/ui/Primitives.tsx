@@ -1,4 +1,5 @@
 import type { ReactNode, CSSProperties } from 'react'
+import { createPortal } from 'react-dom'
 import { ICONS } from './icons'
 import { useT } from '../../i18n'
 import { useFmt } from '../../lib/useFmt'
@@ -122,23 +123,27 @@ export function Empty({ icon = 'Inbox', title, hint, action }: { icon?: string; 
 export function Modal({ open, onClose, title, children, wide = false, footer }: {
   open: boolean; onClose: () => void; title: string; children: ReactNode; wide?: boolean; footer?: ReactNode
 }) {
-  if (!open) return null
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:p-8"
+  if (!open || typeof document === 'undefined') return null
+
+  // Portal باعث می‌شود fixed واقعاً نسبت به viewport باشد. بدون آن، انیمیشن/transform
+  // صفحه‌ی تنظیمات در Electron و WebView اندروید موقعیت باکس را به پایین صفحه می‌برد.
+  return createPortal(
+    <div className="fixed inset-0 z-[100] grid place-items-center overflow-hidden p-3 sm:p-6"
       style={{ background: 'rgba(4,5,8,.72)', backdropFilter: 'blur(4px)' }}
-      onClick={onClose}>
-      <div className={`anim w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} rounded-2xl border border-[var(--color-line2)] bg-[var(--color-bg2)] shadow-2xl my-auto`}
+      role="dialog" aria-modal="true" aria-label={title} onClick={onClose}>
+      <div className={`anim flex w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] flex-col overflow-hidden rounded-2xl border border-[var(--color-line2)] bg-[var(--color-bg2)] shadow-2xl`}
         onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--color-line)]">
-          <h3 className="text-[14px] font-semibold">{title}</h3>
-          <button onClick={onClose} className="text-[var(--color-dim2)] hover:text-[var(--color-tx)] transition-colors p-1 rounded-md hover:bg-white/5">
+        <div className="flex shrink-0 items-center justify-between px-4 py-3 sm:px-5 sm:py-3.5 border-b border-[var(--color-line)]">
+          <h3 className="text-[14px] font-semibold min-w-0 truncate">{title}</h3>
+          <button type="button" onClick={onClose} className="ms-3 shrink-0 text-[var(--color-dim2)] hover:text-[var(--color-tx)] transition-colors p-1 rounded-md hover:bg-white/5" aria-label="close">
             <Icon name="X" size={17} />
           </button>
         </div>
-        <div className="px-5 py-4">{children}</div>
-        {footer && <div className="px-5 py-3.5 border-t border-[var(--color-line)] flex justify-end gap-2">{footer}</div>}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5">{children}</div>
+        {footer && <div className="shrink-0 px-4 py-3 sm:px-5 sm:py-3.5 border-t border-[var(--color-line)] flex justify-end gap-2">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

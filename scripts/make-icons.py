@@ -134,7 +134,9 @@ for d, px in DPI.items():
         side = max(w, h)
         sq = Image.new('RGBA', (side, side), (0, 0, 0, 0))
         sq.paste(mk, ((side - w) // 2, (side - h) // 2), mk)
-        mk = sq.resize((int(fg_px * 0.62), int(fg_px * 0.62)), Image.LANCZOS)
+        # Android Adaptive Icon بخش زیادی از foreground را خارج از safe zone برش می‌دهد.
+        # اندازه‌ی کوچک‌تر از زوم/بریدگی لوگو در launcherهای مختلف جلوگیری می‌کند.
+        mk = sq.resize((int(fg_px * 0.46), int(fg_px * 0.46)), Image.LANCZOS)
     fg.alpha_composite(mk, ((fg_px - mk.size[0]) // 2, (fg_px - mk.size[1]) // 2))
     save(fg, os.path.join(res, f'mipmap-{d}', 'ic_launcher_foreground.png'))
 
