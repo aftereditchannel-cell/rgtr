@@ -95,6 +95,16 @@ function Shell() {
     return () => window.removeEventListener('nexus:cloud-sync-failed', onFailure)
   }, [])
 
+  // وقتی اینترنت برگردد، فقط داده‌ای که قبلاً با وضعیت «فقط محلی» مانده دوباره ارسال می‌شود.
+  useEffect(() => {
+    const retryWhenOnline = () => {
+      if (!useApp.getState().data.settings.cloud.pendingSync) return
+      void retryPendingCloudSync().then(() => useApp.getState().setToast(t('set.cloudPushed'))).catch(() => { /* دیالوگ pending هنوز در تنظیمات باقی می‌ماند */ })
+    }
+    window.addEventListener('online', retryWhenOnline)
+    return () => window.removeEventListener('online', retryWhenOnline)
+  }, [t])
+
   const retryPending = () => {
     void retryPendingCloudSync().then(() => {
       setSyncFailure(null)
