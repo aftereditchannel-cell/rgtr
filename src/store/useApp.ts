@@ -10,6 +10,7 @@ import { loadDoc, saveDoc, pushSnapshot } from '../lib/db'
 import { migrate } from '../lib/migrate'
 import { uid, nowISO } from '../lib/id'
 import * as cloud from '../lib/cloud'
+import { cloudError, tr } from '../i18n'
 
 interface Store {
   data: AppData
@@ -63,6 +64,8 @@ interface Store {
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let syncTimer: ReturnType<typeof setTimeout> | null = null
+let pushInFlight = false
+let stopLiveSync: (() => void) | null = null
 
 export const useApp = create<Store>((set, get) => {
   /** ذخیره‌ی خودکار Firebase بعد از هر تغییر؛ ذخیره‌ی محلی همیشه اول انجام می‌شود. */
@@ -70,16 +73,24 @@ export const useApp = create<Store>((set, get) => {
     const c = get().data.settings.cloud
     if (!c.autoSync || !cloud.isCloudReady()) return
     if (syncTimer) clearTimeout(syncTimer)
-    syncTimer = setTimeout(() => { void autoPush() }, 3500)
+    // هر ویرایش سریع را در یک ارسال جمع می‌کنیم تا هم حس لحظه‌ای داشته باشد و هم Firestore بی‌دلیل هزینه نسازد.
+    syncTimer = setTimeout(() => { void autoPush() }, 900)
   }
 
   const autoPush = async () => {
+    if (pushInFlight) return
+    pushInFlight = true
     await get().persist()
+    const lang = get().data.settings.lang ?? 'fa'
     try {
       const updatedAt = await cloud.pushCloudData(get().data)
       // مستقیم با set تا sync دوباره زمان‌بندی و حلقه ایجاد نکند.
       set(s => ({ data: { ...s.data, settings: { ...s.data.settings, cloud: { ...s.data.settings.cloud, lastSync: updatedAt } } } }))
-    } catch { /* آفلاین بودن نباید کار محلی کاربر را متوقف کند */ }
+      get().setToast(tr(lang, 'set.cloudPushed'))
+    } catch (error) {
+      const code = cloud.mapCloudError(error).code
+      get().setToast(`${tr(lang, 'sync.failed')}: ${cloudError(lang, code)}`)
+    } finally { pushInFlight = false }
   }
 
   const touch = () => {
@@ -379,21 +390,51 @@ export const useApp = create<Store>((set, get) => {
   }
 })
 
-/** دریافت خودکار Firebase در شروع/بازگشت؛ آخرین تغییر جدیدتر برنده است. */
-export async function autoPullIfEnabled(): Promise<void> {
+/** داده‌ی جدید Firestore را فقط وقتی اعمال می‌کند که از آخرین تغییر محلی جدیدتر باشد. */
+async function applyRemote(res: cloud.RemoteData): Promise<boolean> {
+  if (!res || pushInFlight) return false
   const st = useApp.getState()
   const c = st.data.settings.cloud
-  if (!c.autoPull || !cloud.isCloudReady()) return
-  try {
-    const res = await cloud.pullCloudData()
-    if (!res) return
-    const remoteT = Date.parse(res.updatedAt) || 0
-    const localT = Math.max(Date.parse(c.lastSync) || 0, Date.parse(c.lastLocalChange) || 0)
-    if (remoteT > localT) {
-      await st.replaceAll(migrate(res.data))
-      useApp.setState(s => ({ data: { ...s.data, settings: { ...s.data.settings, cloud: { ...s.data.settings.cloud, lastSync: res.updatedAt } } } }))
-    }
-  } catch { /* آفلاین بودن نباید برنامه را متوقف کند */ }
+  const remoteT = Date.parse(res.updatedAt) || 0
+  const localT = Math.max(Date.parse(c.lastSync) || 0, Date.parse(c.lastLocalChange) || 0)
+  if (remoteT <= localT) return false
+  await st.replaceAll(migrate(res.data))
+  useApp.setState(s => ({ data: { ...s.data, settings: { ...s.data.settings, cloud: { ...s.data.settings.cloud, lastSync: res.updatedAt } } } }))
+  return true
+}
+
+/** دریافت دستی یا pull-to-refresh. */
+export async function refreshCloudNow(): Promise<boolean> {
+  if (!cloud.isCloudReady()) throw new cloud.CloudError('not_signed_in')
+  return applyRemote(await cloud.pullCloudData())
+}
+
+/** شنونده‌ی لحظه‌ای Firestore؛ تغییر دستگاه دیگر بدون polling به‌طور خودکار اعمال می‌شود. */
+export function startLiveSync(): void {
+  stopLiveSync?.()
+  if (!cloud.isCloudReady() || !useApp.getState().data.settings.cloud.autoPull) return
+  stopLiveSync = cloud.watchCloudData(res => {
+    void applyRemote(res).then(changed => {
+      if (changed) {
+        const st = useApp.getState()
+        st.setToast(tr(st.data.settings.lang ?? 'fa', 'set.cloudPulled'))
+      }
+    })
+  }, error => {
+    const st = useApp.getState()
+    st.setToast(`${tr(st.data.settings.lang ?? 'fa', 'sync.failed')}: ${cloudError(st.data.settings.lang ?? 'fa', error.code)}`)
+  })
+}
+
+export function stopLiveCloudSync(): void {
+  stopLiveSync?.(); stopLiveSync = null
+}
+
+/** دریافت خودکار Firebase در شروع/بازگشت. */
+export async function autoPullIfEnabled(): Promise<void> {
+  const st = useApp.getState()
+  if (!st.data.settings.cloud.autoPull || !cloud.isCloudReady()) return
+  try { await refreshCloudNow() } catch { /* آفلاین بودن نباید برنامه را متوقف کند */ }
 }
 
 /* ---------- selectors ---------- */

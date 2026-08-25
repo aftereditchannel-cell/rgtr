@@ -27,7 +27,7 @@ export const DEFAULT_SETTINGS: Settings = {
     baseUrl: 'https://api.openai.com/v1',
     enabled: true,
   },
-  cloud: { provider: 'firebase', lastSync: '', lastLocalChange: '', autoSync: false, autoPull: false },
+  cloud: { provider: 'firebase', lastSync: '', lastLocalChange: '', autoSync: true, autoPull: true },
 }
 
 /**
@@ -63,8 +63,8 @@ export function migrate(input: unknown): AppData {
         lastSync: typeof rawSettings.cloud?.lastSync === 'string' ? rawSettings.cloud.lastSync : '',
         lastLocalChange: typeof (rawSettings.cloud as { lastLocalChange?: unknown } | undefined)?.lastLocalChange === 'string'
           ? (rawSettings.cloud as { lastLocalChange: string }).lastLocalChange : '',
-        autoSync: rawSettings.cloud?.autoSync === true,
-        autoPull: rawSettings.cloud?.autoPull === true,
+        autoSync: rawSettings.cloud?.autoSync !== false,
+        autoPull: rawSettings.cloud?.autoPull !== false,
       },
     },
     modules: Array.isArray(raw.modules) && raw.modules.length ? raw.modules : CORE_MODULES,

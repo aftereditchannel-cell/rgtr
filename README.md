@@ -429,17 +429,13 @@ MIT · ساخته‌شده برای یک نفر: شما.
 
 ## Firebase Setup
 
-Cloud sync uses **Firebase Authentication (Google)** and **Cloud Firestore**. It is local-first: NEXUS HQ writes to its normal local storage first, then sends the complete `AppData` to `users/{uid}/appData/main` when the signed-in device is online.
+NEXUS HQ uses **Firebase Authentication (Email/Password)** and **Cloud Firestore**. Cloud sync is local-first: every change is saved on the device first, then automatically sent to Firestore. Firestore also sends changes from another signed-in device immediately—there is no Google sign-in, GitHub token, Gist, or polling timer.
 
-1. The Firebase Web configuration is embedded in `src/lib/firebase.ts` so Windows, Android and render tooling use the same Firebase project without `.env.local` or build-time environment variables. It is a normal public Firebase client configuration, **not** a private key.
-2. Enable **Authentication → Sign-in method → Google**.
-3. Create a Cloud Firestore database and publish the rules below in **Firestore Database → Rules**.
+1. In Firebase Console, open **Authentication → Sign-in method → Email/Password** and enable **Email/Password**.
+2. Create a Cloud Firestore database and publish the rules below in **Firestore Database → Rules**.
+3. In the app, go to Settings → Firebase Cloud Sync, enter an email and a password of at least six characters, then choose **Create account**. Use the same email and password on another device to receive the same data.
 
-Never add a service-account JSON, private key, OAuth client secret, or Firebase Admin SDK credential to this project. Firebase Security Rules—not hiding the public web configuration—protect user data.
-
-### Firebase Console authentication configuration
-
-Add every production web host to **Authentication → Settings → Authorized domains**. For Capacitor Android, authorise the origin used by the packaged WebView (normally `localhost` with Capacitor's HTTPS scheme) and configure the Android package/SHA fingerprints in the Google/Firebase OAuth configuration when Firebase requests them. For Electron, use the packaged app's Firebase redirect/authorised web host; do not hard-code a `localhost` API endpoint in NEXUS HQ. Android uses native Google Sign-In and does not redirect the WebView; Electron uses Firebase Auth redirect because popup windows are often blocked there, while regular browsers use a popup and can fall back to redirect.
+The Firebase client configuration is embedded in `src/lib/firebase.ts`. It is a public client configuration, not a service account. Never add a service-account JSON, private key, Firebase Admin SDK credential, or a user password to this repository.
 
 ### Firestore Rules
 
@@ -458,34 +454,13 @@ service cloud.firestore {
 }
 ```
 
-These rules prevent unauthenticated access and restrict every user to their own `users/{uid}` tree.
+### Live sync behaviour
 
-### Sync behaviour and size limit
+- Changes are stored locally immediately.
+- Automatic sending is debounced by about one second, so several fast edits become one write.
+- Firestore `onSnapshot` delivers changes from another device immediately; no every-minute refresh is used.
+- Pull down at the top of any page, or use the refresh icon in the mobile header, to request a manual cloud refresh.
+- The newest timestamp wins. The app never replaces a newer local unsent change with an older cloud document.
+- A success toast confirms auto-send; failures show a specific Firebase error such as bad password, permission denied, network unavailable, or document too large.
 
-When auto-save is enabled, writes are debounced by a few seconds and only one Firestore write is sent at a time. At startup/return, auto-pull replaces the local document only if the remote `updatedAt` is newer; this is the documented **last-write-wins** conflict policy. Pull creates a local recovery snapshot first and runs the existing migration process. Offline errors never block local work and the next open/change retries sync.
-
-Firestore has a 1 MiB document limit. NEXUS HQ stops cloud push before roughly 900 KiB and shows an explanatory error. It is suitable for ordinary text data; do not place large files or large image data directly in this Firestore document.
-
-### Android native Google Sign-In
-
-Android uses `@capacitor-firebase/authentication` with the native Android Credential Manager. It does **not** use `signInWithRedirect` on Android, so the Google account chooser returns directly to the app rather than navigating the WebView to `https://localhost`.
-
-Place the Firebase Android configuration at `android/app/google-services.json`. The Android Gradle module detects that file and applies `com.google.gms.google-services`, which creates the Google client resource used by the native plugin. Ensure its Android client package name is exactly `app.nexushq.mobile`.
-
-In Firebase Console, enable Google under **Authentication → Sign-in method** and register both SHA-1 and SHA-256 certificate fingerprints for the debug and release signing certificates under **Project settings → Your apps → Android app**. Obtain the exact values from your build machine with:
-
-```bash
-cd android
-./gradlew signingReport
-```
-
-Copy the values shown for the `debug` variant while testing debug APKs, and the `release` values for the keystore used to ship release APKs. Download a fresh `google-services.json` after registering fingerprints and place it in `android/app/` before running `npm run cap:sync` / building the APK.
-
-### Downloading SHA fingerprints from GitHub Actions
-
-Run **Actions → Release — Android APK → Run workflow** manually. The workflow uses Temurin Java 21, runs `./gradlew signingReport --no-daemon`, and uploads the full output as the `android-signing-report` artifact. Open the downloaded `android-signing-report.txt` and register the fingerprints from:
-
-- **`debug` variant** — when installing/testing the debug APK produced by the workflow.
-- **`release` variant** — when distributing the final APK signed with the configured release keystore.
-
-The project loads `android/keystore.properties` and `android/keystore/nexus-hq.jks` when present, so `signingReport` reports the actual release keystore fingerprints in a release-signing build. For GitHub Actions, add optional repository secrets `ANDROID_KEYSTORE_BASE64`, `NEXUS_STORE_PASSWORD`, `NEXUS_KEY_PASSWORD`, and `NEXUS_KEY_ALIAS`; the workflow restores that key only for the run, and the report will then include the real `release` SHA values.
+Firestore documents have a 1 MiB limit. NEXUS HQ stops a cloud write before roughly 900 KiB. Large file/image data should not be stored in the AppData document.

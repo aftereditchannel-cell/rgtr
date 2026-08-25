@@ -1,27 +1,22 @@
 import {
-  GoogleAuthProvider,
   browserLocalPersistence,
-  getRedirectResult,
+  createUserWithEmailAndPassword,
   onAuthStateChanged,
   setPersistence,
-  signInWithCredential,
-  signInWithPopup,
-  signInWithRedirect,
+  signInWithEmailAndPassword,
   signOut,
   type User,
 } from 'firebase/auth'
-import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { doc, getDoc, onSnapshot, setDoc, type Unsubscribe } from 'firebase/firestore'
 import type { AppData } from '../store/types'
 import { auth, firestore, isFirebaseConfigured } from './firebase'
-import { isMobile, isNativeAndroid } from './mobile'
-import { isDesktop } from './desktop'
 
 const MAX_DOCUMENT_BYTES = 900 * 1024
 
 export type CloudCode =
-  | 'not_configured' | 'not_signed_in' | 'popup_blocked' | 'cancelled'
-  | 'unauthorized_domain' | 'network' | 'too_large' | 'android_config'
-  | 'android_sign_in' | 'unknown'
+  | 'not_configured' | 'not_signed_in' | 'bad_email' | 'weak_password'
+  | 'email_in_use' | 'wrong_password' | 'user_not_found' | 'too_many_requests'
+  | 'network' | 'permission' | 'too_large' | 'unknown'
 
 export class CloudError extends Error {
   code: CloudCode
@@ -44,38 +39,28 @@ function requireUser(): User {
   return activeAuth.currentUser
 }
 
-function mapError(error: unknown): CloudError {
+export function mapCloudError(error: unknown): CloudError {
   if (error instanceof CloudError) return error
-  // پلاگین Android در نسخه‌ها/دستگاه‌های مختلف code یا message متفاوتی می‌دهد.
-  // هر دو را بررسی می‌کنیم تا خطای SHA/OAuth به پیام مبهم «عملیات انجام نشد» تبدیل نشود.
   const detail = `${String((error as { code?: string })?.code ?? '')} ${String((error as Error)?.message ?? '')}`.toLowerCase()
-  if (detail.includes('popup-blocked')) return new CloudError('popup_blocked')
-  if (detail.includes('popup-closed-by-user') || detail.includes('cancelled-popup-request') || detail.includes('cancel')) return new CloudError('cancelled')
-  if (detail.includes('unauthorized-domain')) return new CloudError('unauthorized_domain')
+  if (detail.includes('invalid-email')) return new CloudError('bad_email')
+  if (detail.includes('weak-password')) return new CloudError('weak_password')
+  if (detail.includes('email-already-in-use')) return new CloudError('email_in_use')
+  if (detail.includes('wrong-password') || detail.includes('invalid-credential')) return new CloudError('wrong_password')
+  if (detail.includes('user-not-found')) return new CloudError('user_not_found')
+  if (detail.includes('too-many-requests')) return new CloudError('too_many_requests')
+  if (detail.includes('permission-denied')) return new CloudError('permission')
   if (detail.includes('network') || detail.includes('timeout') || detail.includes('unavailable')) return new CloudError('network')
-  // کد 10 / DEVELOPER_ERROR معمولاً یعنی package name، SHA یا google-services.json درست نیست.
-  if (detail.includes('developer_error') || detail.includes('developer error') || detail.includes('code 10') || detail.includes('status: 10') || detail.includes('12500')) {
-    return new CloudError('android_config')
-  }
-  if (detail.includes('sign_in_failed') || detail.includes('sign in failed') || detail.includes('credential manager')) {
-    return new CloudError('android_sign_in')
-  }
-  // جزئیات فنی فقط در log است و هیچ token یا داده‌ی کاربر در UI نمایش داده نمی‌شود.
-  console.warn('[NEXUS HQ] Google sign-in failed', error)
+  console.warn('[NEXUS HQ] Firebase sync failed', error)
   return new CloudError('unknown')
 }
 
-/** Auth را یک‌بار در آغاز برنامه آماده و نتیجه‌ی redirect را دریافت می‌کند. */
+/** نشست ایمیل/رمز را روی دستگاه نگه می‌دارد؛ هیچ redirect یا Google login وجود ندارد. */
 export async function initCloudAuth(): Promise<void> {
   if (!isFirebaseConfigured()) return
   if (!authReady) {
     authReady = (async () => {
       const { auth: activeAuth } = requireFirebase()
       await setPersistence(activeAuth, browserLocalPersistence)
-      // Android از ورود بومی استفاده می‌کند و هرگز نباید redirect وب به localhost اجرا شود.
-      if (!isNativeAndroid()) {
-        try { await getRedirectResult(activeAuth) } catch { /* خطا در کارت تنظیمات نشان داده می‌شود */ }
-      }
     })()
   }
   return authReady
@@ -94,65 +79,25 @@ export function watchCloudUser(callback: (user: CloudUser | null) => void): () =
   } : null))
 }
 
-/**
- * Android uses the native Credential Manager through Capawesome's Capacitor plugin.
- * The plugin supplies a Google ID token which is then exchanged with Firebase Web
- * Auth, so Firestore receives the same authenticated uid and no localhost redirect
- * is ever opened. Other platforms retain their existing web authentication flow.
- */
-async function signInWithNativeGoogle(activeAuth: NonNullable<typeof auth>): Promise<void> {
-  try {
-    const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication')
-    const result = await FirebaseAuthentication.signInWithGoogle({
-      // انتخاب حساب کاملاً بومی است؛ Firebase Web SDK فقط ID token را برای Firestore می‌پذیرد.
-      skipNativeAuth: true,
-      useCredentialManager: true,
-    })
-    const idToken = result.credential?.idToken
-    if (!idToken) throw new CloudError('android_sign_in')
-    await signInWithCredential(activeAuth, GoogleAuthProvider.credential(idToken))
-  } catch (error) {
-    throw mapError(error)
-  }
-}
-
-export async function signInWithGoogle(): Promise<'signed-in' | 'redirecting'> {
+export async function signInWithEmail(email: string, password: string): Promise<void> {
   try {
     const { auth: activeAuth } = requireFirebase()
-    if (isNativeAndroid()) {
-      await signInWithNativeGoogle(activeAuth)
-      return 'signed-in'
-    }
-    const provider = new GoogleAuthProvider()
-    provider.setCustomParameters({ prompt: 'select_account' })
-    if (isMobile || isDesktop) {
-      await signInWithRedirect(activeAuth, provider)
-      return 'redirecting'
-    }
-    await signInWithPopup(activeAuth, provider)
-    return 'signed-in'
-  } catch (error) {
-    const mapped = mapError(error)
-    // Browsers can still block a popup; redirect is the reliable fallback.
-    if (!isNativeAndroid() && mapped.code === 'popup_blocked' && auth) {
-      try {
-        await signInWithRedirect(auth, new GoogleAuthProvider())
-        return 'redirecting'
-      } catch (redirectError) { throw mapError(redirectError) }
-    }
-    throw mapped
-  }
+    await signInWithEmailAndPassword(activeAuth, email.trim(), password)
+  } catch (error) { throw mapCloudError(error) }
+}
+
+export async function createEmailAccount(email: string, password: string): Promise<void> {
+  try {
+    const { auth: activeAuth } = requireFirebase()
+    await createUserWithEmailAndPassword(activeAuth, email.trim(), password)
+  } catch (error) { throw mapCloudError(error) }
 }
 
 export async function signOutCloud(): Promise<void> {
   try {
     const { auth: activeAuth } = requireFirebase()
-    if (isNativeAndroid()) {
-      const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication')
-      await FirebaseAuthentication.signOut()
-    }
     await signOut(activeAuth)
-  } catch (error) { throw mapError(error) }
+  } catch (error) { throw mapCloudError(error) }
 }
 
 export function payloadSize(data: AppData): number {
@@ -166,13 +111,9 @@ export async function pushCloudData(data: AppData): Promise<string> {
     const user = requireUser()
     const { firestore: db } = requireFirebase()
     const updatedAt = new Date().toISOString()
-    await setDoc(doc(db, 'users', user.uid, 'appData', 'main'), {
-      version: data.version,
-      updatedAt,
-      data,
-    })
+    await setDoc(doc(db, 'users', user.uid, 'appData', 'main'), { version: data.version, updatedAt, data })
     return updatedAt
-  } catch (error) { throw mapError(error) }
+  } catch (error) { throw mapCloudError(error) }
 }
 
 export async function pullCloudData(): Promise<RemoteData> {
@@ -184,7 +125,23 @@ export async function pullCloudData(): Promise<RemoteData> {
     const raw = snapshot.data() as { data?: unknown; updatedAt?: unknown }
     if (!raw.data) return null
     return { data: raw.data, updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : '' }
-  } catch (error) { throw mapError(error) }
+  } catch (error) { throw mapCloudError(error) }
+}
+
+/** شنونده‌ی لحظه‌ای Firestore؛ با تغییر دستگاه دیگر فوراً callback صدا زده می‌شود. */
+export function watchCloudData(callback: (data: RemoteData) => void, onError: (error: CloudError) => void): Unsubscribe {
+  try {
+    const user = requireUser()
+    const { firestore: db } = requireFirebase()
+    return onSnapshot(doc(db, 'users', user.uid, 'appData', 'main'), snapshot => {
+      if (!snapshot.exists()) { callback(null); return }
+      const raw = snapshot.data() as { data?: unknown; updatedAt?: unknown }
+      callback(raw.data ? { data: raw.data, updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : '' } : null)
+    }, error => onError(mapCloudError(error)))
+  } catch (error) {
+    onError(mapCloudError(error))
+    return () => {}
+  }
 }
 
 export function isCloudReady(): boolean {

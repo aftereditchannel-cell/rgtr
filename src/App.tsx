@@ -22,7 +22,7 @@ import { LockScreen } from './components/layout/LockScreen'
 import { applyTheme, applyGlass, watchSystemTheme } from './lib/theme'
 import { isLockEnabled, readLock, LOCK_EVENT } from './lib/lock'
 import { isMobile, syncMobileChrome, onMobileResume } from './lib/mobile'
-import { autoPullIfEnabled } from './store/useApp'
+import { autoPullIfEnabled, refreshCloudNow, startLiveSync, stopLiveCloudSync } from './store/useApp'
 import { initCloudAuth, watchCloudUser } from './lib/cloud'
 
 /** پل منوی بومی ویندوز → روتر و اکشن‌های برنامه */
@@ -76,7 +76,16 @@ function Shell() {
   const toast = useApp(s => s.toast)
   const accent = useApp(s => s.data.settings.accent)
   const appName = useApp(s => s.data.settings.branding?.appName ?? 'NEXUS HQ')
-  const { lang, rtl } = useT()
+  const { lang, rtl, t } = useT()
+  const pullStart = useRef<number | null>(null)
+  const refresh = () => {
+    void refreshCloudNow().then(changed => {
+      useApp.getState().setToast(t(changed ? 'set.cloudPulled' : 'set.cloudUpToDate'))
+    }).catch(error => {
+      const code = (error as { code?: string }).code ?? 'unknown'
+      useApp.getState().setToast(`${t('sync.failed')}: ${code}`)
+    })
+  }
 
   useEffect(() => {
     document.documentElement.style.setProperty('--color-acc', accent)
@@ -107,9 +116,15 @@ function Shell() {
             <Icon name="Menu" size={19} />
           </button>
           <span className="text-[13px] font-semibold flex-1 truncate">{appName}</span>
+          <button onClick={refresh} className="text-[var(--color-dim)] p-1.5 -m-1 rounded-lg active:bg-[var(--hover)]" aria-label={t('set.cloudRefresh')} title={t('set.cloudRefresh')}>
+            <Icon name="RefreshCw" size={17} />
+          </button>
         </div>
 
-        <main className="flex-1 scroll-y">
+        <main className="flex-1 scroll-y" onTouchStart={e => { if (e.currentTarget.scrollTop <= 0) pullStart.current = e.touches[0]?.clientY ?? null }} onTouchEnd={e => {
+          const start = pullStart.current; pullStart.current = null
+          if (start !== null && e.currentTarget.scrollTop <= 0 && (e.changedTouches[0]?.clientY ?? start) - start > 70) refresh()
+        }}>
           <div className="max-w-[1400px] mx-auto px-3 sm:px-5 lg:px-6 py-4 sm:py-6">
             <Routes>
               <Route path="/" element={<Dashboard />} />
@@ -239,7 +254,10 @@ export default function App() {
   // دریافت خودکار Firebase را بدون منتظر ماندن برای رفرش صفحه فعال کند.
   useEffect(() => {
     void initCloudAuth()
-    return watchCloudUser(user => { if (user) void autoPullIfEnabled() })
+    return watchCloudUser(user => {
+      if (user) { startLiveSync(); void autoPullIfEnabled() }
+      else stopLiveCloudSync()
+    })
   }, [])
 
   // پوسته را پیش از آماده شدن داده هم اعمال می‌کنیم تا صفحه‌ی بارگذاری سفید/سیاه نپرد
