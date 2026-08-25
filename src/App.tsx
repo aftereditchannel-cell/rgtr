@@ -12,7 +12,7 @@ import { ModulePage } from './pages/ModulePage'
 import { Help } from './pages/Help'
 import { SocialHub } from './pages/SocialHub'
 import { Automation } from './pages/Automation'
-import { Icon } from './components/ui/Primitives'
+import { Button, Icon, Modal } from './components/ui/Primitives'
 import { BrandMark } from './components/ui/BrandMark'
 import { desktop } from './lib/desktop'
 import { exportJSON, importViaDialog } from './lib/backup'
@@ -22,7 +22,7 @@ import { LockScreen } from './components/layout/LockScreen'
 import { applyTheme, applyGlass, watchSystemTheme } from './lib/theme'
 import { isLockEnabled, readLock, LOCK_EVENT } from './lib/lock'
 import { isMobile, syncMobileChrome, onMobileResume } from './lib/mobile'
-import { autoPullIfEnabled, refreshCloudNow, startLiveSync, stopLiveCloudSync } from './store/useApp'
+import { autoPullIfEnabled, refreshCloudNow, retryPendingCloudSync } from './store/useApp'
 import { initCloudAuth, mapCloudError, watchCloudUser } from './lib/cloud'
 
 /** پل منوی بومی ویندوز → روتر و اکشن‌های برنامه */
@@ -73,6 +73,7 @@ function DesktopMenuBridge() {
 
 function Shell() {
   const [navOpen, setNavOpen] = useState(false)
+  const [syncFailure, setSyncFailure] = useState<{ code: string; detail?: string } | null>(null)
   const toast = useApp(s => s.toast)
   const accent = useApp(s => s.data.settings.accent)
   const appName = useApp(s => s.data.settings.branding?.appName ?? 'NEXUS HQ')
@@ -85,6 +86,22 @@ function Shell() {
       const cloudErr = mapCloudError(error)
       const detail = cloudErr.detail ? ` — ${t('sync.errorCode')}: ${cloudErr.detail}` : ''
       useApp.getState().setToast(`${t('sync.failed')}: ${cloudError(lang, cloudErr.code)}${detail}`)
+    })
+  }
+
+  useEffect(() => {
+    const onFailure = (event: Event) => setSyncFailure((event as CustomEvent<{ code: string; detail?: string }>).detail)
+    window.addEventListener('nexus:cloud-sync-failed', onFailure)
+    return () => window.removeEventListener('nexus:cloud-sync-failed', onFailure)
+  }, [])
+
+  const retryPending = () => {
+    void retryPendingCloudSync().then(() => {
+      setSyncFailure(null)
+      useApp.getState().setToast(t('set.cloudPushed'))
+    }).catch(error => {
+      const cloudErr = mapCloudError(error)
+      setSyncFailure(cloudErr)
     })
   }
 
@@ -149,6 +166,15 @@ function Shell() {
       <CommandPalette />
       <ExitSavePrompt />
 
+      {syncFailure && <Modal open onClose={() => setSyncFailure(null)} title={t('sync.localSavedTitle')}
+        footer={<><Button size="sm" variant="ghost" onClick={() => setSyncFailure(null)}>{t('sync.keepLocal')}</Button><Button size="sm" variant="primary" icon="RefreshCw" onClick={retryPending}>{t('sync.retry')}</Button></>}>
+        <div className="space-y-2 text-[12.5px] leading-relaxed">
+          <p>{t('sync.localSavedBody')}</p>
+          <p className="text-red-400">{cloudError(lang, syncFailure.code)}{syncFailure.detail ? ` — ${t('sync.errorCode')}: ${syncFailure.detail}` : ''}</p>
+          <p className="text-[11px] text-[var(--color-dim2)]">{t('sync.localSavedHint')}</p>
+        </div>
+      </Modal>}
+
       {toast && (
         <div className="fixed left-1/2 -translate-x-1/2 z-[70] anim px-3 w-full max-w-sm"
           style={{ bottom: 'calc(1.25rem + var(--sab) + var(--toast-lift, 0px))' }}>
@@ -182,14 +208,8 @@ function Root() {
 
   useEffect(() => { applyGlass(glass) }, [glass])
 
-  // دریافت خودکار از ابر هنگام باز شدن/بازگشت برنامه (اگر autoPull روشن باشد)
-  useEffect(() => {
-    void autoPullIfEnabled()
-    const onVis = () => { if (document.visibilityState === 'visible') void autoPullIfEnabled() }
-    document.addEventListener('visibilitychange', onVis)
-    const offResume = onMobileResume(() => void autoPullIfEnabled())
-    return () => { document.removeEventListener('visibilitychange', onVis); offResume() }
-  }, [])
+  // فقط یک‌بار در شروع برنامه از ابر بررسی می‌کنیم؛ بعد از آن Refresh دستی است.
+  useEffect(() => { void autoPullIfEnabled() }, [])
 
   // قفل خودکار: پس از بی‌کاری، یا وقتی برنامه از پس‌زمینه برمی‌گردد
   useEffect(() => {
@@ -255,10 +275,7 @@ export default function App() {
   // دریافت خودکار Firebase را بدون منتظر ماندن برای رفرش صفحه فعال کند.
   useEffect(() => {
     void initCloudAuth()
-    return watchCloudUser(user => {
-      if (user) { startLiveSync(); void autoPullIfEnabled() }
-      else stopLiveCloudSync()
-    })
+    return watchCloudUser(user => { if (user) void autoPullIfEnabled() })
   }, [])
 
   // پوسته را پیش از آماده شدن داده هم اعمال می‌کنیم تا صفحه‌ی بارگذاری سفید/سیاه نپرد

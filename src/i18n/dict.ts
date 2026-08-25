@@ -627,6 +627,13 @@ export const UI: Record<string, Pair> = {
   'set.cloudUpToDate': { fa: 'اطلاعات همین حالا به‌روز است', en: 'Your data is already up to date' },
   'sync.failed': { fa: 'ارسال خودکار ناموفق بود', en: 'Auto-sync failed' },
   'sync.errorCode': { fa: 'کد Firebase', en: 'Firebase code' },
+  'sync.localSavedTitle': { fa: 'داده روی دستگاه ذخیره شد', en: 'Data saved on this device' },
+  'sync.localSavedBody': { fa: 'ارسال به Firebase انجام نشد، اما داده‌ی شما امن و روی همین دستگاه ذخیره شده است.', en: 'Firebase upload did not complete, but your data is safe and saved on this device.' },
+  'sync.localSavedHint': { fa: 'با وصل‌شدن اینترنت یا ذخیره‌ی بعدی، برنامه دوباره تلاش می‌کند. می‌توانید همین حالا هم تلاش مجدد را بزنید.', en: 'The app retries when online or after your next save. You can also retry now.' },
+  'sync.keepLocal': { fa: 'فقط محلی نگه دار', en: 'Keep local only' },
+  'sync.retry': { fa: 'تلاش مجدد', en: 'Retry now' },
+  'set.cloudPending': { fa: 'یک تغییر فقط محلی است و منتظر ارسال به Firebase است', en: 'One local change is waiting to be sent to Firebase' },
+  'set.cloudStartupHint': { fa: 'فقط یک‌بار هنگام بازشدن برنامه نسخه ابری را بررسی می‌کند', en: 'Checks the cloud version once when the app opens' },
 }
 
 /** پیام‌های وضعیت اتصال ابری که خارج از React هم لازم می‌شوند */

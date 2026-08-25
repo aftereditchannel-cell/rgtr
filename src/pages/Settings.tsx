@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useApp, refreshCloudNow, startLiveSync, stopLiveCloudSync } from '../store/useApp'
+import { useApp, refreshCloudNow } from '../store/useApp'
 import { exportJSON, importJSON } from '../lib/backup'
 import { listSnapshots, getSnapshot, storageBackend, saveDoc } from '../lib/db'
 import type { Snapshot } from '../store/types'
@@ -485,7 +485,8 @@ function CloudCard() {
     {err && <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/25 bg-red-500/[.07] px-3 py-2 text-[11.5px] text-red-300"><Icon name="AlertTriangle" size={13} className="mt-0.5 shrink-0" /><span>{err}</span></div>}
     <div className="mt-4 pt-3 border-t border-[var(--color-line)] grid sm:grid-cols-2 gap-2 text-[11.5px]"><Row label={t('set.cloudLastSync')} value={c.lastSync ? fmt.relTime(c.lastSync) : t('common.never')} /><Row label={t('set.cloudSize')} value={`${fmt.dg((size / 1024).toFixed(1))} KB`} /></div>
     <label className="mt-3 flex items-center gap-2 cursor-pointer"><input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={c.autoSync} onChange={e => setSettings({ cloud: { ...c, autoSync: e.target.checked } })} /><span className="text-[12px]">{t('set.cloudAutoSync')}</span><span className="text-[10.5px] text-[var(--color-dim2)]">— {t('set.firebaseAutoSyncHint')}</span></label>
-    <label className="mt-2.5 flex items-center gap-2 cursor-pointer"><input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={c.autoPull} onChange={e => { setSettings({ cloud: { ...c, autoPull: e.target.checked } }); if (e.target.checked) startLiveSync(); else stopLiveCloudSync() }} /><span className="text-[12px]">{t('set.cloudAutoPull')}</span><span className="text-[10.5px] text-[var(--color-dim2)]">— {t('set.firebaseLiveHint')}</span></label>
+    <label className="mt-2.5 flex items-center gap-2 cursor-pointer"><input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={c.autoPull} onChange={e => setSettings({ cloud: { ...c, autoPull: e.target.checked } })} /><span className="text-[12px]">{t('set.cloudAutoPull')}</span><span className="text-[10.5px] text-[var(--color-dim2)]">— {t('set.cloudStartupHint')}</span></label>
+    {c.pendingSync && <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/25 bg-amber-500/[.07] px-3 py-2 text-[11.5px] text-amber-300"><Icon name="Clock3" size={13} className="mt-0.5 shrink-0" /><span>{t('set.cloudPending')}{c.lastSyncError ? ` — ${t('sync.errorCode')}: ${c.lastSyncError}` : ''}</span></div>}
   </Card>
 }
 

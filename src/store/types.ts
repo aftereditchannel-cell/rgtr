@@ -73,8 +73,12 @@ export interface CloudSettings {
   lastLocalChange: string
   /** ذخیره‌ی خودکار روی ابر بعد از هر تغییر (debounced) */
   autoSync: boolean
-  /** دریافت خودکار از ابر هنگام باز شدن/بازگشت برنامه */
+  /** فقط یک‌بار هنگام باز شدن برنامه از ابر بررسی می‌شود */
   autoPull: boolean
+  /** ارسال محلی انجام شده اما ارسال آنلاین ناموفق بوده و باید بعداً retry شود */
+  pendingSync: boolean
+  /** آخرین کد خطای Firebase برای نمایش و بررسی در تنظیمات */
+  lastSyncError: string
 }
 
 /** تنظیمات هوش مصنوعی Agent Runner — کلید API جدا (در localStorage) ذخیره می‌شود */

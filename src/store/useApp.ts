@@ -66,6 +66,7 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null
 let syncTimer: ReturnType<typeof setTimeout> | null = null
 let pushInFlight = false
 let stopLiveSync: (() => void) | null = null
+let didAutoPullThisSession = false
 
 export const useApp = create<Store>((set, get) => {
   /** ذخیره‌ی خودکار Firebase بعد از هر تغییر؛ ذخیره‌ی محلی همیشه اول انجام می‌شود. */
@@ -85,12 +86,17 @@ export const useApp = create<Store>((set, get) => {
     try {
       const updatedAt = await cloud.pushCloudData(get().data)
       // مستقیم با set تا sync دوباره زمان‌بندی و حلقه ایجاد نکند.
-      set(s => ({ data: { ...s.data, settings: { ...s.data.settings, cloud: { ...s.data.settings.cloud, lastSync: updatedAt } } } }))
+      set(s => ({ data: { ...s.data, settings: { ...s.data.settings, cloud: { ...s.data.settings.cloud, lastSync: updatedAt, pendingSync: false, lastSyncError: '' } } } }))
+      await get().persist()
       get().setToast(tr(lang, 'set.cloudPushed'))
     } catch (error) {
       const cloudErr = cloud.mapCloudError(error)
+      // هیچ‌وقت داده‌ی محلی را حذف نمی‌کنیم: وضعیت pending در خود فایل/دیتابیس محلی می‌ماند.
+      set(s => ({ data: { ...s.data, settings: { ...s.data.settings, cloud: { ...s.data.settings.cloud, pendingSync: true, lastSyncError: cloudErr.detail || cloudErr.code } } } }))
+      await get().persist()
       const detail = cloudErr.detail ? ` — ${tr(lang, 'sync.errorCode')}: ${cloudErr.detail}` : ''
       get().setToast(`${tr(lang, 'sync.failed')}: ${cloudError(lang, cloudErr.code)}${detail}`)
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('nexus:cloud-sync-failed', { detail: cloudErr }))
     } finally { pushInFlight = false }
   }
 
@@ -396,6 +402,8 @@ async function applyRemote(res: cloud.RemoteData): Promise<boolean> {
   if (!res || pushInFlight) return false
   const st = useApp.getState()
   const c = st.data.settings.cloud
+  // تا وقتی ارسال محلیِ قبلی تأیید نشده، pull خودکار حق overwrite کردن دستگاه را ندارد.
+  if (c.pendingSync) return false
   const remoteT = Date.parse(res.updatedAt) || 0
   const localT = Math.max(Date.parse(c.lastSync) || 0, Date.parse(c.lastLocalChange) || 0)
   if (remoteT <= localT) return false
@@ -408,6 +416,15 @@ async function applyRemote(res: cloud.RemoteData): Promise<boolean> {
 export async function refreshCloudNow(): Promise<boolean> {
   if (!cloud.isCloudReady()) throw new cloud.CloudError('not_signed_in')
   return applyRemote(await cloud.pullCloudData())
+}
+
+/** تلاش دستی برای ارسال داده‌ای که قبلاً فقط محلی ذخیره شده است. */
+export async function retryPendingCloudSync(): Promise<void> {
+  const st = useApp.getState()
+  if (!cloud.isCloudReady()) throw new cloud.CloudError('not_signed_in')
+  const updatedAt = await cloud.pushCloudData(st.data)
+  useApp.setState(s => ({ data: { ...s.data, settings: { ...s.data.settings, cloud: { ...s.data.settings.cloud, lastSync: updatedAt, pendingSync: false, lastSyncError: '' } } } }))
+  await useApp.getState().persist()
 }
 
 /** شنونده‌ی لحظه‌ای Firestore؛ تغییر دستگاه دیگر بدون polling به‌طور خودکار اعمال می‌شود. */
@@ -434,7 +451,8 @@ export function stopLiveCloudSync(): void {
 /** دریافت خودکار Firebase در شروع/بازگشت. */
 export async function autoPullIfEnabled(): Promise<void> {
   const st = useApp.getState()
-  if (!st.data.settings.cloud.autoPull || !cloud.isCloudReady()) return
+  if (didAutoPullThisSession || !st.data.settings.cloud.autoPull || !cloud.isCloudReady()) return
+  didAutoPullThisSession = true
   try { await refreshCloudNow() } catch { /* آفلاین بودن نباید برنامه را متوقف کند */ }
 }
 
