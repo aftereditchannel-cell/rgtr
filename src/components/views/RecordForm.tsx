@@ -8,10 +8,57 @@ import { Dropdown } from '../ui/Dropdown'
 import { useT } from '../../i18n'
 import { useFmt } from '../../lib/useFmt'
 import { fetchSocialProfile } from '../../lib/social'
+import { isoToJalali } from '../../lib/jalali'
 
 interface Props { module: ModuleDef; row: Entity | null; open: boolean; onClose: () => void }
 
 type ChecklistItem = { t: string; done: boolean }
+
+/** تقویم سفارشی یکسان در Android، Electron و وب؛ تاریخ در داده همیشه ISO میلادی می‌ماند. */
+function DateField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const { t } = useT()
+  const fmt = useFmt()
+  const [open, setOpen] = useState(false)
+  const selected = value.slice(0, 10)
+  const initialMonth = () => {
+    if (selected && fmt.opts.calendar === 'jalali' && fmt.opts.lang === 'fa') {
+      const j = isoToJalali(selected)
+      if (j) return { year: j.jy, month: j.jm - 1 }
+    }
+    if (selected) { const d = new Date(selected + 'T00:00:00'); return { year: d.getFullYear(), month: d.getMonth() } }
+    return fmt.currentYearMonth()
+  }
+  const [cursor, setCursor] = useState(initialMonth)
+  const show = () => { setCursor(initialMonth()); setOpen(true) }
+  const choose = (iso: string) => { onChange(iso); setOpen(false) }
+  const today = new Date().toISOString().slice(0, 10)
+
+  return <>
+    <button type="button" onClick={show} className="w-full flex items-center gap-2 rounded-lg bg-[var(--color-bg)] border border-[var(--color-line2)] px-3 py-2 text-[13px] text-start hover:border-[var(--color-dim2)] focus:border-[var(--color-acc)]">
+      <Icon name="Calendar" size={15} className="text-[var(--color-acc)] shrink-0" />
+      <span className={selected ? 'flex-1' : 'flex-1 text-[var(--color-dim2)]'}>{selected ? fmt.date(selected) : t('form.pickDate')}</span>
+      <Icon name="ChevronDown" size={14} className="text-[var(--color-dim2)]" />
+    </button>
+    <Modal open={open} onClose={() => setOpen(false)} title={t('form.pickDate')} footer={<><Button size="sm" variant="ghost" onClick={() => choose('')}>{t('form.clearDate')}</Button><Button size="sm" variant="outline" onClick={() => { setCursor(fmt.currentYearMonth()); choose(today) }}>{t('form.today')}</Button><Button size="sm" variant="primary" onClick={() => setOpen(false)}>{t('common.done')}</Button></>}>
+      <div className="min-w-[260px]">
+        <div className="flex items-center justify-between mb-4">
+          <Button size="sm" variant="ghost" icon="ChevronRight" onClick={() => setCursor(fmt.shiftMonth(cursor.year, cursor.month, -1))} title={t('form.prevMonth')} />
+          <span className="text-[13px] font-semibold">{fmt.monthTitle(cursor.year, cursor.month)}</span>
+          <Button size="sm" variant="ghost" icon="ChevronLeft" onClick={() => setCursor(fmt.shiftMonth(cursor.year, cursor.month, 1))} title={t('form.nextMonth')} />
+        </div>
+        <div className="grid grid-cols-7 gap-1 text-center mb-1">{fmt.weekdayNames().map(day => <span key={day} className="text-[10px] text-[var(--color-dim2)] py-1">{day}</span>)}</div>
+        <div className="grid grid-cols-7 gap-1">
+          {fmt.monthMatrix(cursor.year, cursor.month).flat().map((iso, i) => {
+            if (!iso) return <span key={`empty-${i}`} />
+            const day = fmt.opts.calendar === 'jalali' && fmt.opts.lang === 'fa' ? isoToJalali(iso)?.jd ?? '' : Number(iso.slice(8))
+            const isSelected = iso === selected, isToday = iso === today
+            return <button key={iso} type="button" onClick={() => choose(iso)} className={`h-9 rounded-lg text-[12px] transition-colors ${isSelected ? 'bg-[var(--color-acc)] text-white font-semibold' : isToday ? 'border border-[var(--color-acc)] text-[var(--color-acc)]' : 'hover:bg-white/[.07] text-[var(--color-tx)]'}`}>{fmt.dg(day)}</button>
+          })}
+        </div>
+      </div>
+    </Modal>
+  </>
+}
 
 export function RecordForm({ module, row, open, onClose }: Props) {
   const { add, update, remove, data } = useApp()
@@ -52,7 +99,7 @@ export function RecordForm({ module, row, open, onClose }: Props) {
           </div>
         )
       case 'date':
-        return <TextInput type="date" value={String(val ?? '').slice(0, 10)} onChange={e => set(f.key, e.target.value)} />
+        return <DateField value={String(val ?? '').slice(0, 10)} onChange={date => set(f.key, date)} />
       case 'select':
         return (
           <Dropdown
