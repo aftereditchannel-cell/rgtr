@@ -39,6 +39,7 @@ export function Settings() {
   const [newMod, setNewMod] = useState('')
   const [editMod, setEditMod] = useState<ModuleDef | null>(null)
   const [showTpl, setShowTpl] = useState(false)
+  const [section, setSection] = useState<'sync' | 'appearance' | 'api' | 'data' | 'system'>('sync')
 
   useEffect(() => { void listSnapshots().then(setSnaps) }, [data])
 
@@ -77,6 +78,26 @@ export function Settings() {
         </p>
       </div>
 
+      <nav className="sticky top-0 z-20 -mx-1 px-1 py-2 bg-[var(--color-bg)]/90 backdrop-blur border-y border-[var(--color-line)] overflow-x-auto">
+        <div className="flex gap-1 min-w-max">
+          {([
+            ['sync', 'Cloud', 'set.sectionSync'],
+            ['appearance', 'Palette', 'set.sectionAppearance'],
+            ['api', 'Plug', 'set.sectionApi'],
+            ['data', 'DatabaseBackup', 'set.sectionData'],
+            ['system', 'Monitor', 'set.sectionSystem'],
+          ] as const).map(([id, icon, label]) => (
+            <button key={id} onClick={() => setSection(id)} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-[11.5px] transition-colors ${section === id ? 'bg-[var(--color-acc)] text-white font-medium' : 'text-[var(--color-dim)] hover:bg-[var(--hover)] hover:text-[var(--color-tx)]'}`}>
+              <Icon name={icon} size={13} />{t(label)}
+            </button>
+          ))}
+        </div>
+      </nav>
+
+      {/* همگام‌سازی همیشه اولین دسته است */}
+      <div className={section === 'sync' ? '' : 'hidden'}><CloudCard /></div>
+
+      <div className={section === 'appearance' ? '' : 'hidden'}>
       {/* ---------- general ---------- */}
       <Card>
         <SectionTitle icon="User">{t('set.general')}</SectionTitle>
@@ -164,15 +185,17 @@ export function Settings() {
       {/* ---------- security ---------- */}
       <SecurityCard />
 
+      </div>
+
+      <div className={section === 'api' ? '' : 'hidden'}>
       {/* ---------- ai ---------- */}
       <AiCard />
 
       {/* ---------- social ---------- */}
       <SocialCard />
+      </div>
 
-      {/* ---------- cloud ---------- */}
-      <CloudCard />
-
+      <div className={section === 'data' ? '' : 'hidden'}>
       {/* ---------- backup ---------- */}
       <Card>
         <SectionTitle icon="DatabaseBackup">{t('set.backup')}</SectionTitle>
@@ -204,10 +227,15 @@ export function Settings() {
         )}
       </Card>
 
+      </div>
+
+      <div className={section === 'system' ? '' : 'hidden'}>
       {/* ---------- desktop ---------- */}
       <DesktopCard onSaved={async () => { await persist(); await saveDoc(useApp.getState().data); setToast(t('set.savedNow')) }} />
       <UpdateCard />
+      </div>
 
+      <div className={section === 'data' ? '' : 'hidden'}>
       {/* ---------- modules ---------- */}
       <Card id="modules">
         <SectionTitle icon="Blocks" right={<span className="text-[10.5px] text-[var(--color-dim2)] nums">{t('set.moduleCount', { n: fmt.dg(data.modules.length) })}</span>}>
@@ -264,6 +292,9 @@ export function Settings() {
         </div>
       </Card>
 
+      </div>
+
+      <div className={section === 'api' ? '' : 'hidden'}>
       {/* ---------- future integrations ---------- */}
       <Card>
         <SectionTitle icon="Plug">{t('set.integrations')}</SectionTitle>
@@ -288,6 +319,9 @@ export function Settings() {
         </div>
       </Card>
 
+      </div>
+
+      <div className={section === 'data' ? '' : 'hidden'}>
       {/* ---------- danger ---------- */}
       <Card className="border-red-500/20">
         <SectionTitle icon="AlertTriangle">{t('set.danger')}</SectionTitle>
@@ -302,6 +336,8 @@ export function Settings() {
           </Button>
         </div>
       </Card>
+
+      </div>
 
       {editMod && <ModuleEditor module={editMod} onClose={() => setEditMod(null)} onSave={p => { updateModule(editMod.key, p); setEditMod(null) }} />}
       {showTpl && <NewModuleModal open={showTpl} onClose={() => setShowTpl(false)}

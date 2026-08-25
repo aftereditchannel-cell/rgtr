@@ -603,6 +603,11 @@ export const UI: Record<string, Pair> = {
   'set.aiTestSave':    { fa: 'ذخیره و تست اتصال', en: 'Save & test connection' },
   'social.profiles':   { fa: 'پروفایل', en: 'profiles' },
 
+  'set.sectionSync': { fa: 'همگام‌سازی', en: 'Sync' },
+  'set.sectionAppearance': { fa: 'ظاهر و حساب', en: 'Appearance & account' },
+  'set.sectionApi': { fa: 'API و اتصال‌ها', en: 'API & integrations' },
+  'set.sectionData': { fa: 'داده و بکاپ', en: 'Data & backup' },
+  'set.sectionSystem': { fa: 'سیستم و نسخه', en: 'System & version' },
   'set.firebaseTitle': { fa: 'همگام‌سازی ابری لحظه‌ای Firebase', en: 'Firebase Cloud sync' },
   'set.firebaseIntro': { fa: 'با ایمیل و رمز خود یک حساب بسازید. هر تغییر ابتدا روی دستگاه ذخیره و سپس خودکار و لحظه‌ای با Firebase همگام می‌شود.', en: 'Create an account with email and password. Every change is saved locally first, then synced automatically and live through Firebase.' },
   'set.firebaseNotConfigured': { fa: 'تنظیمات Firebase در نسخهٔ برنامه موجود نیست.', en: 'Firebase configuration is unavailable in this app build.' },

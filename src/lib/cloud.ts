@@ -67,7 +67,11 @@ export async function initCloudAuth(): Promise<void> {
   if (!authReady) {
     authReady = (async () => {
       const { auth: activeAuth } = requireFirebase()
-      await setPersistence(activeAuth, browserLocalPersistence)
+      // Electron/Capacitor معمولاً local persistence دارند. اگر یک WebView محدودش کند،
+      // Auth پیش‌فرض Firebase همچنان کار می‌کند و نباید کل ورود را متوقف کند.
+      try { await setPersistence(activeAuth, browserLocalPersistence) } catch (error) {
+        console.warn('[NEXUS HQ] Firebase persistence fallback', error)
+      }
     })()
   }
   return authReady
