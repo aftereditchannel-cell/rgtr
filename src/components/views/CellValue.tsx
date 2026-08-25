@@ -63,7 +63,22 @@ export function CellValue({ f, row, data, currency }: { f: FieldDef; row: Entity
     }
     case 'textarea':
       return <span className="text-[12px] text-[var(--color-dim)] line-clamp-1">{String(v ?? '') || '—'}</span>
-    default:
-      return <span className="truncate">{String(v ?? '') || <span className="text-[var(--color-dim2)]">—</span>}</span>
+    default: {
+      const text = String(v ?? '')
+      if (!text) return <span className="text-[var(--color-dim2)]">—</span>
+      // فیلدهای تلفن (یا عددی که شکل تلفن دارد) در Android تماس می‌گیرند و در Windows شماره‌گیر پیش‌فرض را باز می‌کنند.
+      const phone = f.key.toLowerCase().includes('phone') || f.label.toLowerCase().includes('phone')
+      const normalized = text.replace(/[\s().-]/g, '')
+      if (phone && /^\+?[0-9]{7,15}$/.test(normalized)) {
+        return <a href={`tel:${normalized}`} onClick={e => e.stopPropagation()} className="inline-flex items-center gap-1 text-[var(--color-acc)] hover:underline ltr"><Icon name="Phone" size={12} />{text}</a>
+      }
+      // لینک‌هایی که در فیلد متنی وارد شده‌اند نیز بدون نیاز به تعیین نوع فیلد clickable هستند.
+      const urlMatch = text.match(/^(https?:\/\/[^\s]+|(?:www\.)[^\s]+)$/i)
+      if (urlMatch) {
+        const href = text.startsWith('http') ? text : `https://${text}`
+        return <a href={href} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className="truncate block text-[var(--color-acc)] hover:underline ltr">{text}</a>
+      }
+      return <span className="truncate">{text}</span>
+    }
   }
 }

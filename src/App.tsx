@@ -24,6 +24,7 @@ import { isLockEnabled, readLock, LOCK_EVENT } from './lib/lock'
 import { isMobile, syncMobileChrome, onMobileResume } from './lib/mobile'
 import { autoPullIfEnabled, refreshCloudNow, retryPendingCloudSync } from './store/useApp'
 import { initCloudAuth, mapCloudError, watchCloudUser } from './lib/cloud'
+import { fetchProfileCached } from './domain/social'
 
 /** پل منوی بومی ویندوز → روتر و اکشن‌های برنامه */
 function DesktopMenuBridge() {
@@ -80,6 +81,8 @@ function Shell() {
   const { lang, rtl, t } = useT()
   const pullStart = useRef<number | null>(null)
   const refresh = () => {
+    // یک Refresh دستی، پروفایل‌های اجتماعی صفحه‌ی فعلی را هم تازه می‌کند.
+    window.dispatchEvent(new Event('nexus:refresh-social'))
     void refreshCloudNow().then(changed => {
       useApp.getState().setToast(t(changed ? 'set.cloudPulled' : 'set.cloudUpToDate'))
     }).catch(error => {
@@ -280,6 +283,20 @@ export default function App() {
   const lang = useApp(s => s.data.settings.lang) ?? 'fa'
 
   useEffect(() => { void init() }, [init])
+
+  // آمار شبکه‌های اجتماعیِ قابل‌دسترسی هنگام ورود به اپ تازه می‌شود؛ خطای هر پلتفرم
+  // فقط روی همان کارت ثبت می‌شود و هرگز مانع بازشدن برنامه نیست.
+  useEffect(() => {
+    if (!ready) return
+    const social = useApp.getState().data.settings.social
+    if (!social.autoRefresh || !social.profiles.length) return
+    void Promise.all(social.profiles.map(async profile => {
+      try {
+        const fresh = await fetchProfileCached(profile.url, { keys: useApp.getState().data.settings.social.keys })
+        useApp.getState().upsertProfile(fresh)
+      } catch { /* provider خودش خطای قابل‌نمایش ذخیره می‌کند */ }
+    }))
+  }, [ready])
 
   // احراز هویت مستقل از ذخیره‌سازی محلی آماده می‌شود؛ ورود کاربر می‌تواند
   // دریافت خودکار Firebase را بدون منتظر ماندن برای رفرش صفحه فعال کند.

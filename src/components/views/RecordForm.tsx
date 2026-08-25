@@ -156,8 +156,10 @@ export function RecordForm({ module, row, open, onClose }: Props) {
           </div>
         )
       }
-      default:
-        return <TextInput value={String(val ?? '')} placeholder={f.placeholder} onChange={e => set(f.key, e.target.value)} />
+      default: {
+        const isPhone = f.key.toLowerCase().includes('phone') || f.label.toLowerCase().includes('phone')
+        return <TextInput type={isPhone ? 'tel' : 'text'} inputMode={isPhone ? 'tel' : undefined} value={String(val ?? '')} placeholder={f.placeholder} onChange={e => set(f.key, e.target.value)} />
+      }
     }
   }
 

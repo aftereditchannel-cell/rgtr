@@ -608,6 +608,7 @@ export const UI: Record<string, Pair> = {
   'set.aiWorkflow':    { fa: 'AI برای جریان‌های کاری (OpenAI / Gemini / Claude)', en: 'Workflow AI (OpenAI / Gemini / Claude)' },
   'set.aiTestSave':    { fa: 'ذخیره و تست اتصال', en: 'Save & test connection' },
   'social.profiles':   { fa: 'پروفایل', en: 'profiles' },
+  'social.following':  { fa: 'دنبال‌کردن', en: 'Following' },
 
   'set.sectionSync': { fa: 'همگام‌سازی', en: 'Sync' },
   'set.sectionAppearance': { fa: 'ظاهر و حساب', en: 'Appearance & account' },
