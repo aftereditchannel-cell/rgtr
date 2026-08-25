@@ -1,3 +1,25 @@
+name: Release — Android APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '22'
+  JAVA_VERSION: '21'
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/setup-java@v5
         with:
           java-version: '21'
@@ -12,9 +34,14 @@
           node-version: '22'
           cache: 'npm'
 
-      - run: npm ci
-      - run: npm run build
-      - run: npx cap sync android
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web application
+        run: npm run build
+
+      - name: Sync Capacitor Android
+        run: npx cap sync android
 
       - name: Build APK
         shell: bash
@@ -24,15 +51,17 @@
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon --stacktrace --info 2>&1 | tee ../android-build.log
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload Android build log
         if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: android-build-log
           path: android-build.log
           if-no-files-found: warn
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload Android APK
         if: success()
+        uses: actions/upload-artifact@v4
         with:
           name: android-apk
           path: android/**/*.apk
