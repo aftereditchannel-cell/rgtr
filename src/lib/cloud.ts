@@ -16,11 +16,14 @@ const MAX_DOCUMENT_BYTES = 900 * 1024
 export type CloudCode =
   | 'not_configured' | 'not_signed_in' | 'bad_email' | 'weak_password'
   | 'email_in_use' | 'wrong_password' | 'user_not_found' | 'too_many_requests'
-  | 'network' | 'permission' | 'too_large' | 'unknown'
+  | 'network' | 'permission' | 'provider_disabled' | 'firestore_missing'
+  | 'bad_firebase_config' | 'too_large' | 'unknown'
 
 export class CloudError extends Error {
   code: CloudCode
-  constructor(code: CloudCode) { super(code); this.code = code; this.name = 'CloudError' }
+  /** Firebase code is safe to show and makes support/debugging possible without exposing credentials. */
+  detail: string
+  constructor(code: CloudCode, detail = '') { super(code); this.code = code; this.detail = detail; this.name = 'CloudError' }
 }
 
 export type CloudUser = Pick<User, 'uid' | 'displayName' | 'email' | 'photoURL'>
@@ -41,17 +44,21 @@ function requireUser(): User {
 
 export function mapCloudError(error: unknown): CloudError {
   if (error instanceof CloudError) return error
-  const detail = `${String((error as { code?: string })?.code ?? '')} ${String((error as Error)?.message ?? '')}`.toLowerCase()
-  if (detail.includes('invalid-email')) return new CloudError('bad_email')
-  if (detail.includes('weak-password')) return new CloudError('weak_password')
-  if (detail.includes('email-already-in-use')) return new CloudError('email_in_use')
-  if (detail.includes('wrong-password') || detail.includes('invalid-credential')) return new CloudError('wrong_password')
-  if (detail.includes('user-not-found')) return new CloudError('user_not_found')
-  if (detail.includes('too-many-requests')) return new CloudError('too_many_requests')
-  if (detail.includes('permission-denied')) return new CloudError('permission')
-  if (detail.includes('network') || detail.includes('timeout') || detail.includes('unavailable')) return new CloudError('network')
+  const rawCode = String((error as { code?: string })?.code ?? '')
+  const detail = `${rawCode} ${String((error as Error)?.message ?? '')}`.toLowerCase()
+  if (detail.includes('invalid-email')) return new CloudError('bad_email', rawCode)
+  if (detail.includes('weak-password')) return new CloudError('weak_password', rawCode)
+  if (detail.includes('email-already-in-use')) return new CloudError('email_in_use', rawCode)
+  if (detail.includes('wrong-password') || detail.includes('invalid-credential')) return new CloudError('wrong_password', rawCode)
+  if (detail.includes('user-not-found')) return new CloudError('user_not_found', rawCode)
+  if (detail.includes('too-many-requests')) return new CloudError('too_many_requests', rawCode)
+  if (detail.includes('operation-not-allowed') || detail.includes('operation-not-supported')) return new CloudError('provider_disabled', rawCode)
+  if (detail.includes('permission-denied')) return new CloudError('permission', rawCode)
+  if (detail.includes('failed-precondition')) return new CloudError('firestore_missing', rawCode)
+  if (detail.includes('api-key-not-valid') || detail.includes('invalid-api-key') || detail.includes('app-not-authorized')) return new CloudError('bad_firebase_config', rawCode)
+  if (detail.includes('network') || detail.includes('timeout') || detail.includes('unavailable')) return new CloudError('network', rawCode)
   console.warn('[NEXUS HQ] Firebase sync failed', error)
-  return new CloudError('unknown')
+  return new CloudError('unknown', rawCode || String((error as Error)?.message ?? '').slice(0, 120))
 }
 
 /** نشست ایمیل/رمز را روی دستگاه نگه می‌دارد؛ هیچ redirect یا Google login وجود ندارد. */

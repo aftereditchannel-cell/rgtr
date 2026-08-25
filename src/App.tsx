@@ -16,14 +16,14 @@ import { Icon } from './components/ui/Primitives'
 import { BrandMark } from './components/ui/BrandMark'
 import { desktop } from './lib/desktop'
 import { exportJSON, importViaDialog } from './lib/backup'
-import { useT, tr } from './i18n'
+import { useT, tr, cloudError } from './i18n'
 import { ExitSavePrompt } from './components/layout/ExitSavePrompt'
 import { LockScreen } from './components/layout/LockScreen'
 import { applyTheme, applyGlass, watchSystemTheme } from './lib/theme'
 import { isLockEnabled, readLock, LOCK_EVENT } from './lib/lock'
 import { isMobile, syncMobileChrome, onMobileResume } from './lib/mobile'
 import { autoPullIfEnabled, refreshCloudNow, startLiveSync, stopLiveCloudSync } from './store/useApp'
-import { initCloudAuth, watchCloudUser } from './lib/cloud'
+import { initCloudAuth, mapCloudError, watchCloudUser } from './lib/cloud'
 
 /** پل منوی بومی ویندوز → روتر و اکشن‌های برنامه */
 function DesktopMenuBridge() {
@@ -82,8 +82,9 @@ function Shell() {
     void refreshCloudNow().then(changed => {
       useApp.getState().setToast(t(changed ? 'set.cloudPulled' : 'set.cloudUpToDate'))
     }).catch(error => {
-      const code = (error as { code?: string }).code ?? 'unknown'
-      useApp.getState().setToast(`${t('sync.failed')}: ${code}`)
+      const cloudErr = mapCloudError(error)
+      const detail = cloudErr.detail ? ` — ${t('sync.errorCode')}: ${cloudErr.detail}` : ''
+      useApp.getState().setToast(`${t('sync.failed')}: ${cloudError(lang, cloudErr.code)}${detail}`)
     })
   }
 

@@ -621,6 +621,7 @@ export const UI: Record<string, Pair> = {
   'set.cloudRefresh': { fa: 'تازه‌سازی از ابر', en: 'Refresh from cloud' },
   'set.cloudUpToDate': { fa: 'اطلاعات همین حالا به‌روز است', en: 'Your data is already up to date' },
   'sync.failed': { fa: 'ارسال خودکار ناموفق بود', en: 'Auto-sync failed' },
+  'sync.errorCode': { fa: 'کد Firebase', en: 'Firebase code' },
 }
 
 /** پیام‌های وضعیت اتصال ابری که خارج از React هم لازم می‌شوند */
@@ -634,7 +635,10 @@ export const CLOUD_ERR: Record<string, Pair> = {
   user_not_found: { fa: 'برای این ایمیل حسابی پیدا نشد؛ ساخت حساب را بزنید.', en: 'No account exists for this email. Create an account.' },
   too_many_requests: { fa: 'تلاش‌های ناموفق زیاد بود؛ کمی بعد دوباره امتحان کنید.', en: 'Too many failed attempts. Try again later.' },
   permission: { fa: 'Firebase اجازهٔ خواندن یا نوشتن نداد. Firestore Rules را بررسی کنید.', en: 'Firebase denied read or write access. Check Firestore Rules.' },
-  network: { fa: 'اتصال اینترنت یا Firebase برقرار نشد. داده‌های محلی محفوظ هستند.', en: 'Could not reach Firebase. Your local data is safe.' },
+  provider_disabled: { fa: 'ورود با ایمیل/رمز در Firebase فعال نیست. Authentication → Sign-in method → Email/Password را Enable کنید.', en: 'Email/Password sign-in is disabled. Enable it in Authentication → Sign-in method.' },
+  firestore_missing: { fa: 'Cloud Firestore هنوز ساخته نشده است. در Firebase Console یک Firestore Database بسازید.', en: 'Cloud Firestore has not been created yet. Create a Firestore Database in Firebase Console.' },
+  bad_firebase_config: { fa: 'تنظیمات Firebase یا API key این نسخه معتبر نیست.', en: 'This build has an invalid Firebase configuration or API key.' },
+  network: { fa: 'Firebase از این اینترنت قابل دسترس نیست. اینترنت، VPN یا محدودیت شبکه را بررسی کنید؛ دادهٔ محلی محفوظ است.', en: 'Firebase is unreachable from this network. Check internet, VPN, or network restrictions; local data is safe.' },
   too_large: { fa: 'حجم داده برای یک سند Firestore زیاد است. فایل یا عکس بزرگ را از داده‌ها حذف کنید.', en: 'Data is too large for one Firestore document. Remove large files or images.' },
   unknown: { fa: 'خطای ناشناخته در Firebase رخ داد. اتصال اینترنت و تنظیمات Firebase را بررسی کنید.', en: 'An unknown Firebase error occurred. Check your connection and Firebase setup.' },
 }

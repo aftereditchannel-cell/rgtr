@@ -412,8 +412,9 @@ function CloudCard() {
   }, [])
 
   const fail = (e: unknown) => {
-    const code = e instanceof cloud.CloudError ? e.code : 'unknown'
-    setErr(cloudError(lang, code)); setState('idle')
+    const cloudErr = cloud.mapCloudError(e)
+    const diagnostic = cloudErr.detail ? ` — ${t('sync.errorCode')}: ${cloudErr.detail}` : ''
+    setErr(cloudError(lang, cloudErr.code) + diagnostic); setState('idle')
   }
   const signIn = async (create = false) => {
     setErr(''); setState('busy')

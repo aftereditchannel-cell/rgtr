@@ -88,8 +88,9 @@ export const useApp = create<Store>((set, get) => {
       set(s => ({ data: { ...s.data, settings: { ...s.data.settings, cloud: { ...s.data.settings.cloud, lastSync: updatedAt } } } }))
       get().setToast(tr(lang, 'set.cloudPushed'))
     } catch (error) {
-      const code = cloud.mapCloudError(error).code
-      get().setToast(`${tr(lang, 'sync.failed')}: ${cloudError(lang, code)}`)
+      const cloudErr = cloud.mapCloudError(error)
+      const detail = cloudErr.detail ? ` — ${tr(lang, 'sync.errorCode')}: ${cloudErr.detail}` : ''
+      get().setToast(`${tr(lang, 'sync.failed')}: ${cloudError(lang, cloudErr.code)}${detail}`)
     } finally { pushInFlight = false }
   }
 
