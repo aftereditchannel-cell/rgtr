@@ -9,8 +9,9 @@ directories:
 # فقط چیزهایی که برنامه واقعاً لازم دارد وارد بسته می‌شود
 files:
   - dist/**/*
-  - electron/main.cjs
-  - electron/preload.cjs
+  # همه‌ی فایل‌های فرآیند اصلی باید داخل app.asar باشند؛ main.cjs در زمان اجرا
+  # updater.cjs را require می‌کند. الگو باعث می‌شود ماژول CJS بعدی هم جا نماند.
+  - electron/*.cjs
   - electron/icons/icon.png
   - package.json
 
