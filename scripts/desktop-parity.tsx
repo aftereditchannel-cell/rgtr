@@ -127,8 +127,6 @@ assert('Firebase email field exists', !!document.querySelector('input[type="emai
 assert('Firebase password field exists', !!document.querySelector('input[type="password"]'))
 assert('email sign-in action exists', !!exactButton('ورود'))
 assert('email account creation exists', !!exactButton('ساخت حساب'))
-assert('private Cloudflare relay setting exists', bodyText().includes('اتصال امن بدون VPN'))
-assert('relay URL field uses URL input', !!document.querySelector('input[type="url"][placeholder*="workers.dev"]'))
 
 await click(exactButton('ظاهر و حساب'))
 assert('appearance/branding section opens', visibleText('نام برنامه'))

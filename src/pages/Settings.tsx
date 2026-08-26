@@ -17,7 +17,6 @@ import { checkForUpdates, cmpVersion, fmtDate, APP_VERSION } from '../lib/update
 import type { UpdateRelease, UpdateCheckResult, DownloadProgress } from '../lib/desktop'
 import * as cloud from '../lib/cloud'
 import { isFirebaseConfigured } from '../lib/firebase'
-import { isValidFirebaseRelayUrl, setFirebaseRelayUrl, testFirebaseRelay } from '../lib/firebaseRelay'
 import {
   readLock, setPasscode, disableLock, setAutoLockMin, setBiometric,
   biometricAuth, getBiometricStatus, cryptoAvailable,
@@ -441,8 +440,6 @@ function CloudCard() {
   const [password, setPassword] = useState('')
   const [state, setState] = useState<CloudState>('idle')
   const [err, setErr] = useState('')
-  const [relay, setRelay] = useState(c.relayUrl ?? '')
-  const [relayState, setRelayState] = useState<'idle' | 'busy' | 'ok' | 'error'>('idle')
   const configured = isFirebaseConfigured()
   const size = cloud.payloadSize(data)
 
@@ -475,49 +472,10 @@ function CloudCard() {
     setErr(''); setState('busy')
     try { await cloud.signOutCloud(); setToast(t('set.firebaseSignedOut')); setState('idle') } catch (e) { fail(e) }
   }
-  const saveRelay = async () => {
-    const raw = relay.trim()
-    if (!raw) {
-      setFirebaseRelayUrl('')
-      setSettings({ cloud: { ...c, relayUrl: '' } })
-      setRelayState('idle'); setToast(t('set.relayDirect'))
-      return
-    }
-    if (!isValidFirebaseRelayUrl(raw)) {
-      setRelayState('error'); setToast(t('set.relayBadUrl'))
-      return
-    }
-    setRelayState('busy')
-    const health = await testFirebaseRelay(raw)
-    if (!health.ok || (health.project && health.project !== 'nexus-hq-c42cd')) {
-      setRelayState('error'); setToast(t('set.relayFailed'))
-      return
-    }
-    const normalized = setFirebaseRelayUrl(raw)
-    setRelay(normalized)
-    setSettings({ cloud: { ...c, relayUrl: normalized } })
-    setRelayState('ok'); setToast(t('set.relayConnected'))
-  }
 
   return <Card>
     <SectionTitle icon={user ? 'CloudCheck' : 'CloudOff'} right={<span className={`text-[10.5px] ${user ? 'text-emerald-400' : 'text-[var(--color-dim2)]'}`}>{user ? t('set.cloudOn') : t('set.cloudOff')}</span>}>{t('set.firebaseTitle')}</SectionTitle>
     <p className="text-[12px] text-[var(--color-dim)] leading-relaxed mb-3">{t('set.firebaseIntro')}</p>
-    <div className="mb-4 rounded-xl border border-[var(--color-line)] bg-[var(--color-bg)]/55 p-3">
-      <div className="mb-1.5 flex items-center gap-2 text-[12px] font-medium">
-        <Icon name="ShieldCheck" size={14} className="text-[var(--color-acc)]" />
-        {t('set.relayTitle')}
-        {c.relayUrl && <span className="ms-auto text-[10px] text-emerald-400">{t('set.relayActive')}</span>}
-      </div>
-      <p className="mb-2.5 text-[10.5px] leading-relaxed text-[var(--color-dim2)]">{t('set.relayHint')}</p>
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <TextInput type="url" value={relay} className="ltr flex-1 text-[12px]" placeholder="https://nexus-hq-cloud.example.workers.dev"
-          onChange={e => { setRelay(e.target.value); setRelayState('idle') }} />
-        <Button size="sm" variant="outline" icon={relayState === 'busy' ? 'Loader' : 'Plug'} disabled={relayState === 'busy'}
-          onClick={() => void saveRelay()}>{relay.trim() ? t('set.relayTestSave') : t('set.relayUseDirect')}</Button>
-      </div>
-      {relayState === 'ok' && <div className="mt-2 text-[10.5px] text-emerald-400">{t('set.relayConnected')}</div>}
-      {relayState === 'error' && <div className="mt-2 text-[10.5px] text-red-400">{t('set.relayFailed')}</div>}
-    </div>
     {!configured ? <div className="rounded-lg border border-amber-500/25 bg-amber-500/[.07] px-3 py-2 text-[11.5px] text-amber-300">{t('set.firebaseNotConfigured')}</div>
       : !user ? <div className="space-y-3 max-w-md">
         <Field label={t('set.firebaseEmail')}><TextInput type="email" value={email} className="ltr" placeholder="name@example.com" onChange={e => setEmail(e.target.value)} /></Field>

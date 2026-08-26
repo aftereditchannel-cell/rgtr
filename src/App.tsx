@@ -25,7 +25,6 @@ import { isMobile, syncMobileChrome, onMobileResume } from './lib/mobile'
 import { autoPullIfEnabled, refreshCloudNow, retryPendingCloudSync } from './store/useApp'
 import { initCloudAuth, mapCloudError, watchCloudUser } from './lib/cloud'
 import { fetchProfileCached } from './domain/social'
-import { setFirebaseRelayUrl } from './lib/firebaseRelay'
 
 /** پل منوی بومی ویندوز → روتر و اکشن‌های برنامه */
 function DesktopMenuBridge() {
@@ -282,13 +281,8 @@ export default function App() {
   const init = useApp(s => s.init)
   const ready = useApp(s => s.ready)
   const lang = useApp(s => s.data.settings.lang) ?? 'fa'
-  const firebaseRelayUrl = useApp(s => s.data.settings.cloud.relayUrl)
 
   useEffect(() => { void init() }, [init])
-
-  // آدرس عمومی Relay secret نیست. mirror محلی باعث می‌شود حتی refresh-token زودهنگام
-  // Firebase هم پیش از خواندن کامل فایل داده از همان مسیر اختصاصی عبور کند.
-  useEffect(() => { if (ready) setFirebaseRelayUrl(firebaseRelayUrl) }, [firebaseRelayUrl, ready])
 
   // آمار شبکه‌های اجتماعیِ قابل‌دسترسی هنگام ورود به اپ تازه می‌شود؛ خطای هر پلتفرم
   // فقط روی همان کارت ثبت می‌شود و هرگز مانع بازشدن برنامه نیست.

@@ -1,7 +1,0 @@
-name = "nexus-hq-firebase-relay"
-main = "worker.js"
-compatibility_date = "2026-08-26"
-workers_dev = true
-
-# هیچ secret یا متغیر محیطی لازم نیست. Firebase Web API key عمومی است و
-# داخل worker.js فقط برای محدودکردن Relay به همین پروژه استفاده می‌شود.

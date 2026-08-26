@@ -1,7 +1,6 @@
 import { getApp, getApps, initializeApp, type FirebaseApp } from 'firebase/app'
 import { getAuth, type Auth } from 'firebase/auth'
 import { getFirestore, type Firestore } from 'firebase/firestore'
-import { installFirebaseRelay } from './firebaseRelay'
 
 /**
  * Public Firebase Web configuration for the NEXUS HQ client.
@@ -21,9 +20,6 @@ const firebaseConfig = {
 export function isFirebaseConfigured(): boolean {
   return true
 }
-
-// بازنویسی اختیاری شبکه باید قبل از اولین درخواست Auth/Firestore نصب شود.
-installFirebaseRelay()
 
 const app: FirebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig)
 const auth: Auth = getAuth(app)

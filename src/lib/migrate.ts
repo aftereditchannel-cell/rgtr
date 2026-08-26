@@ -3,7 +3,7 @@ import { CORE_MODULES } from '../domain/schema'
 import { DEFAULT_WEIGHTS } from '../domain/scoring'
 import { DEFAULT_PROVIDERS, DEFAULT_AUTOMATIONS } from '../domain/ai'
 
-export const CURRENT_VERSION = 5
+export const CURRENT_VERSION = 4
 
 export const DEFAULT_SETTINGS: Settings = {
   ownerName: '',
@@ -27,7 +27,7 @@ export const DEFAULT_SETTINGS: Settings = {
     baseUrl: 'https://api.openai.com/v1',
     enabled: true,
   },
-  cloud: { provider: 'firebase', lastSync: '', lastLocalChange: '', autoSync: true, autoPull: true, pendingSync: false, lastSyncError: '', relayUrl: '' },
+  cloud: { provider: 'firebase', lastSync: '', lastLocalChange: '', autoSync: true, autoPull: true, pendingSync: false, lastSyncError: '' },
 }
 
 /**
@@ -68,8 +68,6 @@ export function migrate(input: unknown): AppData {
         pendingSync: (rawSettings.cloud as { pendingSync?: unknown } | undefined)?.pendingSync === true,
         lastSyncError: typeof (rawSettings.cloud as { lastSyncError?: unknown } | undefined)?.lastSyncError === 'string'
           ? (rawSettings.cloud as { lastSyncError: string }).lastSyncError : '',
-        relayUrl: typeof (rawSettings.cloud as { relayUrl?: unknown } | undefined)?.relayUrl === 'string'
-          ? (rawSettings.cloud as { relayUrl: string }).relayUrl : '',
       },
     },
     modules: Array.isArray(raw.modules) && raw.modules.length ? raw.modules : CORE_MODULES,
@@ -116,13 +114,6 @@ export function migrate(input: unknown): AppData {
     if (!Array.isArray(data.workflows)) data.workflows = []
     if (!Array.isArray(data.runLogs)) data.runLogs = []
     v = 3
-  }
-
-  // v3/v4 → v5 : مسیر اختیاری Cloudflare Relay اضافه شد. مقدار خالی یعنی
-  // اتصال مستقیم قبلی و بنابراین هیچ بکاپ قدیمی رفتارش عوض نمی‌شود.
-  if (v < 5) {
-    data.settings.cloud.relayUrl ||= ''
-    v = 5
   }
 
   // ماژول‌های هسته‌ای جدید فقط وقتی اضافه می‌شوند که کاربر آن‌ها را حذف نکرده باشد.
