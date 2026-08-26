@@ -38,6 +38,8 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- حسگر اختیاری است؛ نبودنش نباید نصب برنامه را روی گوشی‌های بدون حسگر مسدود کند. -->
+    <uses-feature android:name="android.hardware.fingerprint" android:required="false" />
     <!-- اثر انگشت: اندروید ۹ به بالا USE_BIOMETRIC و اندروید ۶ تا ۸ USE_FINGERPRINT -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.USE_FINGERPRINT" />

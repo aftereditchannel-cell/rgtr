@@ -79,6 +79,8 @@ export interface CloudSettings {
   pendingSync: boolean
   /** آخرین کد خطای Firebase برای نمایش و بررسی در تنظیمات */
   lastSyncError: string
+  /** آدرس عمومی Cloudflare Relay اختصاصی؛ خالی یعنی اتصال مستقیم Firebase. */
+  relayUrl: string
 }
 
 /** تنظیمات هوش مصنوعی Agent Runner — کلید API جدا (در localStorage) ذخیره می‌شود */

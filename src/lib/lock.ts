@@ -233,27 +233,67 @@ export function lockNow(): void {
 
 /* ---------- اثر انگشت (فقط اندروید) ---------- */
 
+export interface BiometricStatus {
+  /** حسگر توسط برنامه قابل استفاده است و حداقل یک اثر/چهره ثبت شده است. */
+  available: boolean
+  /** گوشی PIN/Pattern/Password سیستمی دارد. */
+  deviceSecure: boolean
+  /** کد استاندارد پلاگین؛ برای نمایش دلیل غیرفعال‌بودن، نه اطلاعات حساس. */
+  code: string
+  reason: string
+  /** 3=اثر انگشت، 4=چهره، 5=عنبیه */
+  type: number
+}
+
 async function biometricPlugin() {
-  const { BiometricAuth } = await import('@aparajita/capacitor-biometric-auth')
-  return BiometricAuth
+  return import('@aparajita/capacitor-biometric-auth')
+}
+
+/** وضعیت کامل اثر انگشت؛ خطا پنهان نمی‌شود تا صفحه تنظیمات دلیل را نشان دهد. */
+export async function getBiometricStatus(): Promise<BiometricStatus> {
+  try {
+    const { BiometricAuth } = await biometricPlugin()
+    const res = await BiometricAuth.checkBiometry()
+    return {
+      available: !!res?.isAvailable,
+      deviceSecure: !!res?.deviceIsSecure,
+      code: String(res?.code ?? ''),
+      reason: String(res?.reason ?? ''),
+      type: Number(res?.biometryType ?? 0),
+    }
+  } catch (error) {
+    const raw = error as { code?: unknown; message?: unknown }
+    return {
+      available: false,
+      deviceSecure: false,
+      code: String(raw?.code ?? 'plugin_unavailable'),
+      reason: String(raw?.message ?? ''),
+      type: 0,
+    }
+  }
 }
 
 /** آیا اثر انگشت روی این دستگاه قابل استفاده است؟ (اندروید با سنسور) */
 export async function isBiometricAvailable(): Promise<boolean> {
-  try {
-    const Bio = await biometricPlugin()
-    const res = await Bio.checkBiometry()
-    return !!res?.isAvailable
-  } catch {
-    return false // مرورگر / ویندوز / پلاگین ثبت‌نشده
-  }
+  return (await getBiometricStatus()).available
 }
 
-/** تلاش ورود با اثر انگشت — true یعنی کاربر تأیید شد */
+/** تلاش ورود با اثر انگشت — true یعنی کاربر واقعاً توسط پنجره بومی Android تأیید شد. */
 export async function tryBiometricUnlock(reason?: string): Promise<boolean> {
   try {
-    const Bio = await biometricPlugin()
-    await Bio.authenticate({ reason: reason ?? 'NEXUS HQ' })
+    const { BiometricAuth, AndroidBiometryStrength } = await biometricPlugin()
+    await BiometricAuth.authenticate({
+      reason: reason ?? 'NEXUS HQ',
+      cancelTitle: 'لغو',
+      // قفل عددی خود NEXUS همیشه به‌عنوان مسیر جایگزین روی صفحه هست؛ این دکمه
+      // باید واقعاً بیومتریک را آزمایش کند، نه PIN سیستمی گوشی را.
+      allowDeviceCredential: false,
+      androidTitle: 'NEXUS HQ',
+      androidSubtitle: reason ?? 'ورود با اثر انگشت',
+      androidConfirmationRequired: false,
+      // weak شامل اثر انگشت strong هم می‌شود و روی گوشی‌های بیشتری کار می‌کند.
+      androidBiometryStrength: AndroidBiometryStrength.weak,
+    })
     return true
   } catch {
     return false

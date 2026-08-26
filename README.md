@@ -437,6 +437,17 @@ NEXUS HQ uses **Firebase Authentication (Email/Password)** and **Cloud Firestore
 
 The Firebase client configuration is embedded in `src/lib/firebase.ts`. It is a public client configuration, not a service account. Never add a service-account JSON, private key, Firebase Admin SDK credential, or a user password to this repository.
 
+### Optional private Cloudflare Relay
+
+If the direct Firebase endpoints are unavailable on a device's network, NEXUS HQ can route only Firebase Auth and Firestore traffic through an owner-controlled Cloudflare Worker. The Worker source is in `cloudflare/firebase-relay/`.
+
+- It is restricted to `identitytoolkit.googleapis.com`, `securetoken.googleapis.com`, and `firestore.googleapis.com`.
+- Auth requests must use this app's public Firebase API key; Firestore requests must target `nexus-hq-c42cd` and carry a Firebase ID token.
+- It does not store or log passwords, tokens, or app data, and it never caches responses.
+- It is not a general-purpose VPN or open proxy. Use it only from a Cloudflare account/domain you control and in accordance with the providers' terms and applicable laws.
+
+After deploying the Worker, paste its public HTTPS URL into **Settings → Sync → Secure no-VPN connection**, then choose **Test & connect** on both Windows and Android. No Cloudflare token or private key belongs in the app. Persian deployment steps are in `cloudflare/firebase-relay/README.fa.md`.
+
 ### Firestore Rules
 
 In **Firestore Database → Rules**, replace the rules with the following and click **Publish**:

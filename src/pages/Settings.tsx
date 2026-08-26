@@ -11,15 +11,17 @@ import { ICON_NAMES } from '../components/ui/icons.tsx'
 import { useT, cloudError } from '../i18n'
 import { useFmt } from '../lib/useFmt'
 import { desktop, isDesktop } from '../lib/desktop'
-import { isMobile, mobilePlatform, mobileDataPath } from '../lib/mobile'
+import { isMobile, isNativeAndroid, mobilePlatform, mobileDataPath, onMobileResume } from '../lib/mobile'
 import type { AppInfo } from '../lib/desktop'
 import { checkForUpdates, cmpVersion, fmtDate, APP_VERSION } from '../lib/updater'
 import type { UpdateRelease, UpdateCheckResult, DownloadProgress } from '../lib/desktop'
 import * as cloud from '../lib/cloud'
 import { isFirebaseConfigured } from '../lib/firebase'
+import { isValidFirebaseRelayUrl, setFirebaseRelayUrl, testFirebaseRelay } from '../lib/firebaseRelay'
 import {
   readLock, setPasscode, disableLock, setAutoLockMin, setBiometric,
-  biometricAvailable, cryptoAvailable,
+  biometricAuth, getBiometricStatus, cryptoAvailable,
+  type BiometricStatus,
 } from '../lib/lock'
 import { getAiKey, setAiKey as storeAiKey, chat as aiChat, AiError } from '../lib/ai'
 import { getKey, setKey as setKeySecret } from '../lib/secrets'
@@ -439,6 +441,8 @@ function CloudCard() {
   const [password, setPassword] = useState('')
   const [state, setState] = useState<CloudState>('idle')
   const [err, setErr] = useState('')
+  const [relay, setRelay] = useState(c.relayUrl ?? '')
+  const [relayState, setRelayState] = useState<'idle' | 'busy' | 'ok' | 'error'>('idle')
   const configured = isFirebaseConfigured()
   const size = cloud.payloadSize(data)
 
@@ -471,10 +475,49 @@ function CloudCard() {
     setErr(''); setState('busy')
     try { await cloud.signOutCloud(); setToast(t('set.firebaseSignedOut')); setState('idle') } catch (e) { fail(e) }
   }
+  const saveRelay = async () => {
+    const raw = relay.trim()
+    if (!raw) {
+      setFirebaseRelayUrl('')
+      setSettings({ cloud: { ...c, relayUrl: '' } })
+      setRelayState('idle'); setToast(t('set.relayDirect'))
+      return
+    }
+    if (!isValidFirebaseRelayUrl(raw)) {
+      setRelayState('error'); setToast(t('set.relayBadUrl'))
+      return
+    }
+    setRelayState('busy')
+    const health = await testFirebaseRelay(raw)
+    if (!health.ok || (health.project && health.project !== 'nexus-hq-c42cd')) {
+      setRelayState('error'); setToast(t('set.relayFailed'))
+      return
+    }
+    const normalized = setFirebaseRelayUrl(raw)
+    setRelay(normalized)
+    setSettings({ cloud: { ...c, relayUrl: normalized } })
+    setRelayState('ok'); setToast(t('set.relayConnected'))
+  }
 
   return <Card>
     <SectionTitle icon={user ? 'CloudCheck' : 'CloudOff'} right={<span className={`text-[10.5px] ${user ? 'text-emerald-400' : 'text-[var(--color-dim2)]'}`}>{user ? t('set.cloudOn') : t('set.cloudOff')}</span>}>{t('set.firebaseTitle')}</SectionTitle>
     <p className="text-[12px] text-[var(--color-dim)] leading-relaxed mb-3">{t('set.firebaseIntro')}</p>
+    <div className="mb-4 rounded-xl border border-[var(--color-line)] bg-[var(--color-bg)]/55 p-3">
+      <div className="mb-1.5 flex items-center gap-2 text-[12px] font-medium">
+        <Icon name="ShieldCheck" size={14} className="text-[var(--color-acc)]" />
+        {t('set.relayTitle')}
+        {c.relayUrl && <span className="ms-auto text-[10px] text-emerald-400">{t('set.relayActive')}</span>}
+      </div>
+      <p className="mb-2.5 text-[10.5px] leading-relaxed text-[var(--color-dim2)]">{t('set.relayHint')}</p>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <TextInput type="url" value={relay} className="ltr flex-1 text-[12px]" placeholder="https://nexus-hq-cloud.example.workers.dev"
+          onChange={e => { setRelay(e.target.value); setRelayState('idle') }} />
+        <Button size="sm" variant="outline" icon={relayState === 'busy' ? 'Loader' : 'Plug'} disabled={relayState === 'busy'}
+          onClick={() => void saveRelay()}>{relay.trim() ? t('set.relayTestSave') : t('set.relayUseDirect')}</Button>
+      </div>
+      {relayState === 'ok' && <div className="mt-2 text-[10.5px] text-emerald-400">{t('set.relayConnected')}</div>}
+      {relayState === 'error' && <div className="mt-2 text-[10.5px] text-red-400">{t('set.relayFailed')}</div>}
+    </div>
     {!configured ? <div className="rounded-lg border border-amber-500/25 bg-amber-500/[.07] px-3 py-2 text-[11.5px] text-amber-300">{t('set.firebaseNotConfigured')}</div>
       : !user ? <div className="space-y-3 max-w-md">
         <Field label={t('set.firebaseEmail')}><TextInput type="email" value={email} className="ltr" placeholder="name@example.com" onChange={e => setEmail(e.target.value)} /></Field>
@@ -581,20 +624,69 @@ function SecurityCard() {
   const [hint, setHintInput] = useState(cfg.hint)
   const [autoMin, setAutoMin] = useState(cfg.autoLockMin)
   const [bio, setBio] = useState(cfg.biometric)
-  const [bioAvail, setBioAvail] = useState(false)
+  const [bioStatus, setBioStatus] = useState<BiometricStatus | null>(null)
+  const [bioBusy, setBioBusy] = useState(false)
+  // تشخیص لحظه‌ای برای دستگاه‌هایی که پل Capacitor کمی بعد از load آماده می‌شود.
+  const androidRuntime = isMobile || isNativeAndroid()
+  const bioAvail = !!bioStatus?.available
 
   const refresh = () => setCfg(readLock())
 
   useEffect(() => {
-    if (!isMobile) return
-    void biometricAvailable().then(setBioAvail)
-  }, [])
+    if (!androidRuntime) return
+    let alive = true
+    const check = async () => {
+      const status = await getBiometricStatus()
+      if (alive) setBioStatus(status)
+    }
+    void check()
+    // ممکن است کاربر برای ثبت اثر انگشت به تنظیمات گوشی برود؛ در بازگشت دوباره چک کن.
+    const offResume = onMobileResume(() => { void check() })
+    return () => { alive = false; offResume() }
+  }, [androidRuntime])
+
+  const biometricStatusText = (status: BiometricStatus | null = bioStatus) => {
+    if (!status) return t('set.biometricChecking')
+    if (status.available) return t('set.biometricReady')
+    if (status.code === 'biometryNotEnrolled') return t('set.biometricNotEnrolled')
+    if (status.code === 'noDeviceCredential' || status.code === 'passcodeNotSet') return t('set.biometricNeedDeviceLock')
+    if (status.code === 'biometryNotAvailable' || status.code === 'plugin_unavailable') return t('set.biometricUnavailable')
+    if (!status.deviceSecure) return t('set.biometricNeedDeviceLock')
+    return t('set.biometricUnavailable')
+  }
+
+  /** قبل از روشن‌کردن، پنجره‌ی واقعی Android را نشان می‌دهد؛ تیک صوری پذیرفته نمی‌شود. */
+  const verifyBiometric = async () => {
+    setBioBusy(true)
+    const status = await getBiometricStatus()
+    setBioStatus(status)
+    if (!status.available) {
+      setBioBusy(false)
+      setToast(biometricStatusText(status))
+      return false
+    }
+    const ok = await biometricAuth(t('lock.bioReason'))
+    setBioBusy(false)
+    if (!ok) setToast(t('set.biometricFailed'))
+    return ok
+  }
+
+  const toggleBiometric = async (on: boolean) => {
+    if (!on) {
+      setBiometric(false); setBio(false); refresh(); setToast(t('set.biometricOff'))
+      return
+    }
+    if (!(await verifyBiometric())) return
+    setBiometric(true); setBio(true); refresh(); setToast(t('set.biometricOn'))
+  }
 
   const save = async () => {
     const clean = code.replace(/[^\d]/g, '')
     if (clean.length < 4) { alert(t('set.passcodeShort')); return }
     if (clean !== confirmCode.replace(/[^\d]/g, '')) { alert(t('set.passcodeMismatch')); return }
     try {
+      // بار اولی که اثر انگشت روشن می‌شود، همان لحظه واقعاً آن را امتحان می‌کنیم.
+      if (bio && !cfg.biometric && !(await verifyBiometric())) return
       const res = await setPasscode(clean, { hint: hint.trim(), biometric: bio && bioAvail, current: currentCode })
       if (!res.ok) {
         if (res.error === 'current') alert(lang === 'fa' ? 'رمز فعلی اشتباه است.' : 'Current passcode is wrong.')
@@ -604,7 +696,7 @@ function SecurityCard() {
       setAutoLockMin(autoMin)
       setBiometric(bio && bioAvail)
       refresh(); setEdit(false); setCode(''); setCurrentCode(''); setConfirmCode('')
-      setToast(t('set.passcodeSet'))
+      setToast(bio && bioAvail ? t('set.biometricOn') : t('set.passcodeSet'))
     } catch (e) {
       alert(t('common.error') + ': ' + (e as Error).message)
     }
@@ -631,6 +723,19 @@ function SecurityCard() {
       </SectionTitle>
       <p className="text-[12px] text-[var(--color-dim)] leading-relaxed mb-3">{t('set.securityNote')}</p>
 
+      {androidRuntime && (
+        <div className={`mb-3 flex items-start gap-2.5 rounded-lg border px-3 py-2.5 ${bioAvail ? 'border-emerald-500/25 bg-emerald-500/[.07]' : 'border-amber-500/25 bg-amber-500/[.07]'}`}>
+          <Icon name="Fingerprint" size={16} className={`mt-0.5 shrink-0 ${bioAvail ? 'text-emerald-400' : 'text-amber-400'}`} />
+          <div className="min-w-0 flex-1">
+            <div className="text-[12px] font-medium">{biometricStatusText()}</div>
+            <div className="mt-0.5 text-[10.5px] text-[var(--color-dim2)]">{t('set.biometricSetupHint')}</div>
+            {!bioAvail && bioStatus?.code && <div className="mt-1 text-[9.5px] text-[var(--color-dim2)] ltr">{bioStatus.code}</div>}
+          </div>
+          <Button size="sm" variant="ghost" icon="RefreshCw" disabled={bioBusy}
+            onClick={() => void getBiometricStatus().then(setBioStatus)}>{t('set.cloudRefresh')}</Button>
+        </div>
+      )}
+
       {!cfg.enabled ? (
         <Button variant="primary" size="sm" icon="KeyRound" onClick={() => setEdit(true)} disabled={!cryptoAvailable()}>
           {t('set.setPasscode')}
@@ -654,10 +759,11 @@ function SecurityCard() {
                 onChange={nv => { setAutoLockMin(Number(nv)); refresh() }}
                 options={autoOpts.map(o => ({ value: o.v, label: o.l }))} />
             </div>
-            {isMobile && bioAvail && (
-              <label className="flex items-center gap-2 cursor-pointer">
+            {androidRuntime && (
+              <label className={`flex items-center gap-2 ${bioAvail || cfg.biometric ? 'cursor-pointer' : 'opacity-60'}`}>
                 <input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={cfg.biometric}
-                  onChange={e => { setBiometric(e.target.checked); refresh(); if (e.target.checked) setToast(t('set.biometricOn')) }} />
+                  disabled={bioBusy || (!bioAvail && !cfg.biometric)}
+                  onChange={e => void toggleBiometric(e.target.checked)} />
                 <span className="text-[12px]">{t('set.biometric')}</span>
                 <span className="text-[10.5px] text-[var(--color-dim2)]">— {t('set.biometricHint')}</span>
               </label>
@@ -676,7 +782,7 @@ function SecurityCard() {
         <Modal open onClose={() => setEdit(false)} title={cfg.enabled ? t('set.changePasscode') : t('set.setPasscode')}
           footer={<>
             <Button variant="ghost" size="sm" onClick={() => setEdit(false)}>{t('common.cancel')}</Button>
-            <Button variant="primary" size="sm" icon="Check" onClick={save}>{t('common.save')}</Button>
+            <Button variant="primary" size="sm" icon={bioBusy ? 'Loader' : 'Check'} disabled={bioBusy} onClick={save}>{t('common.save')}</Button>
           </>}>
           <div className="grid sm:grid-cols-2 gap-3">
             {cfg.enabled && (
@@ -700,10 +806,12 @@ function SecurityCard() {
               <Dropdown value={String(autoMin)} onChange={nv => setAutoMin(Number(nv))}
                 options={autoOpts.map(o => ({ value: o.v, label: o.l }))} />
             </Field>
-            {isMobile && bioAvail && (
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={bio} onChange={e => setBio(e.target.checked)} />
+            {androidRuntime && (
+              <label className={`flex items-center gap-2 ${bioAvail ? 'cursor-pointer' : 'opacity-60'}`}>
+                <input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={bio}
+                  disabled={!bioAvail || bioBusy} onChange={e => setBio(e.target.checked)} />
                 <span className="text-[12px]">{t('set.biometric')}</span>
+                <span className="text-[10.5px] text-[var(--color-dim2)]">— {biometricStatusText()}</span>
               </label>
             )}
           </div>
