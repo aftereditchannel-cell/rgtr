@@ -64,21 +64,26 @@ export interface AIState {
   enabled: boolean
 }
 
-/** تنظیمات همگام‌سازی Firebase. اطلاعات ورود در Firebase Auth نگه‌داری می‌شود. */
-export interface CloudSettings {
-  provider: 'firebase'
-  /** آخرین همگام‌سازی موفق (ISO) */
+export interface CloudSyncMeta {
   lastSync: string
-  /** آخرین تغییر محلی؛ برای جلوگیری از overwrite ناخواسته در auto-pull */
   lastLocalChange: string
-  /** ذخیره‌ی خودکار روی ابر بعد از هر تغییر (debounced) */
-  autoSync: boolean
-  /** فقط یک‌بار هنگام باز شدن برنامه از ابر بررسی می‌شود */
-  autoPull: boolean
-  /** ارسال محلی انجام شده اما ارسال آنلاین ناموفق بوده و باید بعداً retry شود */
   pendingSync: boolean
-  /** آخرین کد خطای Firebase برای نمایش و بررسی در تنظیمات */
   lastSyncError: string
+}
+
+/** Firebase حفظ شده و Google Drive یک انتخاب مستقل است. */
+export interface CloudSettings extends CloudSyncMeta {
+  provider: 'firebase' | 'googleDrive'
+  /** URL عمومی Web App متعلق به Google Apps Script خود کاربر؛ secret نیست. */
+  googleScriptUrl: string
+  /** وضعیت هر سرویس جدا می‌ماند تا تعویض سرویس باعث overwrite اشتباه نشود. */
+  providerState: Record<'firebase' | 'googleDrive', CloudSyncMeta>
+  /** ذخیره محلی همیشه اول است؛ سپس در سرویس فعال ارسال می‌شود. */
+  autoSync: boolean
+  /** فقط برای Firebase؛ دریافت Drive همیشه دستی است. */
+  autoPull: boolean
+  /** ترجیح Firebase هنگام جابه‌جایی موقت به Drive. */
+  firebaseAutoPull: boolean
 }
 
 /** تنظیمات هوش مصنوعی Agent Runner — کلید API جدا (در localStorage) ذخیره می‌شود */

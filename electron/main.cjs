@@ -310,6 +310,27 @@ ipcMain.handle('file:saveText', async (_e, { name, text, filters }) => {
   return { ok: true, path: filePath }
 })
 
+/** Google Apps Script در ContentService redirect و محدودیت CORS دارد. این پل فقط
+ * URL رسمی /exec را می‌پذیرد و اجازه تبدیل‌شدن به پراکسی عمومی/SSRF نمی‌دهد. */
+ipcMain.handle('drive:request', async (_e, { url, method, body }) => {
+  let target
+  try { target = new URL(String(url || '')) } catch { throw new Error('bad Google Script URL') }
+  if (target.protocol !== 'https:' || target.hostname !== 'script.google.com' ||
+      !/^\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(target.pathname)) {
+    throw new Error('forbidden Google Script URL')
+  }
+  const verb = method === 'GET' ? 'GET' : 'POST'
+  const textBody = typeof body === 'string' ? body : ''
+  if (Buffer.byteLength(textBody, 'utf8') > 1024 * 1024) throw new Error('Drive request too large')
+  const response = await net.fetch(target.toString(), {
+    method: verb,
+    redirect: 'follow',
+    headers: verb === 'POST' ? { 'Content-Type': 'text/plain;charset=utf-8' } : undefined,
+    body: verb === 'POST' ? textBody : undefined,
+  })
+  return { ok: response.ok, status: response.status, text: await response.text() }
+})
+
 /* ---------------- IPC: اطلاعات و ابزار ---------------- */
 ipcMain.handle('app:info', () => ({
   version: app.getVersion(),

@@ -1,9 +1,21 @@
-import type { AppData, Settings } from '../store/types'
+import type { AppData, Settings, CloudSyncMeta } from '../store/types'
 import { CORE_MODULES } from '../domain/schema'
 import { DEFAULT_WEIGHTS } from '../domain/scoring'
 import { DEFAULT_PROVIDERS, DEFAULT_AUTOMATIONS } from '../domain/ai'
 
-export const CURRENT_VERSION = 4
+export const CURRENT_VERSION = 5
+
+const EMPTY_CLOUD_META: CloudSyncMeta = { lastSync: '', lastLocalChange: '', pendingSync: false, lastSyncError: '' }
+
+function cloudMeta(value: unknown): CloudSyncMeta {
+  const raw = (value ?? {}) as Partial<CloudSyncMeta>
+  return {
+    lastSync: typeof raw.lastSync === 'string' ? raw.lastSync : '',
+    lastLocalChange: typeof raw.lastLocalChange === 'string' ? raw.lastLocalChange : '',
+    pendingSync: raw.pendingSync === true,
+    lastSyncError: typeof raw.lastSyncError === 'string' ? raw.lastSyncError : '',
+  }
+}
 
 export const DEFAULT_SETTINGS: Settings = {
   ownerName: '',
@@ -27,7 +39,11 @@ export const DEFAULT_SETTINGS: Settings = {
     baseUrl: 'https://api.openai.com/v1',
     enabled: true,
   },
-  cloud: { provider: 'firebase', lastSync: '', lastLocalChange: '', autoSync: true, autoPull: true, pendingSync: false, lastSyncError: '' },
+  cloud: {
+    provider: 'firebase', googleScriptUrl: '', autoSync: true, autoPull: true, firebaseAutoPull: true,
+    ...EMPTY_CLOUD_META,
+    providerState: { firebase: { ...EMPTY_CLOUD_META }, googleDrive: { ...EMPTY_CLOUD_META } },
+  },
 }
 
 /**
@@ -39,6 +55,15 @@ export function migrate(input: unknown): AppData {
   let v = Number(raw.version) || 0
 
   const rawSettings = (raw.settings ?? {}) as Partial<Settings>
+  const activeCloudMeta = cloudMeta(rawSettings.cloud)
+  const savedProviderState = (rawSettings.cloud as { providerState?: Partial<Record<'firebase' | 'googleDrive', unknown>> } | undefined)?.providerState
+  const providerState = v >= 5 ? {
+    firebase: cloudMeta(savedProviderState?.firebase),
+    googleDrive: cloudMeta(savedProviderState?.googleDrive),
+  } : {
+    firebase: { ...activeCloudMeta },
+    googleDrive: { ...EMPTY_CLOUD_META },
+  }
   const data: AppData = {
     version: CURRENT_VERSION,
     settings: {
@@ -59,15 +84,16 @@ export function migrate(input: unknown): AppData {
       branding: { ...DEFAULT_SETTINGS.branding, ...rawSettings.branding },
       // Gist token/id هرگز وارد داده‌ی Firebase یا بکاپ جدید نمی‌شود.
       cloud: {
-        provider: 'firebase',
-        lastSync: typeof rawSettings.cloud?.lastSync === 'string' ? rawSettings.cloud.lastSync : '',
-        lastLocalChange: typeof (rawSettings.cloud as { lastLocalChange?: unknown } | undefined)?.lastLocalChange === 'string'
-          ? (rawSettings.cloud as { lastLocalChange: string }).lastLocalChange : '',
+        provider: rawSettings.cloud?.provider === 'googleDrive' ? 'googleDrive' : 'firebase',
+        googleScriptUrl: typeof (rawSettings.cloud as { googleScriptUrl?: unknown } | undefined)?.googleScriptUrl === 'string'
+          ? (rawSettings.cloud as { googleScriptUrl: string }).googleScriptUrl : '',
+        ...activeCloudMeta,
+        providerState,
         autoSync: rawSettings.cloud?.autoSync !== false,
-        autoPull: rawSettings.cloud?.autoPull !== false,
-        pendingSync: (rawSettings.cloud as { pendingSync?: unknown } | undefined)?.pendingSync === true,
-        lastSyncError: typeof (rawSettings.cloud as { lastSyncError?: unknown } | undefined)?.lastSyncError === 'string'
-          ? (rawSettings.cloud as { lastSyncError: string }).lastSyncError : '',
+        autoPull: rawSettings.cloud?.provider === 'googleDrive' ? false : rawSettings.cloud?.autoPull !== false,
+        firebaseAutoPull: typeof (rawSettings.cloud as { firebaseAutoPull?: unknown } | undefined)?.firebaseAutoPull === 'boolean'
+          ? (rawSettings.cloud as { firebaseAutoPull: boolean }).firebaseAutoPull
+          : rawSettings.cloud?.autoPull !== false,
       },
     },
     modules: Array.isArray(raw.modules) && raw.modules.length ? raw.modules : CORE_MODULES,
@@ -115,6 +141,16 @@ export function migrate(input: unknown): AppData {
     if (!Array.isArray(data.runLogs)) data.runLogs = []
     v = 3
   }
+
+  // v3/v4 → v5: Drive اختیاری اضافه شد؛ Firebase برای نصب‌های قبلی پیش‌فرض می‌ماند.
+  if (v < 5) {
+    data.settings.cloud.provider = 'firebase'
+    data.settings.cloud.googleScriptUrl ||= ''
+    v = 5
+  }
+
+  // دریافت Drive فقط با Refresh دستی است.
+  if (data.settings.cloud.provider === 'googleDrive') data.settings.cloud.autoPull = false
 
   // ماژول‌های هسته‌ای جدید فقط وقتی اضافه می‌شوند که کاربر آن‌ها را حذف نکرده باشد.
   const removed = new Set(data.removedCore ?? [])

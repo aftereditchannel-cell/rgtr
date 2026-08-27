@@ -52,6 +52,7 @@ Object.defineProperty(dom.window, 'hq', {
     }),
     openDataDir: async () => {},
     confirm: async () => true,
+    driveRequest: async () => ({ ok: true, status: 200, text: '{"ok":true,"service":"nexus-hq-drive"}' }),
     updateCheck: async () => ({ ok: true, source: 'api', releases: [] }),
     updateDownload: async () => ({ ok: true, path: '', size: 0, name: '' }),
     updateCancel: async () => true,
@@ -97,6 +98,7 @@ function assert(name: string, condition: boolean, extra = '') {
 const bodyText = () => document.body.textContent ?? ''
 const buttons = () => [...document.querySelectorAll('button')]
 const exactButton = (label: string) => buttons().find(button => button.textContent?.trim() === label)
+const buttonContaining = (label: string) => buttons().find(button => button.textContent?.includes(label))
 const click = async (element: Element | undefined) => {
   await act(async () => {
     if (element instanceof dom.window.HTMLElement) element.click()
@@ -127,6 +129,24 @@ assert('Firebase email field exists', !!document.querySelector('input[type="emai
 assert('Firebase password field exists', !!document.querySelector('input[type="password"]'))
 assert('email sign-in action exists', !!exactButton('ورود'))
 assert('email account creation exists', !!exactButton('ساخت حساب'))
+assert('Firebase remains available and default', useApp.getState().data.settings.cloud.provider === 'firebase')
+assert('Google Drive is offered beside Firebase', !!buttonContaining('Google Drive'))
+await act(async () => {
+  useApp.setState(s => ({ data: { ...s.data, settings: { ...s.data.settings, cloud: {
+    ...s.data.settings.cloud,
+    lastSync: '2026-01-01T00:00:00.000Z',
+    providerState: { ...s.data.settings.cloud.providerState, googleDrive: { ...s.data.settings.cloud.providerState.googleDrive, lastSync: '2026-02-02T00:00:00.000Z' } },
+  } } } }))
+  await settle()
+})
+await click(buttonContaining('Google Drive'))
+assert('Drive can be selected without removing Firebase', useApp.getState().data.settings.cloud.provider === 'googleDrive')
+assert('Drive restores its separate sync timestamp', useApp.getState().data.settings.cloud.lastSync.startsWith('2026-02-02'))
+assert('Apps Script /exec URL field appears', !!document.querySelector('input[type="url"][placeholder*="script.google.com"]'))
+assert('Drive auto-pull is disabled', useApp.getState().data.settings.cloud.autoPull === false)
+await click(buttonContaining('Firebase'))
+assert('switching back to Firebase works', useApp.getState().data.settings.cloud.provider === 'firebase')
+assert('Firebase timestamp is restored', useApp.getState().data.settings.cloud.lastSync.startsWith('2026-01-01'))
 
 await click(exactButton('ظاهر و حساب'))
 assert('appearance/branding section opens', visibleText('نام برنامه'))

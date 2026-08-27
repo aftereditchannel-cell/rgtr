@@ -60,6 +60,9 @@ export interface DesktopAPI {
   openDataDir(): Promise<void>
   confirm(opts: { title?: string; message: string; detail?: string }): Promise<boolean>
 
+  /** درخواست محدود به Google Apps Script؛ در main process و بدون محدودیت CORS. */
+  driveRequest(opts: { url: string; method: 'GET' | 'POST'; body?: string }): Promise<{ ok: boolean; status: number; text: string }>
+
   /** بروزرسانی خودکار — بررسی، دانلود، نصب */
   updateCheck(): Promise<UpdateCheckResult>
   updateDownload(opts: { url: string; filename: string; size?: number }): Promise<{ ok: boolean; path: string; size: number; name: string }>

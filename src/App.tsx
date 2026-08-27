@@ -23,7 +23,7 @@ import { applyTheme, applyGlass, watchSystemTheme } from './lib/theme'
 import { isLockEnabled, readLock, LOCK_EVENT } from './lib/lock'
 import { isMobile, syncMobileChrome, onMobileResume } from './lib/mobile'
 import { autoPullIfEnabled, refreshCloudNow, retryPendingCloudSync } from './store/useApp'
-import { initCloudAuth, mapCloudError, watchCloudUser } from './lib/cloud'
+import { configureCloudProvider, initCloudAuth, mapCloudError, watchCloudUser } from './lib/cloud'
 import { fetchProfileCached } from './domain/social'
 
 /** پل منوی بومی ویندوز → روتر و اکشن‌های برنامه */
@@ -281,8 +281,13 @@ export default function App() {
   const init = useApp(s => s.init)
   const ready = useApp(s => s.ready)
   const lang = useApp(s => s.data.settings.lang) ?? 'fa'
+  const cloudProvider = useApp(s => s.data.settings.cloud.provider)
+  const googleScriptUrl = useApp(s => s.data.settings.cloud.googleScriptUrl)
 
   useEffect(() => { void init() }, [init])
+  useEffect(() => {
+    if (ready) configureCloudProvider(cloudProvider, googleScriptUrl)
+  }, [cloudProvider, googleScriptUrl, ready])
 
   // آمار شبکه‌های اجتماعیِ قابل‌دسترسی هنگام ورود به اپ تازه می‌شود؛ خطای هر پلتفرم
   // فقط روی همان کارت ثبت می‌شود و هرگز مانع بازشدن برنامه نیست.
@@ -298,8 +303,7 @@ export default function App() {
     }))
   }, [ready])
 
-  // احراز هویت مستقل از ذخیره‌سازی محلی آماده می‌شود؛ ورود کاربر می‌تواند
-  // دریافت خودکار Firebase را بدون منتظر ماندن برای رفرش صفحه فعال کند.
+  // Firebase و Drive نشست جدا دارند؛ دریافت خودکار فقط طبق تنظیم سرویس فعال است.
   useEffect(() => {
     void initCloudAuth()
     return watchCloudUser(user => { if (user) void autoPullIfEnabled() })

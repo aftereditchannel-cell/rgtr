@@ -10,33 +10,62 @@ import {
 import { doc, getDoc, onSnapshot, setDoc, type Unsubscribe } from 'firebase/firestore'
 import type { AppData } from '../store/types'
 import { auth, firestore, isFirebaseConfigured } from './firebase'
+import * as drive from './googleDriveCloud'
+import { CloudError, type CloudCode, type CloudProvider, type CloudUser, type RemoteData } from './cloudTypes'
+
+export { CloudError }
+export type { CloudCode, CloudProvider, CloudUser, RemoteData }
 
 const MAX_DOCUMENT_BYTES = 900 * 1024
+let activeProvider: CloudProvider = 'firebase'
+let firebaseAuthReady: Promise<void> | null = null
+const userListeners = new Set<(user: CloudUser | null) => void>()
+let firebaseUserOff: (() => void) | null = null
+let driveUserOff: (() => void) | null = null
 
-export type CloudCode =
-  | 'not_configured' | 'not_signed_in' | 'bad_email' | 'weak_password'
-  | 'email_in_use' | 'wrong_password' | 'user_not_found' | 'too_many_requests'
-  | 'network' | 'permission' | 'provider_disabled' | 'firestore_missing'
-  | 'bad_firebase_config' | 'too_large' | 'unknown'
-
-export class CloudError extends Error {
-  code: CloudCode
-  /** Firebase code is safe to show and makes support/debugging possible without exposing credentials. */
-  detail: string
-  constructor(code: CloudCode, detail = '') { super(code); this.code = code; this.detail = detail; this.name = 'CloudError' }
+function currentFirebaseUser(): CloudUser | null {
+  if (!isFirebaseConfigured() || !auth?.currentUser) return null
+  const { uid, displayName, email, photoURL } = auth.currentUser
+  return { uid, displayName, email, photoURL }
 }
 
-export type CloudUser = Pick<User, 'uid' | 'displayName' | 'email' | 'photoURL'>
-export type RemoteData = { data: unknown; updatedAt: string } | null
+function emitUser() {
+  const user = getCurrentUser()
+  for (const listener of userListeners) listener(user)
+}
 
-let authReady: Promise<void> | null = null
+function ensureUserBridges() {
+  if (!firebaseUserOff && isFirebaseConfigured() && auth) {
+    firebaseUserOff = onAuthStateChanged(auth, () => {
+      if (activeProvider === 'firebase') emitUser()
+    })
+  }
+  if (!driveUserOff) {
+    driveUserOff = drive.watchUser(() => {
+      if (activeProvider === 'googleDrive') emitUser()
+    })
+  }
+}
+
+/** تغییر سرویس، نشست سرویس دیگر را پاک نمی‌کند. */
+export function configureCloudProvider(provider: CloudProvider, googleScriptUrl = ''): void {
+  activeProvider = provider === 'googleDrive' ? 'googleDrive' : 'firebase'
+  drive.configure(googleScriptUrl)
+  ensureUserBridges()
+  emitUser()
+  void initCloudAuth().then(emitUser).catch(() => {})
+}
+
+export function getCloudProvider(): CloudProvider { return activeProvider }
+export function normalizeGoogleScriptUrl(value: string): string { return drive.normalizeGoogleScriptUrl(value) }
+export function testGoogleScriptEndpoint(value: string): Promise<boolean> { return drive.health(value) }
 
 function requireFirebase() {
   if (!isFirebaseConfigured() || !auth || !firestore) throw new CloudError('not_configured')
   return { auth, firestore }
 }
 
-function requireUser(): User {
+function requireFirebaseUser(): User {
   const { auth: activeAuth } = requireFirebase()
   if (!activeAuth.currentUser) throw new CloudError('not_signed_in')
   return activeAuth.currentUser
@@ -56,58 +85,67 @@ export function mapCloudError(error: unknown): CloudError {
   if (detail.includes('permission-denied')) return new CloudError('permission', rawCode)
   if (detail.includes('failed-precondition')) return new CloudError('firestore_missing', rawCode)
   if (detail.includes('api-key-not-valid') || detail.includes('invalid-api-key') || detail.includes('app-not-authorized')) return new CloudError('bad_firebase_config', rawCode)
-  if (detail.includes('network') || detail.includes('timeout') || detail.includes('unavailable')) return new CloudError('network', rawCode)
-  console.warn('[NEXUS HQ] Firebase sync failed', error)
+  if (detail.includes('network') || detail.includes('timeout') || detail.includes('unavailable') || detail.includes('fetch')) return new CloudError('network', rawCode)
+  console.warn(`[NEXUS HQ] ${activeProvider} sync failed`, error)
   return new CloudError('unknown', rawCode || String((error as Error)?.message ?? '').slice(0, 120))
 }
 
-/** نشست ایمیل/رمز را روی دستگاه نگه می‌دارد؛ هیچ redirect یا Google login وجود ندارد. */
 export async function initCloudAuth(): Promise<void> {
+  ensureUserBridges()
+  if (activeProvider === 'googleDrive') {
+    await drive.init()
+    return
+  }
   if (!isFirebaseConfigured()) return
-  if (!authReady) {
-    authReady = (async () => {
+  if (!firebaseAuthReady) {
+    firebaseAuthReady = (async () => {
       const { auth: activeAuth } = requireFirebase()
-      // Electron/Capacitor معمولاً local persistence دارند. اگر یک WebView محدودش کند،
-      // Auth پیش‌فرض Firebase همچنان کار می‌کند و نباید کل ورود را متوقف کند.
       try { await setPersistence(activeAuth, browserLocalPersistence) } catch (error) {
         console.warn('[NEXUS HQ] Firebase persistence fallback', error)
       }
     })()
   }
-  return authReady
+  await firebaseAuthReady
 }
 
 export function getCurrentUser(): CloudUser | null {
-  if (!isFirebaseConfigured() || !auth?.currentUser) return null
-  const { uid, displayName, email, photoURL } = auth.currentUser
-  return { uid, displayName, email, photoURL }
+  return activeProvider === 'googleDrive' ? drive.getCurrentUser() : currentFirebaseUser()
 }
 
 export function watchCloudUser(callback: (user: CloudUser | null) => void): () => void {
-  if (!isFirebaseConfigured() || !auth) { callback(null); return () => {} }
-  return onAuthStateChanged(auth, user => callback(user ? {
-    uid: user.uid, displayName: user.displayName, email: user.email, photoURL: user.photoURL,
-  } : null))
+  userListeners.add(callback)
+  ensureUserBridges()
+  callback(getCurrentUser())
+  return () => { userListeners.delete(callback) }
 }
 
 export async function signInWithEmail(email: string, password: string): Promise<void> {
   try {
-    const { auth: activeAuth } = requireFirebase()
-    await signInWithEmailAndPassword(activeAuth, email.trim(), password)
+    if (activeProvider === 'googleDrive') await drive.signIn(email, password)
+    else {
+      const { auth: activeAuth } = requireFirebase()
+      await signInWithEmailAndPassword(activeAuth, email.trim(), password)
+    }
   } catch (error) { throw mapCloudError(error) }
 }
 
 export async function createEmailAccount(email: string, password: string): Promise<void> {
   try {
-    const { auth: activeAuth } = requireFirebase()
-    await createUserWithEmailAndPassword(activeAuth, email.trim(), password)
+    if (activeProvider === 'googleDrive') await drive.createAccount(email, password)
+    else {
+      const { auth: activeAuth } = requireFirebase()
+      await createUserWithEmailAndPassword(activeAuth, email.trim(), password)
+    }
   } catch (error) { throw mapCloudError(error) }
 }
 
 export async function signOutCloud(): Promise<void> {
   try {
-    const { auth: activeAuth } = requireFirebase()
-    await signOut(activeAuth)
+    if (activeProvider === 'googleDrive') await drive.signOut()
+    else {
+      const { auth: activeAuth } = requireFirebase()
+      await signOut(activeAuth)
+    }
   } catch (error) { throw mapCloudError(error) }
 }
 
@@ -116,10 +154,10 @@ export function payloadSize(data: AppData): number {
 }
 
 export async function pushCloudData(data: AppData): Promise<string> {
-  const bytes = payloadSize(data)
-  if (bytes > MAX_DOCUMENT_BYTES) throw new CloudError('too_large')
+  if (payloadSize(data) > MAX_DOCUMENT_BYTES) throw new CloudError('too_large')
   try {
-    const user = requireUser()
+    if (activeProvider === 'googleDrive') return await drive.push(data)
+    const user = requireFirebaseUser()
     const { firestore: db } = requireFirebase()
     const updatedAt = new Date().toISOString()
     await setDoc(doc(db, 'users', user.uid, 'appData', 'main'), { version: data.version, updatedAt, data })
@@ -129,7 +167,8 @@ export async function pushCloudData(data: AppData): Promise<string> {
 
 export async function pullCloudData(): Promise<RemoteData> {
   try {
-    const user = requireUser()
+    if (activeProvider === 'googleDrive') return await drive.pull()
+    const user = requireFirebaseUser()
     const { firestore: db } = requireFirebase()
     const snapshot = await getDoc(doc(db, 'users', user.uid, 'appData', 'main'))
     if (!snapshot.exists()) return null
@@ -139,10 +178,11 @@ export async function pullCloudData(): Promise<RemoteData> {
   } catch (error) { throw mapCloudError(error) }
 }
 
-/** شنونده‌ی لحظه‌ای Firestore؛ با تغییر دستگاه دیگر فوراً callback صدا زده می‌شود. */
+/** Firebase شنونده زنده دارد؛ دریافت Drive فقط با Refresh دستی است. */
 export function watchCloudData(callback: (data: RemoteData) => void, onError: (error: CloudError) => void): Unsubscribe {
+  if (activeProvider === 'googleDrive') return () => {}
   try {
-    const user = requireUser()
+    const user = requireFirebaseUser()
     const { firestore: db } = requireFirebase()
     return onSnapshot(doc(db, 'users', user.uid, 'appData', 'main'), snapshot => {
       if (!snapshot.exists()) { callback(null); return }
@@ -156,5 +196,5 @@ export function watchCloudData(callback: (data: RemoteData) => void, onError: (e
 }
 
 export function isCloudReady(): boolean {
-  return isFirebaseConfigured() && !!auth?.currentUser
+  return activeProvider === 'googleDrive' ? drive.isReady() : isFirebaseConfigured() && !!auth?.currentUser
 }
