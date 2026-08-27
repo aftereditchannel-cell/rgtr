@@ -10,33 +10,69 @@ import {
 import { doc, getDoc, onSnapshot, setDoc, type Unsubscribe } from 'firebase/firestore'
 import type { AppData } from '../store/types'
 import { auth, firestore, isFirebaseConfigured } from './firebase'
+import * as cloudflare from './cloudflareCloud'
+import {
+  CloudError,
+  type CloudCode,
+  type CloudProvider,
+  type CloudUser,
+  type RemoteData,
+} from './cloudTypes'
+
+export { CloudError }
+export type { CloudCode, CloudProvider, CloudUser, RemoteData }
 
 const MAX_DOCUMENT_BYTES = 900 * 1024
+let activeProvider: CloudProvider = 'firebase'
+let authReady: Promise<void> | null = null
+const userListeners = new Set<(user: CloudUser | null) => void>()
+let firebaseUserOff: (() => void) | null = null
+let cloudflareUserOff: (() => void) | null = null
 
-export type CloudCode =
-  | 'not_configured' | 'not_signed_in' | 'bad_email' | 'weak_password'
-  | 'email_in_use' | 'wrong_password' | 'user_not_found' | 'too_many_requests'
-  | 'network' | 'permission' | 'provider_disabled' | 'firestore_missing'
-  | 'bad_firebase_config' | 'too_large' | 'unknown'
-
-export class CloudError extends Error {
-  code: CloudCode
-  /** Firebase code is safe to show and makes support/debugging possible without exposing credentials. */
-  detail: string
-  constructor(code: CloudCode, detail = '') { super(code); this.code = code; this.detail = detail; this.name = 'CloudError' }
+function firebaseUser(): CloudUser | null {
+  if (!isFirebaseConfigured() || !auth?.currentUser) return null
+  const { uid, displayName, email, photoURL } = auth.currentUser
+  return { uid, displayName, email, photoURL }
 }
 
-export type CloudUser = Pick<User, 'uid' | 'displayName' | 'email' | 'photoURL'>
-export type RemoteData = { data: unknown; updatedAt: string } | null
+function emitUser() {
+  const user = getCurrentUser()
+  for (const listener of userListeners) listener(user)
+}
 
-let authReady: Promise<void> | null = null
+function ensureUserBridges() {
+  if (!firebaseUserOff && isFirebaseConfigured() && auth) {
+    firebaseUserOff = onAuthStateChanged(auth, () => {
+      if (activeProvider === 'firebase') emitUser()
+    })
+  }
+  if (!cloudflareUserOff) {
+    cloudflareUserOff = cloudflare.watchUser(() => {
+      if (activeProvider === 'cloudflare') emitUser()
+    })
+  }
+}
+
+/** انتخاب سرویس فقط مسیر همگام‌سازی فعال را عوض می‌کند؛ نشست سرویس دیگر حذف نمی‌شود. */
+export function configureCloudProvider(provider: CloudProvider, cloudflareUrl = ''): void {
+  activeProvider = provider === 'cloudflare' ? 'cloudflare' : 'firebase'
+  cloudflare.configure(cloudflareUrl)
+  ensureUserBridges()
+  emitUser()
+  void initCloudAuth().then(emitUser).catch(() => {})
+}
+
+export function getCloudProvider(): CloudProvider { return activeProvider }
+export function getCloudflareUrl(): string { return cloudflare.getApiUrl() }
+export function normalizeCloudflareUrl(value: string): string { return cloudflare.normalizeCloudflareUrl(value) }
+export function testCloudflareEndpoint(value: string): Promise<boolean> { return cloudflare.health(value) }
 
 function requireFirebase() {
   if (!isFirebaseConfigured() || !auth || !firestore) throw new CloudError('not_configured')
   return { auth, firestore }
 }
 
-function requireUser(): User {
+function requireFirebaseUser(): User {
   const { auth: activeAuth } = requireFirebase()
   if (!activeAuth.currentUser) throw new CloudError('not_signed_in')
   return activeAuth.currentUser
@@ -56,58 +92,68 @@ export function mapCloudError(error: unknown): CloudError {
   if (detail.includes('permission-denied')) return new CloudError('permission', rawCode)
   if (detail.includes('failed-precondition')) return new CloudError('firestore_missing', rawCode)
   if (detail.includes('api-key-not-valid') || detail.includes('invalid-api-key') || detail.includes('app-not-authorized')) return new CloudError('bad_firebase_config', rawCode)
-  if (detail.includes('network') || detail.includes('timeout') || detail.includes('unavailable')) return new CloudError('network', rawCode)
-  console.warn('[NEXUS HQ] Firebase sync failed', error)
+  if (detail.includes('network') || detail.includes('timeout') || detail.includes('unavailable') || detail.includes('fetch')) return new CloudError('network', rawCode)
+  console.warn(`[NEXUS HQ] ${activeProvider} sync failed`, error)
   return new CloudError('unknown', rawCode || String((error as Error)?.message ?? '').slice(0, 120))
 }
 
-/** نشست ایمیل/رمز را روی دستگاه نگه می‌دارد؛ هیچ redirect یا Google login وجود ندارد. */
+/** نشست هر دو سرویس محلی است؛ فقط سرویس انتخاب‌شده برای عملیات داده استفاده می‌شود. */
 export async function initCloudAuth(): Promise<void> {
+  ensureUserBridges()
+  if (activeProvider === 'cloudflare') {
+    await cloudflare.init()
+    return
+  }
   if (!isFirebaseConfigured()) return
   if (!authReady) {
     authReady = (async () => {
       const { auth: activeAuth } = requireFirebase()
-      // Electron/Capacitor معمولاً local persistence دارند. اگر یک WebView محدودش کند،
-      // Auth پیش‌فرض Firebase همچنان کار می‌کند و نباید کل ورود را متوقف کند.
       try { await setPersistence(activeAuth, browserLocalPersistence) } catch (error) {
         console.warn('[NEXUS HQ] Firebase persistence fallback', error)
       }
     })()
   }
-  return authReady
+  await authReady
 }
 
 export function getCurrentUser(): CloudUser | null {
-  if (!isFirebaseConfigured() || !auth?.currentUser) return null
-  const { uid, displayName, email, photoURL } = auth.currentUser
-  return { uid, displayName, email, photoURL }
+  return activeProvider === 'cloudflare' ? cloudflare.getCurrentUser() : firebaseUser()
 }
 
 export function watchCloudUser(callback: (user: CloudUser | null) => void): () => void {
-  if (!isFirebaseConfigured() || !auth) { callback(null); return () => {} }
-  return onAuthStateChanged(auth, user => callback(user ? {
-    uid: user.uid, displayName: user.displayName, email: user.email, photoURL: user.photoURL,
-  } : null))
+  userListeners.add(callback)
+  ensureUserBridges()
+  callback(getCurrentUser())
+  return () => { userListeners.delete(callback) }
 }
 
 export async function signInWithEmail(email: string, password: string): Promise<void> {
   try {
-    const { auth: activeAuth } = requireFirebase()
-    await signInWithEmailAndPassword(activeAuth, email.trim(), password)
+    if (activeProvider === 'cloudflare') await cloudflare.signIn(email, password)
+    else {
+      const { auth: activeAuth } = requireFirebase()
+      await signInWithEmailAndPassword(activeAuth, email.trim(), password)
+    }
   } catch (error) { throw mapCloudError(error) }
 }
 
 export async function createEmailAccount(email: string, password: string): Promise<void> {
   try {
-    const { auth: activeAuth } = requireFirebase()
-    await createUserWithEmailAndPassword(activeAuth, email.trim(), password)
+    if (activeProvider === 'cloudflare') await cloudflare.createAccount(email, password)
+    else {
+      const { auth: activeAuth } = requireFirebase()
+      await createUserWithEmailAndPassword(activeAuth, email.trim(), password)
+    }
   } catch (error) { throw mapCloudError(error) }
 }
 
 export async function signOutCloud(): Promise<void> {
   try {
-    const { auth: activeAuth } = requireFirebase()
-    await signOut(activeAuth)
+    if (activeProvider === 'cloudflare') await cloudflare.signOut()
+    else {
+      const { auth: activeAuth } = requireFirebase()
+      await signOut(activeAuth)
+    }
   } catch (error) { throw mapCloudError(error) }
 }
 
@@ -119,7 +165,8 @@ export async function pushCloudData(data: AppData): Promise<string> {
   const bytes = payloadSize(data)
   if (bytes > MAX_DOCUMENT_BYTES) throw new CloudError('too_large')
   try {
-    const user = requireUser()
+    if (activeProvider === 'cloudflare') return await cloudflare.push(data)
+    const user = requireFirebaseUser()
     const { firestore: db } = requireFirebase()
     const updatedAt = new Date().toISOString()
     await setDoc(doc(db, 'users', user.uid, 'appData', 'main'), { version: data.version, updatedAt, data })
@@ -129,7 +176,8 @@ export async function pushCloudData(data: AppData): Promise<string> {
 
 export async function pullCloudData(): Promise<RemoteData> {
   try {
-    const user = requireUser()
+    if (activeProvider === 'cloudflare') return await cloudflare.pull()
+    const user = requireFirebaseUser()
     const { firestore: db } = requireFirebase()
     const snapshot = await getDoc(doc(db, 'users', user.uid, 'appData', 'main'))
     if (!snapshot.exists()) return null
@@ -139,10 +187,11 @@ export async function pullCloudData(): Promise<RemoteData> {
   } catch (error) { throw mapCloudError(error) }
 }
 
-/** شنونده‌ی لحظه‌ای Firestore؛ با تغییر دستگاه دیگر فوراً callback صدا زده می‌شود. */
+/** Firebase شنونده زنده دارد؛ Cloudflare در شروع و Refresh دستی دریافت می‌شود. */
 export function watchCloudData(callback: (data: RemoteData) => void, onError: (error: CloudError) => void): Unsubscribe {
+  if (activeProvider === 'cloudflare') return () => {}
   try {
-    const user = requireUser()
+    const user = requireFirebaseUser()
     const { firestore: db } = requireFirebase()
     return onSnapshot(doc(db, 'users', user.uid, 'appData', 'main'), snapshot => {
       if (!snapshot.exists()) { callback(null); return }
@@ -156,5 +205,7 @@ export function watchCloudData(callback: (data: RemoteData) => void, onError: (e
 }
 
 export function isCloudReady(): boolean {
-  return isFirebaseConfigured() && !!auth?.currentUser
+  return activeProvider === 'cloudflare'
+    ? cloudflare.isReady()
+    : isFirebaseConfigured() && !!auth?.currentUser
 }

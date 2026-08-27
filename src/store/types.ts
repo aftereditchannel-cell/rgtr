@@ -64,21 +64,29 @@ export interface AIState {
   enabled: boolean
 }
 
-/** تنظیمات همگام‌سازی Firebase. اطلاعات ورود در Firebase Auth نگه‌داری می‌شود. */
-export interface CloudSettings {
-  provider: 'firebase'
+export interface CloudSyncMeta {
   /** آخرین همگام‌سازی موفق (ISO) */
   lastSync: string
-  /** آخرین تغییر محلی؛ برای جلوگیری از overwrite ناخواسته در auto-pull */
+  /** آخرین تغییر محلی؛ برای جلوگیری از overwrite ناخواسته */
   lastLocalChange: string
+  /** تغییر محلی هنوز روی این سرویس تأیید نشده است. */
+  pendingSync: boolean
+  /** آخرین کد خطای سرویس */
+  lastSyncError: string
+}
+
+/** تنظیمات همگام‌سازی. نشست هر سرویس فقط روی همان دستگاه نگه‌داری می‌شود. */
+export interface CloudSettings extends CloudSyncMeta {
+  /** Firebase قبلی حفظ شده؛ Cloudflare یک انتخاب مستقل و اختیاری است. */
+  provider: 'firebase' | 'cloudflare'
+  /** آدرس عمومی Worker اختصاصی کاربر؛ secret نیست. */
+  cloudflareUrl: string
+  /** وضعیت جداگانه هر سرویس هنگام جابه‌جایی، برای جلوگیری از overwrite اشتباه. */
+  providerState: Record<'firebase' | 'cloudflare', CloudSyncMeta>
   /** ذخیره‌ی خودکار روی ابر بعد از هر تغییر (debounced) */
   autoSync: boolean
   /** فقط یک‌بار هنگام باز شدن برنامه از ابر بررسی می‌شود */
   autoPull: boolean
-  /** ارسال محلی انجام شده اما ارسال آنلاین ناموفق بوده و باید بعداً retry شود */
-  pendingSync: boolean
-  /** آخرین کد خطای Firebase برای نمایش و بررسی در تنظیمات */
-  lastSyncError: string
 }
 
 /** تنظیمات هوش مصنوعی Agent Runner — کلید API جدا (در localStorage) ذخیره می‌شود */

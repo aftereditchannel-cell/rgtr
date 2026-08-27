@@ -68,8 +68,13 @@ let pushInFlight = false
 let stopLiveSync: (() => void) | null = null
 let didAutoPullThisSession = false
 
+/** با تغییر سرویس یا ورود تازه، بررسی شروع باید برای همان سرویس دوباره مجاز شود. */
+export function resetCloudPullSession(): void {
+  didAutoPullThisSession = false
+}
+
 export const useApp = create<Store>((set, get) => {
-  /** ذخیره‌ی خودکار Firebase بعد از هر تغییر؛ ذخیره‌ی محلی همیشه اول انجام می‌شود. */
+  /** ذخیره‌ی خودکار روی سرویس انتخاب‌شده؛ ذخیره‌ی محلی همیشه اول انجام می‌شود. */
   const scheduleCloudPush = () => {
     const c = get().data.settings.cloud
     if (!c.autoSync || !cloud.isCloudReady()) return
@@ -121,6 +126,10 @@ export const useApp = create<Store>((set, get) => {
       // seededAt تضمین می‌کند داده‌ی نمونه فقط یک‌بار در عمر نصب ساخته شود؛
       // اگر کاربر همه‌چیز را پاک کند، دوباره برنمی‌گردد.
       const data = stored ? migrate(stored) : seedData()
+      // سرویس فعال باید قبل از mount شدن Root مشخص باشد تا auto-pull اشتباهاً
+      // از Firebase یا Cloudflare دیگر اجرا نشود.
+      cloud.configureCloudProvider(data.settings.cloud.provider, data.settings.cloud.cloudflareUrl)
+      void cloud.initCloudAuth()
       set({ data, ready: true })
       if (!stored) await saveDoc(data)
     },
@@ -397,7 +406,7 @@ export const useApp = create<Store>((set, get) => {
   }
 })
 
-/** داده‌ی جدید Firestore را فقط وقتی اعمال می‌کند که از آخرین تغییر محلی جدیدتر باشد. */
+/** داده‌ی ابری را فقط وقتی اعمال می‌کند که از آخرین تغییر محلی جدیدتر باشد. */
 async function applyRemote(res: cloud.RemoteData): Promise<boolean> {
   if (!res || pushInFlight) return false
   const st = useApp.getState()
@@ -448,7 +457,7 @@ export function stopLiveCloudSync(): void {
   stopLiveSync?.(); stopLiveSync = null
 }
 
-/** دریافت خودکار Firebase در شروع/بازگشت. */
+/** دریافت خودکار سرویس انتخاب‌شده در شروع/بازگشت. */
 export async function autoPullIfEnabled(): Promise<void> {
   const st = useApp.getState()
   if (didAutoPullThisSession || !st.data.settings.cloud.autoPull || !cloud.isCloudReady()) return

@@ -427,15 +427,35 @@ Build command: `npm run build` · Output directory: `dist`
 
 MIT · ساخته‌شده برای یک نفر: شما.
 
-## Firebase Setup
+## Cloud sync providers
 
-NEXUS HQ uses **Firebase Authentication (Email/Password)** and **Cloud Firestore**. Cloud sync is local-first: every change is saved on the device first, then automatically sent to Firestore. Firestore also sends changes from another signed-in device immediately—there is no Google sign-in, GitHub token, Gist, or polling timer.
+NEXUS HQ supports two independent cloud providers. **Firebase remains the default and has not been removed.** The user can switch providers in Settings without deleting the other provider's local session:
+
+- **Firebase Authentication + Cloud Firestore** — the existing option.
+- **NEXUS Cloud on Cloudflare Durable Objects** — an optional free, self-owned email/password backend.
+
+Both are local-first: every change is saved on the device before any network request. Provider credentials and sessions are never included in AppData backups or synced to the other provider.
+
+### Firebase Setup (existing option)
 
 1. In Firebase Console, open **Authentication → Sign-in method → Email/Password** and enable **Email/Password**.
 2. Create a Cloud Firestore database and publish the rules below in **Firestore Database → Rules**.
 3. In the app, go to Settings → Firebase Cloud Sync, enter an email and a password of at least six characters, then choose **Create account**. Use the same email and password on another device to receive the same data.
 
 The Firebase client configuration is embedded in `src/lib/firebase.ts`. It is a public client configuration, not a service account. Never add a service-account JSON, private key, Firebase Admin SDK credential, or a user password to this repository.
+
+### Cloudflare Setup (optional second provider)
+
+The standalone Worker is in `cloudflare/nexus-cloud/`. It uses a SQLite-backed Durable Object for users, hashed sessions, rate limiting, and one isolated AppData document per user.
+
+1. In Cloudflare Workers & Pages, import this repository and use `cloudflare/nexus-cloud` as the root directory.
+2. Use `npm install` as the build command and `npm run deploy` as the deploy command.
+3. Cloudflare provisions the SQLite Durable Object from `wrangler.jsonc`.
+4. Copy the public HTTPS Worker URL.
+5. In NEXUS HQ open **Settings → Sync → Cloudflare**, enter the URL, and choose **Test & save**.
+6. Create a separate Cloudflare account in the app. Existing Firebase accounts and data remain untouched.
+
+Passwords are PBKDF2-SHA256 hashed with a random salt and 210,000 iterations. Session tokens are random; only their SHA-256 hashes are stored. Login is rate-limited. The Worker does not log passwords, session tokens, or AppData. Full Persian instructions are in `cloudflare/nexus-cloud/README.fa.md`.
 
 ### Firestore Rules
 
@@ -458,8 +478,8 @@ service cloud.firestore {
 
 - Changes are stored locally immediately.
 - Automatic sending is debounced by about one second, so several fast edits become one write.
-- Firestore `onSnapshot` delivers changes from another device immediately; no every-minute refresh is used.
-- Pull down at the top of any page, or use the refresh icon in the mobile header, to request a manual cloud refresh.
+- Firebase can use Firestore `onSnapshot`; Cloudflare receives once at app start and through manual refresh, without an every-minute polling timer.
+- Pull down at the top of any page, or use the refresh icon in the mobile header, to request a manual refresh from the selected provider.
 - The newest timestamp wins. The app never replaces a newer local unsent change with an older cloud document.
 - A success toast confirms auto-send; failures show a specific Firebase error such as bad password, permission denied, network unavailable, or document too large.
 

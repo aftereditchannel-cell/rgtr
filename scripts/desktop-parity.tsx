@@ -97,6 +97,7 @@ function assert(name: string, condition: boolean, extra = '') {
 const bodyText = () => document.body.textContent ?? ''
 const buttons = () => [...document.querySelectorAll('button')]
 const exactButton = (label: string) => buttons().find(button => button.textContent?.trim() === label)
+const buttonContaining = (label: string) => buttons().find(button => button.textContent?.includes(label))
 const click = async (element: Element | undefined) => {
   await act(async () => {
     if (element instanceof dom.window.HTMLElement) element.click()
@@ -127,6 +128,23 @@ assert('Firebase email field exists', !!document.querySelector('input[type="emai
 assert('Firebase password field exists', !!document.querySelector('input[type="password"]'))
 assert('email sign-in action exists', !!exactButton('ورود'))
 assert('email account creation exists', !!exactButton('ساخت حساب'))
+assert('Firebase remains the default sync provider', useApp.getState().data.settings.cloud.provider === 'firebase')
+assert('Cloudflare is offered beside Firebase', !!buttonContaining('Cloudflare'))
+await act(async () => {
+  useApp.setState(s => ({ data: { ...s.data, settings: { ...s.data.settings, cloud: {
+    ...s.data.settings.cloud,
+    lastSync: '2026-01-01T00:00:00.000Z',
+    providerState: { ...s.data.settings.cloud.providerState, cloudflare: { ...s.data.settings.cloud.providerState.cloudflare, lastSync: '2026-02-02T00:00:00.000Z' } },
+  } } } }))
+  await settle()
+})
+await click(buttonContaining('Cloudflare'))
+assert('Cloudflare provider can be selected without removing Firebase', useApp.getState().data.settings.cloud.provider === 'cloudflare')
+assert('Cloudflare keeps its own sync timestamp', useApp.getState().data.settings.cloud.lastSync.startsWith('2026-02-02'))
+assert('Cloudflare server URL field appears', !!document.querySelector('input[type="url"][placeholder*="workers.dev"]'))
+await click(buttonContaining('Firebase'))
+assert('switching back to Firebase still works', useApp.getState().data.settings.cloud.provider === 'firebase')
+assert('Firebase sync timestamp is restored separately', useApp.getState().data.settings.cloud.lastSync.startsWith('2026-01-01'))
 
 await click(exactButton('ظاهر و حساب'))
 assert('appearance/branding section opens', visibleText('نام برنامه'))
