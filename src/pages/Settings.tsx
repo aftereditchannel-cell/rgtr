@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useApp, refreshCloudNow, autoPullIfEnabled, resetCloudPullSession } from '../store/useApp'
+import { useApp, refreshCloudNow } from '../store/useApp'
 import { exportJSON, importJSON } from '../lib/backup'
 import { listSnapshots, getSnapshot, storageBackend, saveDoc } from '../lib/db'
 import type { Snapshot } from '../store/types'
@@ -427,58 +427,10 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
   )
 }
 
-/* ---------- انتخاب سرویس ابری؛ Firebase قبلی کاملاً حفظ می‌شود ---------- */
+/* ---------- کارت همگام‌سازی لحظه‌ای Firebase ---------- */
 type CloudState = 'idle' | 'busy'
 
 function CloudCard() {
-  const { data, persist } = useApp()
-  const { t } = useT()
-  const c = data.settings.cloud
-
-  const choose = (provider: 'firebase' | 'cloudflare') => {
-    if (provider === c.provider) return
-    const currentMeta = {
-      lastSync: c.lastSync,
-      lastLocalChange: c.lastLocalChange,
-      pendingSync: c.pendingSync,
-      lastSyncError: c.lastSyncError,
-    }
-    const targetMeta = c.providerState[provider]
-    const next = {
-      ...c,
-      ...targetMeta,
-      provider,
-      providerState: { ...c.providerState, [c.provider]: currentMeta },
-    }
-    resetCloudPullSession()
-    cloud.configureCloudProvider(provider, next.cloudflareUrl)
-    useApp.setState(state => ({ data: { ...state.data, settings: { ...state.data.settings, cloud: next } } }))
-    void persist()
-  }
-
-  return <div className="space-y-3">
-    <Card>
-      <SectionTitle icon="Cloud">{t('set.cloudProviderTitle')}</SectionTitle>
-      <p className="text-[11.5px] text-[var(--color-dim)] leading-relaxed mb-3">{t('set.cloudProviderHint')}</p>
-      <div className="grid grid-cols-2 gap-2">
-        <button type="button" onClick={() => choose('firebase')}
-          className={`rounded-xl border px-3 py-3 text-start transition-all ${c.provider === 'firebase' ? 'border-[var(--color-acc)] bg-[var(--color-acc)]/10' : 'border-[var(--color-line)] hover:border-[var(--color-line2)]'}`}>
-          <span className="flex items-center gap-2 text-[12.5px] font-medium"><Icon name="Flame" size={15} className="text-orange-400" />Firebase</span>
-          <span className="block mt-1 text-[10px] text-[var(--color-dim2)]">{t('set.providerFirebaseHint')}</span>
-        </button>
-        <button type="button" onClick={() => choose('cloudflare')}
-          className={`rounded-xl border px-3 py-3 text-start transition-all ${c.provider === 'cloudflare' ? 'border-[var(--color-acc)] bg-[var(--color-acc)]/10' : 'border-[var(--color-line)] hover:border-[var(--color-line2)]'}`}>
-          <span className="flex items-center gap-2 text-[12.5px] font-medium"><Icon name="CloudCog" size={15} className="text-amber-400" />Cloudflare</span>
-          <span className="block mt-1 text-[10px] text-[var(--color-dim2)]">{t('set.providerCloudflareHint')}</span>
-        </button>
-      </div>
-    </Card>
-    {c.provider === 'firebase' ? <FirebaseCloudCard /> : <CloudflareCloudCard />}
-  </div>
-}
-
-/* ---------- کارت Firebase موجود ---------- */
-function FirebaseCloudCard() {
   const { t, lang } = useT()
   const fmt = useFmt()
   const { data, setSettings, setToast } = useApp()
@@ -534,159 +486,6 @@ function FirebaseCloudCard() {
     {err && <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/25 bg-red-500/[.07] px-3 py-2 text-[11.5px] text-red-300"><Icon name="AlertTriangle" size={13} className="mt-0.5 shrink-0" /><span>{err}</span></div>}
     <div className="mt-4 pt-3 border-t border-[var(--color-line)] grid sm:grid-cols-2 gap-2 text-[11.5px]"><Row label={t('set.cloudLastSync')} value={c.lastSync ? fmt.relTime(c.lastSync) : t('common.never')} /><Row label={t('set.cloudSize')} value={`${fmt.dg((size / 1024).toFixed(1))} KB`} /></div>
     <label className="mt-3 flex items-center gap-2 cursor-pointer"><input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={c.autoSync} onChange={e => setSettings({ cloud: { ...c, autoSync: e.target.checked } })} /><span className="text-[12px]">{t('set.cloudAutoSync')}</span><span className="text-[10.5px] text-[var(--color-dim2)]">— {t('set.firebaseAutoSyncHint')}</span></label>
-    <label className="mt-2.5 flex items-center gap-2 cursor-pointer"><input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={c.autoPull} onChange={e => setSettings({ cloud: { ...c, autoPull: e.target.checked } })} /><span className="text-[12px]">{t('set.cloudAutoPull')}</span><span className="text-[10.5px] text-[var(--color-dim2)]">— {t('set.cloudStartupHint')}</span></label>
-    {c.pendingSync && <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/25 bg-amber-500/[.07] px-3 py-2 text-[11.5px] text-amber-300"><Icon name="Clock3" size={13} className="mt-0.5 shrink-0" /><span>{t('set.cloudPending')}{c.lastSyncError ? ` — ${t('sync.errorCode')}: ${c.lastSyncError}` : ''}</span></div>}
-  </Card>
-}
-
-/* ---------- Cloudflare رایگان؛ حساب و نشست مستقل از Firebase ---------- */
-function CloudflareCloudCard() {
-  const { t, lang } = useT()
-  const fmt = useFmt()
-  const { data, setSettings, setToast, persist } = useApp()
-  const c = data.settings.cloud
-  const [user, setUser] = useState<cloud.CloudUser | null>(() => cloud.getCurrentUser())
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [endpoint, setEndpoint] = useState(c.cloudflareUrl)
-  const [state, setState] = useState<CloudState>('idle')
-  const [endpointState, setEndpointState] = useState<'idle' | 'busy' | 'ok' | 'error'>('idle')
-  const [err, setErr] = useState('')
-  const configured = !!cloud.normalizeCloudflareUrl(c.cloudflareUrl)
-  const size = cloud.payloadSize(data)
-
-  useEffect(() => {
-    cloud.configureCloudProvider('cloudflare', c.cloudflareUrl)
-    void cloud.initCloudAuth().finally(() => setUser(cloud.getCurrentUser()))
-    return cloud.watchCloudUser(setUser)
-  }, [c.cloudflareUrl])
-
-  const fail = (error: unknown) => {
-    const cloudErr = cloud.mapCloudError(error)
-    const diagnostic = cloudErr.detail ? ` — ${t('sync.errorCode')}: ${cloudErr.detail}` : ''
-    setErr(cloudError(lang, cloudErr.code) + diagnostic)
-    setState('idle')
-  }
-
-  const saveEndpoint = async () => {
-    const normalized = cloud.normalizeCloudflareUrl(endpoint)
-    if (!normalized) {
-      if (endpoint.trim()) { setEndpointState('error'); setToast(t('set.cloudflareBadUrl')); return }
-      cloud.configureCloudProvider('cloudflare', '')
-      setSettings({ cloud: { ...c, cloudflareUrl: '' } })
-      setEndpointState('idle')
-      return
-    }
-    setEndpointState('busy')
-    if (!(await cloud.testCloudflareEndpoint(normalized))) {
-      setEndpointState('error'); setToast(t('set.cloudflareTestFailed')); return
-    }
-    cloud.configureCloudProvider('cloudflare', normalized)
-    setEndpoint(normalized)
-    setSettings({ cloud: { ...c, cloudflareUrl: normalized } })
-    setEndpointState('ok')
-    setToast(t('set.cloudflareConnected'))
-  }
-
-  const markSynced = async (updatedAt: string) => {
-    useApp.setState(s => ({ data: { ...s.data, settings: { ...s.data.settings, cloud: { ...s.data.settings.cloud, lastSync: updatedAt, pendingSync: false, lastSyncError: '' } } } }))
-    await persist()
-  }
-
-  const signIn = async (create = false) => {
-    setErr(''); setState('busy')
-    try {
-      resetCloudPullSession()
-      if (create) {
-        await cloud.createEmailAccount(email, password)
-        // اولین نسخه ابری از داده محلی فعلی ساخته می‌شود؛ هیچ چیز از دستگاه پاک نمی‌شود.
-        const updatedAt = await cloud.pushCloudData(useApp.getState().data)
-        await markSynced(updatedAt)
-      } else {
-        await cloud.signInWithEmail(email, password)
-        await autoPullIfEnabled()
-      }
-      setPassword('')
-      setToast(t(create ? 'set.cloudflareAccountCreated' : 'set.cloudflareSignedIn'))
-      setState('idle')
-    } catch (error) { fail(error) }
-  }
-
-  const upload = async () => {
-    setErr(''); setState('busy')
-    try {
-      const updatedAt = await cloud.pushCloudData(useApp.getState().data)
-      await markSynced(updatedAt)
-      setToast(t('set.cloudPushed'))
-      setState('idle')
-    } catch (error) { fail(error) }
-  }
-
-  const refresh = async () => {
-    setErr(''); setState('busy')
-    try {
-      const changed = await refreshCloudNow()
-      setToast(t(changed ? 'set.cloudPulled' : 'set.cloudUpToDate'))
-      setState('idle')
-    } catch (error) { fail(error) }
-  }
-
-  const signOut = async () => {
-    setErr(''); setState('busy')
-    try { await cloud.signOutCloud(); setToast(t('set.cloudflareSignedOut')); setState('idle') }
-    catch (error) { fail(error) }
-  }
-
-  return <Card>
-    <SectionTitle icon={user ? 'CloudCheck' : 'CloudOff'} right={<span className={`text-[10.5px] ${user ? 'text-emerald-400' : 'text-[var(--color-dim2)]'}`}>{user ? t('set.cloudOn') : t('set.cloudOff')}</span>}>
-      {t('set.cloudflareTitle')}
-    </SectionTitle>
-    <p className="text-[12px] text-[var(--color-dim)] leading-relaxed mb-3">{t('set.cloudflareIntro')}</p>
-
-    <div className="rounded-xl border border-[var(--color-line)] bg-[var(--color-bg)]/60 p-3 mb-4">
-      <Field label={t('set.cloudflareUrl')} help={t('set.cloudflareUrlHint')}>
-        <div className="flex flex-col sm:flex-row gap-2">
-          <TextInput type="url" value={endpoint} className="ltr flex-1" placeholder="https://nexus-hq-cloud.example.workers.dev"
-            onChange={e => { setEndpoint(e.target.value); setEndpointState('idle') }} />
-          <Button size="sm" variant="outline" icon={endpointState === 'busy' ? 'Loader' : 'Plug'} disabled={endpointState === 'busy'}
-            onClick={() => void saveEndpoint()}>{t('set.cloudflareTestSave')}</Button>
-        </div>
-      </Field>
-      {endpointState === 'ok' && <p className="text-[10.5px] text-emerald-400 mt-2">{t('set.cloudflareConnected')}</p>}
-      {endpointState === 'error' && <p className="text-[10.5px] text-red-400 mt-2">{t('set.cloudflareTestFailed')}</p>}
-    </div>
-
-    {!configured ? (
-      <div className="rounded-lg border border-amber-500/25 bg-amber-500/[.07] px-3 py-2 text-[11.5px] text-amber-300">
-        <p>{t('set.cloudflareNotConfigured')}</p>
-        <a href="https://github.com/aftereditchannel-cell/rgtr/tree/arena/01a03263-rgtr/cloudflare/nexus-cloud" target="_blank" rel="noreferrer"
-          className="inline-flex items-center gap-1 mt-2 text-[var(--color-acc)] hover:underline"><Icon name="ExternalLink" size={12} />{t('set.cloudflareDeployGuide')}</a>
-      </div>
-    ) : !user ? (
-      <div className="space-y-3 max-w-md">
-        <Field label={t('set.firebaseEmail')}><TextInput type="email" value={email} className="ltr" placeholder="name@example.com" onChange={e => setEmail(e.target.value)} /></Field>
-        <Field label={t('set.firebasePassword')} help={t('set.cloudflarePasswordHint')}><TextInput type="password" value={password} maxLength={128} className="ltr" onChange={e => setPassword(e.target.value)} /></Field>
-        <div className="flex gap-2 flex-wrap">
-          <Button size="sm" variant="primary" icon={state === 'busy' ? 'Loader' : 'LogIn'} disabled={state === 'busy' || !email || password.length < 8} onClick={() => void signIn()}>{t('set.firebaseSignIn')}</Button>
-          <Button size="sm" variant="outline" icon="UserPlus" disabled={state === 'busy' || !email || password.length < 8} onClick={() => void signIn(true)}>{t('set.firebaseCreateAccount')}</Button>
-        </div>
-      </div>
-    ) : (
-      <>
-        <div className="flex items-center gap-3 rounded-xl border border-[var(--color-line)] px-3 py-2.5">
-          <div className="w-9 h-9 rounded-full grid place-items-center bg-[var(--color-acc)]/15 text-[var(--color-acc)]"><Icon name="User" size={16} /></div>
-          <div className="min-w-0 flex-1"><div className="text-[12.5px] font-medium truncate">{t('set.cloudflareAccount')}</div><div className="text-[11px] text-[var(--color-dim2)] truncate ltr">{user.email || '—'}</div></div>
-        </div>
-        <div className="flex gap-2 flex-wrap mt-4">
-          <Button size="sm" variant="outline" icon="RefreshCw" disabled={state === 'busy'} onClick={() => void refresh()}>{t('set.cloudRefresh')}</Button>
-          <Button size="sm" variant="outline" icon="CloudUpload" disabled={state === 'busy'} onClick={() => void upload()}>{t('set.cloudUploadNow')}</Button>
-          <Button size="sm" variant="ghost" icon="LogOut" disabled={state === 'busy'} onClick={() => void signOut()}>{t('set.firebaseSignOut')}</Button>
-        </div>
-      </>
-    )}
-    {err && <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/25 bg-red-500/[.07] px-3 py-2 text-[11.5px] text-red-300"><Icon name="AlertTriangle" size={13} className="mt-0.5 shrink-0" /><span>{err}</span></div>}
-    <div className="mt-4 pt-3 border-t border-[var(--color-line)] grid sm:grid-cols-2 gap-2 text-[11.5px]"><Row label={t('set.cloudLastSync')} value={c.lastSync ? fmt.relTime(c.lastSync) : t('common.never')} /><Row label={t('set.cloudSize')} value={`${fmt.dg((size / 1024).toFixed(1))} KB`} /></div>
-    <label className="mt-3 flex items-center gap-2 cursor-pointer"><input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={c.autoSync} onChange={e => setSettings({ cloud: { ...c, autoSync: e.target.checked } })} /><span className="text-[12px]">{t('set.cloudAutoSync')}</span><span className="text-[10.5px] text-[var(--color-dim2)]">— {t('set.cloudflareAutoSyncHint')}</span></label>
     <label className="mt-2.5 flex items-center gap-2 cursor-pointer"><input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={c.autoPull} onChange={e => setSettings({ cloud: { ...c, autoPull: e.target.checked } })} /><span className="text-[12px]">{t('set.cloudAutoPull')}</span><span className="text-[10.5px] text-[var(--color-dim2)]">— {t('set.cloudStartupHint')}</span></label>
     {c.pendingSync && <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/25 bg-amber-500/[.07] px-3 py-2 text-[11.5px] text-amber-300"><Icon name="Clock3" size={13} className="mt-0.5 shrink-0" /><span>{t('set.cloudPending')}{c.lastSyncError ? ` — ${t('sync.errorCode')}: ${c.lastSyncError}` : ''}</span></div>}
   </Card>

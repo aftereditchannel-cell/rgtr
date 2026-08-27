@@ -23,7 +23,7 @@ import { applyTheme, applyGlass, watchSystemTheme } from './lib/theme'
 import { isLockEnabled, readLock, LOCK_EVENT } from './lib/lock'
 import { isMobile, syncMobileChrome, onMobileResume } from './lib/mobile'
 import { autoPullIfEnabled, refreshCloudNow, retryPendingCloudSync } from './store/useApp'
-import { configureCloudProvider, initCloudAuth, mapCloudError, watchCloudUser } from './lib/cloud'
+import { initCloudAuth, mapCloudError, watchCloudUser } from './lib/cloud'
 import { fetchProfileCached } from './domain/social'
 
 /** پل منوی بومی ویندوز → روتر و اکشن‌های برنامه */
@@ -281,13 +281,8 @@ export default function App() {
   const init = useApp(s => s.init)
   const ready = useApp(s => s.ready)
   const lang = useApp(s => s.data.settings.lang) ?? 'fa'
-  const cloudProvider = useApp(s => s.data.settings.cloud.provider)
-  const cloudflareUrl = useApp(s => s.data.settings.cloud.cloudflareUrl)
 
   useEffect(() => { void init() }, [init])
-  useEffect(() => {
-    if (ready) configureCloudProvider(cloudProvider, cloudflareUrl)
-  }, [cloudProvider, cloudflareUrl, ready])
 
   // آمار شبکه‌های اجتماعیِ قابل‌دسترسی هنگام ورود به اپ تازه می‌شود؛ خطای هر پلتفرم
   // فقط روی همان کارت ثبت می‌شود و هرگز مانع بازشدن برنامه نیست.
@@ -303,8 +298,8 @@ export default function App() {
     }))
   }, [ready])
 
-  // احراز هویت سرویس انتخاب‌شده مستقل از ذخیره محلی آماده می‌شود؛ Firebase
-  // و Cloudflare نشست‌های جدا دارند و جابه‌جایی یکی، حساب دیگری را حذف نمی‌کند.
+  // احراز هویت مستقل از ذخیره‌سازی محلی آماده می‌شود؛ ورود کاربر می‌تواند
+  // دریافت خودکار Firebase را بدون منتظر ماندن برای رفرش صفحه فعال کند.
   useEffect(() => {
     void initCloudAuth()
     return watchCloudUser(user => { if (user) void autoPullIfEnabled() })

@@ -1,21 +1,9 @@
-import type { AppData, Settings, CloudSyncMeta } from '../store/types'
+import type { AppData, Settings } from '../store/types'
 import { CORE_MODULES } from '../domain/schema'
 import { DEFAULT_WEIGHTS } from '../domain/scoring'
 import { DEFAULT_PROVIDERS, DEFAULT_AUTOMATIONS } from '../domain/ai'
 
-export const CURRENT_VERSION = 5
-
-const EMPTY_CLOUD_META: CloudSyncMeta = { lastSync: '', lastLocalChange: '', pendingSync: false, lastSyncError: '' }
-
-function cloudMeta(value: unknown): CloudSyncMeta {
-  const raw = (value ?? {}) as Partial<CloudSyncMeta>
-  return {
-    lastSync: typeof raw.lastSync === 'string' ? raw.lastSync : '',
-    lastLocalChange: typeof raw.lastLocalChange === 'string' ? raw.lastLocalChange : '',
-    pendingSync: raw.pendingSync === true,
-    lastSyncError: typeof raw.lastSyncError === 'string' ? raw.lastSyncError : '',
-  }
-}
+export const CURRENT_VERSION = 4
 
 export const DEFAULT_SETTINGS: Settings = {
   ownerName: '',
@@ -39,11 +27,7 @@ export const DEFAULT_SETTINGS: Settings = {
     baseUrl: 'https://api.openai.com/v1',
     enabled: true,
   },
-  cloud: {
-    provider: 'firebase', cloudflareUrl: '', autoSync: true, autoPull: true,
-    ...EMPTY_CLOUD_META,
-    providerState: { firebase: { ...EMPTY_CLOUD_META }, cloudflare: { ...EMPTY_CLOUD_META } },
-  },
+  cloud: { provider: 'firebase', lastSync: '', lastLocalChange: '', autoSync: true, autoPull: true, pendingSync: false, lastSyncError: '' },
 }
 
 /**
@@ -55,15 +39,6 @@ export function migrate(input: unknown): AppData {
   let v = Number(raw.version) || 0
 
   const rawSettings = (raw.settings ?? {}) as Partial<Settings>
-  const activeCloudMeta = cloudMeta(rawSettings.cloud)
-  const savedProviderState = (rawSettings.cloud as { providerState?: Partial<Record<'firebase' | 'cloudflare', unknown>> } | undefined)?.providerState
-  const providerState = v >= 5 ? {
-    firebase: cloudMeta(savedProviderState?.firebase),
-    cloudflare: cloudMeta(savedProviderState?.cloudflare),
-  } : {
-    firebase: { ...activeCloudMeta },
-    cloudflare: { ...EMPTY_CLOUD_META },
-  }
   const data: AppData = {
     version: CURRENT_VERSION,
     settings: {
@@ -84,13 +59,15 @@ export function migrate(input: unknown): AppData {
       branding: { ...DEFAULT_SETTINGS.branding, ...rawSettings.branding },
       // Gist token/id هرگز وارد داده‌ی Firebase یا بکاپ جدید نمی‌شود.
       cloud: {
-        provider: rawSettings.cloud?.provider === 'cloudflare' ? 'cloudflare' : 'firebase',
-        cloudflareUrl: typeof (rawSettings.cloud as { cloudflareUrl?: unknown } | undefined)?.cloudflareUrl === 'string'
-          ? (rawSettings.cloud as { cloudflareUrl: string }).cloudflareUrl : '',
-        ...activeCloudMeta,
-        providerState,
+        provider: 'firebase',
+        lastSync: typeof rawSettings.cloud?.lastSync === 'string' ? rawSettings.cloud.lastSync : '',
+        lastLocalChange: typeof (rawSettings.cloud as { lastLocalChange?: unknown } | undefined)?.lastLocalChange === 'string'
+          ? (rawSettings.cloud as { lastLocalChange: string }).lastLocalChange : '',
         autoSync: rawSettings.cloud?.autoSync !== false,
         autoPull: rawSettings.cloud?.autoPull !== false,
+        pendingSync: (rawSettings.cloud as { pendingSync?: unknown } | undefined)?.pendingSync === true,
+        lastSyncError: typeof (rawSettings.cloud as { lastSyncError?: unknown } | undefined)?.lastSyncError === 'string'
+          ? (rawSettings.cloud as { lastSyncError: string }).lastSyncError : '',
       },
     },
     modules: Array.isArray(raw.modules) && raw.modules.length ? raw.modules : CORE_MODULES,
@@ -137,14 +114,6 @@ export function migrate(input: unknown): AppData {
     if (!Array.isArray(data.workflows)) data.workflows = []
     if (!Array.isArray(data.runLogs)) data.runLogs = []
     v = 3
-  }
-
-  // v3/v4 → v5: سرویس Cloudflare اختیاری اضافه شد؛ Firebase انتخاب پیش‌فرض
-  // باقی می‌ماند تا هیچ نصب یا بکاپ قدیمی رفتار متفاوتی پیدا نکند.
-  if (v < 5) {
-    data.settings.cloud.provider = 'firebase'
-    data.settings.cloud.cloudflareUrl ||= ''
-    v = 5
   }
 
   // ماژول‌های هسته‌ای جدید فقط وقتی اضافه می‌شوند که کاربر آن‌ها را حذف نکرده باشد.

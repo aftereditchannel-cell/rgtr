@@ -54,14 +54,5 @@ const back = migrate(JSON.parse(JSON.stringify(d)))
 console.log('\nmigrate roundtrip modules:', back.modules.length, 'valid:', validateBackup(back))
 const empty = migrate({})
 console.log('migrate({}) modules:', empty.modules.length, 'weights ok:', Object.keys(empty.settings.weights).length)
-if (empty.settings.cloud.provider !== 'firebase') throw new Error('Firebase must remain the default provider')
-if (!empty.settings.cloud.providerState?.firebase || !empty.settings.cloud.providerState?.cloudflare) throw new Error('missing provider-specific sync state')
-const cloudflareRoundTrip = migrate({
-  ...back,
-  version: 5,
-  settings: { ...back.settings, cloud: { ...back.settings.cloud, provider: 'cloudflare', cloudflareUrl: 'https://example.workers.dev' } },
-})
-if (cloudflareRoundTrip.settings.cloud.provider !== 'cloudflare') throw new Error('Cloudflare provider did not survive migration')
-console.log('cloud providers: Firebase default + Cloudflare optional')
 
 console.log('\n✅ ALL SMOKE CHECKS PASSED')
