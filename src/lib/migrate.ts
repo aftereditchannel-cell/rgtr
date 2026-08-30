@@ -40,16 +40,12 @@ export const DEFAULT_SETTINGS: Settings = {
     enabled: true,
   },
   cloud: {
-    provider: 'firebase', googleScriptUrl: '', autoSync: true, autoPull: true, firebaseAutoPull: true,
+    provider: 'googleDrive', googleScriptUrl: '', autoSync: true, autoPull: false,
     ...EMPTY_CLOUD_META,
-    providerState: { firebase: { ...EMPTY_CLOUD_META }, googleDrive: { ...EMPTY_CLOUD_META } },
+    providerState: { googleDrive: { ...EMPTY_CLOUD_META } },
   },
 }
 
-/**
- * migration پله‌ای: هر بکاپ قدیمی همیشه قابل import می‌ماند.
- * برای نسخه‌های بعدی فقط یک case اضافه کنید.
- */
 export function migrate(input: unknown): AppData {
   const raw = (input ?? {}) as Partial<AppData>
   let v = Number(raw.version) || 0
@@ -57,13 +53,10 @@ export function migrate(input: unknown): AppData {
   const rawSettings = (raw.settings ?? {}) as Partial<Settings>
   const activeCloudMeta = cloudMeta(rawSettings.cloud)
   const savedProviderState = (rawSettings.cloud as { providerState?: Partial<Record<'firebase' | 'googleDrive', unknown>> } | undefined)?.providerState
-  const providerState = v >= 5 ? {
-    firebase: cloudMeta(savedProviderState?.firebase),
-    googleDrive: cloudMeta(savedProviderState?.googleDrive),
-  } : {
-    firebase: { ...activeCloudMeta },
-    googleDrive: { ...EMPTY_CLOUD_META },
+  const providerState = {
+    googleDrive: v >= 5 ? cloudMeta(savedProviderState?.googleDrive) : { ...activeCloudMeta },
   }
+
   const data: AppData = {
     version: CURRENT_VERSION,
     settings: {
@@ -82,18 +75,14 @@ export function migrate(input: unknown): AppData {
       },
       social: { ...DEFAULT_SETTINGS.social, ...rawSettings.social },
       branding: { ...DEFAULT_SETTINGS.branding, ...rawSettings.branding },
-      // Gist token/id هرگز وارد داده‌ی Firebase یا بکاپ جدید نمی‌شود.
       cloud: {
-        provider: rawSettings.cloud?.provider === 'googleDrive' ? 'googleDrive' : 'firebase',
+        provider: 'googleDrive',
         googleScriptUrl: typeof (rawSettings.cloud as { googleScriptUrl?: unknown } | undefined)?.googleScriptUrl === 'string'
           ? (rawSettings.cloud as { googleScriptUrl: string }).googleScriptUrl : '',
         ...activeCloudMeta,
         providerState,
         autoSync: rawSettings.cloud?.autoSync !== false,
-        autoPull: rawSettings.cloud?.provider === 'googleDrive' ? false : rawSettings.cloud?.autoPull !== false,
-        firebaseAutoPull: typeof (rawSettings.cloud as { firebaseAutoPull?: unknown } | undefined)?.firebaseAutoPull === 'boolean'
-          ? (rawSettings.cloud as { firebaseAutoPull: boolean }).firebaseAutoPull
-          : rawSettings.cloud?.autoPull !== false,
+        autoPull: false,
       },
     },
     modules: Array.isArray(raw.modules) && raw.modules.length ? raw.modules : CORE_MODULES,
@@ -102,57 +91,34 @@ export function migrate(input: unknown): AppData {
     seededAt: typeof raw.seededAt === 'string' ? raw.seededAt : undefined,
   }
 
-  // v0 → v1 : اطمینان از وجود آرایه برای هر ماژول
   if (v < 1) {
     for (const m of data.modules) if (!Array.isArray(data.records[m.key])) data.records[m.key] = []
     v = 1
   }
 
-  // v1 → v2 : زبان/تقویم/ابر اضافه شد؛ داده‌ی قدیمی «seed شده» فرض می‌شود
-  // تا ماژول‌های پیش‌فرضِ عمداً حذف‌شده دوباره برنگردند.
   if (v < 2) {
     if (!data.seededAt) data.seededAt = new Date().toISOString()
     v = 2
   }
 
-  // v2 → v3 : برند، مرکز شبکه‌های اجتماعی، AI/اتوماسیون و جریان‌های کاری اضافه شد
   if (v < 3) {
     const s = data.settings
     s.branding = { ...s.branding, appName: s.branding?.appName || 'NEXUS HQ' }
-    s.social = {
-      ...s.social,
-      autoRefresh: s.social?.autoRefresh ?? true,
-      intervalMin: s.social?.intervalMin ?? 0,
-      keys: s.social?.keys ?? {},
-      proxyUrl: s.social?.proxyUrl ?? '',
-      profiles: Array.isArray(s.social?.profiles) ? s.social.profiles : [],
-    }
-    s.ai = {
-      ...s.ai,
-      providers: DEFAULT_PROVIDERS,
-      automations: DEFAULT_AUTOMATIONS,
-      provider: 'openai',
-      model: 'gpt-4o-mini',
-      baseUrl: 'https://api.openai.com/v1',
-      enabled: true,
-    }
+    s.social = { ...s.social }
     if (!Array.isArray(data.socialAccounts)) data.socialAccounts = []
     if (!Array.isArray(data.workflows)) data.workflows = []
     if (!Array.isArray(data.runLogs)) data.runLogs = []
     v = 3
   }
 
-  // v3/v4 → v5: Drive اختیاری اضافه شد؛ Firebase برای نصب‌های قبلی پیش‌فرض می‌ماند.
   if (v < 5) {
-    data.settings.cloud.provider = 'firebase'
+    data.settings.cloud.provider = 'googleDrive'
     data.settings.cloud.googleScriptUrl ||= ''
     v = 5
   }
 
-  // دریافت Drive فقط با Refresh دستی است.
-  if (data.settings.cloud.provider === 'googleDrive') data.settings.cloud.autoPull = false
+  data.settings.cloud.autoPull = false
 
-  // ماژول‌های هسته‌ای جدید فقط وقتی اضافه می‌شوند که کاربر آن‌ها را حذف نکرده باشد.
   const removed = new Set(data.removedCore ?? [])
   const have = new Set(data.modules.map(m => m.key))
   for (const cm of CORE_MODULES) {

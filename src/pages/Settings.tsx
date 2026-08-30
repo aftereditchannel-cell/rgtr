@@ -16,7 +16,6 @@ import type { AppInfo } from '../lib/desktop'
 import { checkForUpdates, cmpVersion, fmtDate, APP_VERSION } from '../lib/updater'
 import type { UpdateRelease, UpdateCheckResult, DownloadProgress } from '../lib/desktop'
 import * as cloud from '../lib/cloud'
-import { isFirebaseConfigured } from '../lib/firebase'
 import {
   readLock, setPasscode, disableLock, setAutoLockMin, setBiometric,
   biometricAuth, getBiometricStatus, cryptoAvailable,
@@ -431,110 +430,9 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
 type CloudState = 'idle' | 'busy'
 
 function CloudCard() {
-  const { data, persist } = useApp()
-  const { t } = useT()
-  const c = data.settings.cloud
-
-  const choose = (provider: 'firebase' | 'googleDrive') => {
-    if (provider === c.provider) return
-    const currentMeta = { lastSync: c.lastSync, lastLocalChange: c.lastLocalChange, pendingSync: c.pendingSync, lastSyncError: c.lastSyncError }
-    const targetMeta = c.providerState[provider]
-    const next = {
-      ...c,
-      ...targetMeta,
-      provider,
-      autoPull: provider === 'googleDrive' ? false : c.firebaseAutoPull,
-      firebaseAutoPull: c.provider === 'firebase' ? c.autoPull : c.firebaseAutoPull,
-      providerState: { ...c.providerState, [c.provider]: currentMeta },
-    }
-    resetCloudPullSession()
-    cloud.configureCloudProvider(provider, next.googleScriptUrl)
-    useApp.setState(state => ({ data: { ...state.data, settings: { ...state.data.settings, cloud: next } } }))
-    void persist()
-  }
-
-  return <div className="space-y-3">
-    <Card>
-      <SectionTitle icon="Cloud">{t('set.cloudProviderTitle')}</SectionTitle>
-      <p className="text-[11.5px] text-[var(--color-dim)] leading-relaxed mb-3">{t('set.cloudProviderHint')}</p>
-      <div className="grid grid-cols-2 gap-2">
-        <button type="button" onClick={() => choose('firebase')}
-          className={`rounded-xl border px-3 py-3 text-start transition-all ${c.provider === 'firebase' ? 'border-[var(--color-acc)] bg-[var(--color-acc)]/10' : 'border-[var(--color-line)] hover:border-[var(--color-line2)]'}`}>
-          <span className="flex items-center gap-2 text-[12.5px] font-medium"><Icon name="Flame" size={15} className="text-orange-400" />Firebase</span>
-          <span className="block mt-1 text-[10px] text-[var(--color-dim2)]">{t('set.providerFirebaseHint')}</span>
-        </button>
-        <button type="button" onClick={() => choose('googleDrive')}
-          className={`rounded-xl border px-3 py-3 text-start transition-all ${c.provider === 'googleDrive' ? 'border-[var(--color-acc)] bg-[var(--color-acc)]/10' : 'border-[var(--color-line)] hover:border-[var(--color-line2)]'}`}>
-          <span className="flex items-center gap-2 text-[12.5px] font-medium"><Icon name="HardDriveUpload" size={15} className="text-emerald-400" />Google Drive</span>
-          <span className="block mt-1 text-[10px] text-[var(--color-dim2)]">{t('set.providerDriveHint')}</span>
-        </button>
-      </div>
-    </Card>
-    {c.provider === 'firebase' ? <FirebaseCloudCard /> : <GoogleDriveCloudCard />}
-  </div>
+  return <GoogleDriveCloudCard />
 }
 
-/* ---------- Firebase قبلی بدون حذف ---------- */
-function FirebaseCloudCard() {
-  const { t, lang } = useT()
-  const fmt = useFmt()
-  const { data, setSettings, setToast } = useApp()
-  const c = data.settings.cloud
-  const [user, setUser] = useState<cloud.CloudUser | null>(() => cloud.getCurrentUser())
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [state, setState] = useState<CloudState>('idle')
-  const [err, setErr] = useState('')
-  const configured = isFirebaseConfigured()
-  const size = cloud.payloadSize(data)
-
-  useEffect(() => {
-    void cloud.initCloudAuth().finally(() => setUser(cloud.getCurrentUser()))
-    return cloud.watchCloudUser(setUser)
-  }, [])
-
-  const fail = (e: unknown) => {
-    const cloudErr = cloud.mapCloudError(e)
-    const diagnostic = cloudErr.detail ? ` — ${t('sync.errorCode')}: ${cloudErr.detail}` : ''
-    setErr(cloudError(lang, cloudErr.code) + diagnostic); setState('idle')
-  }
-  const signIn = async (create = false) => {
-    setErr(''); setState('busy')
-    try {
-      if (create) await cloud.createEmailAccount(email, password)
-      else await cloud.signInWithEmail(email, password)
-      setPassword(''); setToast(t(create ? 'set.firebaseAccountCreated' : 'set.firebaseSignedIn')); setState('idle')
-    } catch (e) { fail(e) }
-  }
-  const refresh = async () => {
-    setErr(''); setState('busy')
-    try {
-      const changed = await refreshCloudNow()
-      setToast(t(changed ? 'set.cloudPulled' : 'set.cloudUpToDate')); setState('idle')
-    } catch (e) { fail(e) }
-  }
-  const signOut = async () => {
-    setErr(''); setState('busy')
-    try { await cloud.signOutCloud(); setToast(t('set.firebaseSignedOut')); setState('idle') } catch (e) { fail(e) }
-  }
-
-  return <Card>
-    <SectionTitle icon={user ? 'CloudCheck' : 'CloudOff'} right={<span className={`text-[10.5px] ${user ? 'text-emerald-400' : 'text-[var(--color-dim2)]'}`}>{user ? t('set.cloudOn') : t('set.cloudOff')}</span>}>{t('set.firebaseTitle')}</SectionTitle>
-    <p className="text-[12px] text-[var(--color-dim)] leading-relaxed mb-3">{t('set.firebaseIntro')}</p>
-    {!configured ? <div className="rounded-lg border border-amber-500/25 bg-amber-500/[.07] px-3 py-2 text-[11.5px] text-amber-300">{t('set.firebaseNotConfigured')}</div>
-      : !user ? <div className="space-y-3 max-w-md">
-        <Field label={t('set.firebaseEmail')}><TextInput type="email" value={email} className="ltr" placeholder="name@example.com" onChange={e => setEmail(e.target.value)} /></Field>
-        <Field label={t('set.firebasePassword')} help={t('set.firebasePasswordHint')}><TextInput type="password" value={password} className="ltr" onChange={e => setPassword(e.target.value)} /></Field>
-        <div className="flex gap-2 flex-wrap"><Button size="sm" variant="primary" icon={state === 'busy' ? 'Loader' : 'LogIn'} disabled={state === 'busy' || !email || !password} onClick={() => void signIn()}>{t('set.firebaseSignIn')}</Button><Button size="sm" variant="outline" icon="UserPlus" disabled={state === 'busy' || !email || !password} onClick={() => void signIn(true)}>{t('set.firebaseCreateAccount')}</Button></div>
-      </div>
-      : <><div className="flex items-center gap-3 rounded-xl border border-[var(--color-line)] px-3 py-2.5"><div className="w-9 h-9 rounded-full grid place-items-center bg-[var(--color-acc)]/15 text-[var(--color-acc)]"><Icon name="User" size={16} /></div><div className="min-w-0 flex-1"><div className="text-[12.5px] font-medium truncate">{t('set.firebaseAccount')}</div><div className="text-[11px] text-[var(--color-dim2)] truncate ltr">{user.email || '—'}</div></div></div><div className="flex gap-2 flex-wrap mt-4"><Button size="sm" variant="outline" icon="RefreshCw" disabled={state === 'busy'} onClick={() => void refresh()}>{t('set.cloudRefresh')}</Button><Button size="sm" variant="ghost" icon="LogOut" disabled={state === 'busy'} onClick={() => void signOut()}>{t('set.firebaseSignOut')}</Button></div></>}
-    {err && <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/25 bg-red-500/[.07] px-3 py-2 text-[11.5px] text-red-300"><Icon name="AlertTriangle" size={13} className="mt-0.5 shrink-0" /><span>{err}</span></div>}
-    <div className="mt-4 pt-3 border-t border-[var(--color-line)] grid sm:grid-cols-2 gap-2 text-[11.5px]"><Row label={t('set.cloudLastSync')} value={c.lastSync ? fmt.relTime(c.lastSync) : t('common.never')} /><Row label={t('set.cloudSize')} value={`${fmt.dg((size / 1024).toFixed(1))} KB`} /></div>
-    <label className="mt-3 flex items-center gap-2 cursor-pointer"><input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={c.autoSync} onChange={e => setSettings({ cloud: { ...c, autoSync: e.target.checked } })} /><span className="text-[12px]">{t('set.cloudAutoSync')}</span><span className="text-[10.5px] text-[var(--color-dim2)]">— {t('set.firebaseAutoSyncHint')}</span></label>
-    <label className="mt-2.5 flex items-center gap-2 cursor-pointer"><input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={c.autoPull} onChange={e => setSettings({ cloud: { ...c, autoPull: e.target.checked, firebaseAutoPull: e.target.checked } })} /><span className="text-[12px]">{t('set.cloudAutoPull')}</span><span className="text-[10.5px] text-[var(--color-dim2)]">— {t('set.cloudStartupHint')}</span></label>
-    {c.pendingSync && <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/25 bg-amber-500/[.07] px-3 py-2 text-[11.5px] text-amber-300"><Icon name="Clock3" size={13} className="mt-0.5 shrink-0" /><span>{t('set.cloudPending')}{c.lastSyncError ? ` — ${t('sync.errorCode')}: ${c.lastSyncError}` : ''}</span></div>}
-  </Card>
-}
 
 /* ---------- فایل JSON روی Google Drive از طریق Apps Script ---------- */
 function GoogleDriveCloudCard() {

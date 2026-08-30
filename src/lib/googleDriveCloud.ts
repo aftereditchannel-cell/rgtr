@@ -56,7 +56,9 @@ function emit() {
 }
 
 export function configure(value: string): string {
-  const normalized = normalizeGoogleScriptUrl(value)
+  let normalized = normalizeGoogleScriptUrl(value)
+  if (!normalized && session?.scriptUrl) normalized = session.scriptUrl
+  
   if (scriptUrl === normalized) return scriptUrl
   scriptUrl = normalized
   initializedFor = ''

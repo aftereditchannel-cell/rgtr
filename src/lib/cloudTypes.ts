@@ -1,4 +1,4 @@
-export type CloudProvider = 'firebase' | 'googleDrive'
+export type CloudProvider = 'googleDrive'
 
 export type CloudCode =
   | 'not_configured' | 'not_signed_in' | 'bad_email' | 'weak_password'

@@ -57,6 +57,10 @@ interface Store {
   getLogs: () => RunLog[]
 
   setSettings: (patch: Partial<Settings>) => void
+  pendingCloudPrompt: boolean
+  setPendingCloudPrompt: (val: boolean) => void
+  triggerCloudPush: () => Promise<void>
+
   replaceAll: (d: AppData) => Promise<void>
   loadSeed: () => Promise<void>
   clearAll: () => Promise<void>
@@ -76,12 +80,10 @@ export function resetCloudPullSession(): void {
 export const useApp = create<Store>((set, get) => {
   /** ذخیره خودکار سرویس فعال؛ فایل محلی همیشه قبل از شبکه نوشته می‌شود. */
   const scheduleCloudPush = () => {
-    const c = get().data.settings.cloud
-    if (!c.autoSync || !cloud.isCloudReady()) return
+    if (!cloud.isCloudReady()) return
     if (syncTimer) clearTimeout(syncTimer)
-    // Drive بعد از ذخیره تقریباً فوری ارسال می‌شود؛ Firebase رفتار قبلی را حفظ می‌کند.
-    const delay = c.provider === 'googleDrive' ? 250 : 900
-    syncTimer = setTimeout(() => { void autoPush() }, delay)
+    // نمایش پرسش برای ارسال به درایو پس از پایان تغییرات پیوسته
+    syncTimer = setTimeout(() => { set({ pendingCloudPrompt: true }) }, 800)
   }
 
   const autoPush = async () => {
@@ -125,6 +127,10 @@ export const useApp = create<Store>((set, get) => {
     ready: false,
     dirty: false,
     toast: null,
+    pendingCloudPrompt: false,
+
+    setPendingCloudPrompt: (val) => set({ pendingCloudPrompt: val }),
+    triggerCloudPush: autoPush,
 
     async init() {
       const stored = await loadDoc()

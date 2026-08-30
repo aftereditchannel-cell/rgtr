@@ -73,17 +73,15 @@ export interface CloudSyncMeta {
 
 /** Firebase حفظ شده و Google Drive یک انتخاب مستقل است. */
 export interface CloudSettings extends CloudSyncMeta {
-  provider: 'firebase' | 'googleDrive'
+  provider: 'googleDrive'
   /** URL عمومی Web App متعلق به Google Apps Script خود کاربر؛ secret نیست. */
   googleScriptUrl: string
   /** وضعیت هر سرویس جدا می‌ماند تا تعویض سرویس باعث overwrite اشتباه نشود. */
-  providerState: Record<'firebase' | 'googleDrive', CloudSyncMeta>
+  providerState: Record<'googleDrive', CloudSyncMeta>
   /** ذخیره محلی همیشه اول است؛ سپس در سرویس فعال ارسال می‌شود. */
   autoSync: boolean
-  /** فقط برای Firebase؛ دریافت Drive همیشه دستی است. */
+  /** دریافت Drive همیشه دستی است (یا وابسته به درخواست کاربر). */
   autoPull: boolean
-  /** ترجیح Firebase هنگام جابه‌جایی موقت به Drive. */
-  firebaseAutoPull: boolean
 }
 
 /** تنظیمات هوش مصنوعی Agent Runner — کلید API جدا (در localStorage) ذخیره می‌شود */

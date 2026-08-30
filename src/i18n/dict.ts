@@ -669,8 +669,12 @@ export const UI: Record<string, Pair> = {
   'sync.localSavedBody': { fa: 'ارسال ابری انجام نشد، اما داده‌ی شما امن و روی همین دستگاه ذخیره شده است.', en: 'Cloud upload did not complete, but your data is safe and saved on this device.' },
   'sync.localSavedHint': { fa: 'با وصل‌شدن اینترنت یا ذخیره‌ی بعدی، برنامه دوباره تلاش می‌کند. می‌توانید همین حالا هم تلاش مجدد را بزنید.', en: 'The app retries when online or after your next save. You can also retry now.' },
   'sync.keepLocal': { fa: 'فقط محلی نگه دار', en: 'Keep local only' },
+  'sync.askCloud': { fa: 'کجا ذخیره شود؟', en: 'Where to save?' },
+  'sync.exitPromptHint': { fa: 'در حال خروج از برنامه هستید. آیا مایلید اطلاعات در گوگل درایو ذخیره شود یا فقط روی همین دستگاه بماند؟', en: 'You are exiting the app. Save to Google Drive or keep it local only?' },
+  'sync.saveDrive': { fa: 'ذخیره در درایو', en: 'Save to Drive' },
+  'sync.localOnly': { fa: 'فقط محلی', en: 'Local Only' },
   'sync.retry': { fa: 'تلاش مجدد', en: 'Retry now' },
-  'set.cloudPending': { fa: 'یک تغییر فقط محلی است و منتظر ارسال ابری است', en: 'One local change is waiting for cloud upload' },
+  'set.cloudPending': { fa: 'این تغییر محلی ذخیره شده و منتظر ارسال ابری است', en: 'Saved locally and waiting for cloud upload' },
   'set.cloudStartupHint': { fa: 'فقط یک‌بار هنگام بازشدن برنامه نسخه ابری را بررسی می‌کند', en: 'Checks the cloud version once when the app opens' },
 }
 
