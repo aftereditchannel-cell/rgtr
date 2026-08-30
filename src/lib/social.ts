@@ -94,6 +94,68 @@ async function viaProxy(url: string, proxyUrl: string): Promise<SocialProfile | 
   }
 }
 
+async function viaPublicProxy(url: string): Promise<SocialProfile | null> {
+  const proxyUrl = 'https://api.allorigins.win/get?url=' + encodeURIComponent(url)
+  try {
+    const res = await fetch(proxyUrl)
+    if (!res.ok) return null
+    const json = await res.json()
+    const html = json.contents
+    if (!html) return null
+
+    const extract = (pattern: RegExp) => (html.match(pattern) || [])[1]?.trim() || ''
+    const num = (pattern: RegExp) => {
+      const match = (html.match(pattern) || [])[1]
+      if (!match) return null
+      const n = Number(match.replace(/[^\d]/g, ''))
+      return Number.isFinite(n) ? n : null
+    }
+
+    const title = extract(/<meta\s+property="og:title"\s+content="([^"]+)"/i)
+    const desc = extract(/<meta\s+property="og:description"\s+content="([^"]+)"/i)
+
+    let followers = null
+    let name = title
+    
+    // Telegram
+    if (url.includes('t.me')) {
+      followers = num(/class="tgme_page_extra"[^>]*>([0-9\sA-Za-z.,]+)(subscribers|members)/i)
+      name = title || extract(/<div class="tgme_page_title".*?>\s*<span[^>]*>(.*?)<\/span>/i)
+    }
+    // YouTube
+    else if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      followers = num(/"subscriberCountText":\{"accessibility":\{"accessibilityData":\{"label":"([^"]+) subscribers"/i) 
+                  || num(/"subscriberCountText":\{"simpleText":"([^"]+) subscribers"/i)
+    }
+    // Instagram (might fail due to login wall, but if works:)
+    else if (url.includes('instagram.com')) {
+      followers = num(/content="([0-9.,KMBkm]+)\s+Followers/i)
+      name = extract(/content=".*?See Instagram photos and videos from\s+([^"]+)\s+\(@/i) || title
+    }
+    // SoundCloud
+    else if (url.includes('soundcloud.com')) {
+      followers = num(/"followers_count":\s*(\d+)/i)
+    }
+    // Spotify
+    else if (url.includes('spotify.com')) {
+      followers = num(/"followers":\s*(?:\{[^\}]*"total":\s*)?(\d+)/i) || num(/followerCount":\s*(\d+)/i)
+      name = title || extract(/<meta property="og:title" content="([^"]+)"/i)
+    }
+
+    return {
+      name: name.replace(/\s*-.*$/, ''), // clean up suffixes like " - YouTube"
+      bio: desc,
+      followers,
+      following: null,
+      posts: null,
+      url,
+      source: 'public proxy',
+    }
+  } catch {
+    return null
+  }
+}
+
 /**
  * تلاش برای خواندن پروفایل. هرگز throw نمی‌کند؛ در صورت شکست، null.
  */
@@ -108,7 +170,15 @@ export async function fetchSocialProfile(
     if (p) return p
   }
   const o = await viaOembed(url)
-  return o
+  if (o) {
+    // try to augment oEmbed with follower count using public proxy
+    const aug = await viaPublicProxy(url)
+    if (aug && aug.followers) o.followers = aug.followers
+    return o
+  }
+  // fallback to public proxy
+  const p = await viaPublicProxy(url)
+  return p
 }
 
 /** قالب Worker واسط برای راهنمای کاربر — به‌صورت رشته */

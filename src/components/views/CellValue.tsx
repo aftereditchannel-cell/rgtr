@@ -5,6 +5,31 @@ import { daysUntil } from '../../lib/format'
 import { useFmt } from '../../lib/useFmt'
 import { refLabel } from '../../store/useApp'
 
+function LinkifyText({ text, className = '' }: { text: string; className?: string }) {
+  if (text === '—' || !text) return <span className={className}>{text}</span>
+  // تشخیص آدرس‌ها و شماره تلفن‌ها (مثل 0912... یا +98912...)
+  const regex = /(https?:\/\/[^\s()]+?(?=[.,!?:;]*(?:[\s()\[\]]|$))|09\d{9}|\+\d{10,14})/g
+  const parts = text.split(regex)
+  const matches = text.match(regex) || []
+  
+  if (matches.length === 0) return <span className={className}>{text}</span>
+
+  const result = []
+  for (let i = 0; i < parts.length; i++) {
+    if (parts[i]) result.push(<span key={`t-${i}`}>{parts[i]}</span>)
+    if (matches[i]) {
+       const m = matches[i]
+       if (m.startsWith('http')) {
+         result.push(<a key={`m-${i}`} href={m} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className="text-[var(--color-acc)] hover:underline ltr inline-block">{m}</a>)
+       } else {
+         const norm = m.replace(/[\s-]/g, '')
+         result.push(<a key={`m-${i}`} href={`tel:${norm}`} onClick={e => e.stopPropagation()} className="text-[var(--color-acc)] hover:underline ltr inline-block" dir="ltr">{m}</a>)
+       }
+    }
+  }
+  return <span className={className}>{result}</span>
+}
+
 export function CellValue({ f, row, data, currency }: { f: FieldDef; row: Entity; data: AppData; currency: string }) {
   const fmt = useFmt()
   const v = row[f.key]
@@ -62,23 +87,11 @@ export function CellValue({ f, row, data, currency }: { f: FieldDef; row: Entity
         : <span className="text-[12px] text-[var(--color-dim)]">{s}</span>
     }
     case 'textarea':
-      return <span className="text-[12px] text-[var(--color-dim)] line-clamp-1">{String(v ?? '') || '—'}</span>
+      return <LinkifyText text={String(v ?? '') || '—'} className="text-[12px] text-[var(--color-dim)] line-clamp-1" />
     default: {
       const text = String(v ?? '')
       if (!text) return <span className="text-[var(--color-dim2)]">—</span>
-      // فیلدهای تلفن (یا عددی که شکل تلفن دارد) در Android تماس می‌گیرند و در Windows شماره‌گیر پیش‌فرض را باز می‌کنند.
-      const phone = f.key.toLowerCase().includes('phone') || f.label.toLowerCase().includes('phone')
-      const normalized = text.replace(/[\s().-]/g, '')
-      if (phone && /^\+?[0-9]{7,15}$/.test(normalized)) {
-        return <a href={`tel:${normalized}`} onClick={e => e.stopPropagation()} className="inline-flex items-center gap-1 text-[var(--color-acc)] hover:underline ltr"><Icon name="Phone" size={12} />{text}</a>
-      }
-      // لینک‌هایی که در فیلد متنی وارد شده‌اند نیز بدون نیاز به تعیین نوع فیلد clickable هستند.
-      const urlMatch = text.match(/^(https?:\/\/[^\s]+|(?:www\.)[^\s]+)$/i)
-      if (urlMatch) {
-        const href = text.startsWith('http') ? text : `https://${text}`
-        return <a href={href} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className="truncate block text-[var(--color-acc)] hover:underline ltr">{text}</a>
-      }
-      return <span className="truncate">{text}</span>
+      return <LinkifyText text={text} className="truncate" />
     }
   }
 }
