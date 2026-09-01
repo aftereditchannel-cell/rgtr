@@ -65,9 +65,13 @@ export function RecordForm({ module, row, open, onClose }: Props) {
   const { t, m: ml, f: fl, o: ol, lang } = useT()
   const fmt = useFmt()
   const [v, setV] = useState<Record<string, unknown>>({})
+  const [editMode, setEditMode] = useState(false)
 
   useEffect(() => {
-    if (open) setV(row ? { ...row } : emptyRecord(module))
+    if (open) {
+      setV(row ? { ...row } : emptyRecord(module))
+      setEditMode(!row)
+    }
   }, [open, row, module])
 
   const set = (k: string, val: unknown) => setV(p => ({ ...p, [k]: val }))
@@ -82,8 +86,108 @@ export function RecordForm({ module, row, open, onClose }: Props) {
     if (row && confirm(t('form.confirmDelete'))) { remove(module.key, row.id); onClose() }
   }
 
+  const copyText = (txt: string) => {
+    navigator.clipboard.writeText(txt).catch(()=>{})
+  }
+
+  const renderReadOnlyField = (f: FieldDef, val: unknown) => {
+    const text = String(val ?? '')
+    if (!text || (Array.isArray(val) && val.length === 0)) {
+      return <div className="text-[13px] text-[var(--color-dim2)] pt-1">—</div>
+    }
+
+    if (f.type === 'url' || text.match(/^(https?:\/\/|(?:www\.)[^\s]+)/i)) {
+      const href = text.startsWith('http') ? text : `https://${text}`
+      return (
+        <div className="flex items-center gap-2 pt-1">
+          <a href={href} target="_blank" rel="noreferrer" className="text-[13px] text-[var(--color-acc)] hover:underline ltr truncate max-w-full">
+            {text}
+          </a>
+          <button onClick={() => copyText(text)} className="p-1.5 text-[var(--color-dim2)] hover:text-[var(--color-tx)] hover:bg-white/[.08] rounded-md transition-colors" title="Copy"><Icon name="Copy" size={13}/></button>
+          <a href={href} target="_blank" rel="noreferrer" className="p-1.5 text-[var(--color-dim2)] hover:text-[var(--color-tx)] hover:bg-white/[.08] rounded-md transition-colors inline-block" title="Open"><Icon name="ExternalLink" size={13}/></a>
+        </div>
+      )
+    }
+
+    const isPhone = f.key.toLowerCase().includes('phone') || f.label.toLowerCase().includes('phone')
+    const phoneNorm = text.replace(/[\s().-]/g, '')
+    if (isPhone && /^\+?[0-9]{7,15}$/.test(phoneNorm)) {
+      return (
+        <div className="flex items-center gap-2 pt-1">
+          <a href={`tel:${phoneNorm}`} className="text-[13px] text-[var(--color-acc)] hover:underline ltr font-medium">
+            {text}
+          </a>
+          <button onClick={() => copyText(text)} className="p-1.5 text-[var(--color-dim2)] hover:text-[var(--color-tx)] hover:bg-white/[.08] rounded-md transition-colors" title="Copy"><Icon name="Copy" size={13}/></button>
+          <a href={`tel:${phoneNorm}`} className="p-1.5 text-[var(--color-dim2)] hover:text-[var(--color-tx)] hover:bg-white/[.08] rounded-md transition-colors inline-block" title="Call"><Icon name="Phone" size={13}/></a>
+        </div>
+      )
+    }
+
+    if (f.type === 'progress') {
+      return (
+        <div className="flex items-center gap-3 pt-1">
+          <div className="flex-1 h-1.5 bg-white/[.08] rounded-full overflow-hidden">
+            <div className="h-full bg-[var(--color-acc)]" style={{ width: `${Number(val) || 0}%` }} />
+          </div>
+          <span className="text-[12px] nums text-[var(--color-dim)]">{fmt.dg(Number(val) || 0)}%</span>
+        </div>
+      )
+    }
+
+    if (f.type === 'checklist') {
+      const items = (Array.isArray(val) ? val : []) as ChecklistItem[]
+      return (
+        <div className="space-y-1 pt-1">
+          {items.map((it, i) => (
+            <div key={i} className="flex items-start gap-2">
+              <Icon name={it.done ? 'CheckSquare' : 'Square'} size={14} className={it.done ? 'text-[var(--color-acc)] mt-0.5 shrink-0' : 'text-[var(--color-dim2)] mt-0.5 shrink-0'} />
+              <span className={`text-[13px] ${it.done ? 'text-[var(--color-dim)] line-through' : 'text-[var(--color-tx)]'}`}>{it.t}</span>
+            </div>
+          ))}
+        </div>
+      )
+    }
+    
+    if (f.type === 'ref') {
+      const rm = data.modules.find(m => m.key === f.refModule)
+      const rows = data.records[f.refModule ?? ''] ?? []
+      const refRow = rows.find(r => String(r.id) === String(val))
+      const label = refRow ? String(refRow[rm?.titleField ?? 'name'] ?? refRow.id) : text
+      return <div className="text-[13px] text-[var(--color-tx)] pt-1">{label}</div>
+    }
+
+    // Default text view with LinkifyText-like support (basic regex split for phones/urls)
+    const regex = /(https?:\/\/[^\s()]+?(?=[.,!?:;]*(?:[\s()\[\]]|$))|09\d{9}|\+\d{10,14})/g
+    const parts = text.split(regex)
+    const matches = text.match(regex) || []
+    
+    if (matches.length === 0) {
+       return <div className="text-[13px] text-[var(--color-tx)] pt-1 whitespace-pre-wrap">{text}</div>
+    }
+    
+    const result = []
+    for (let i = 0; i < parts.length; i++) {
+      if (parts[i]) result.push(<span key={`t-${i}`}>{parts[i]}</span>)
+      if (matches[i]) {
+         const m = matches[i]
+         if (m.startsWith('http')) {
+           result.push(<a key={`m-${i}`} href={m} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className="text-[var(--color-acc)] hover:underline ltr inline-block mx-0.5">{m}</a>)
+         } else {
+           const norm = m.replace(/[\s-]/g, '')
+           result.push(<a key={`m-${i}`} href={`tel:${norm}`} onClick={e => e.stopPropagation()} className="text-[var(--color-acc)] hover:underline ltr inline-block mx-0.5">{m}</a>)
+         }
+      }
+    }
+    return <div className="text-[13px] text-[var(--color-tx)] pt-1 whitespace-pre-wrap">{result}</div>
+  }
+
   const renderField = (f: FieldDef) => {
     const val = v[f.key]
+    
+    if (!editMode) {
+      return renderReadOnlyField(f, val)
+    }
+    
     switch (f.type) {
       case 'textarea':
         return <TextArea value={String(val ?? '')} placeholder={f.placeholder} onChange={e => set(f.key, e.target.value)} />
@@ -190,12 +294,22 @@ export function RecordForm({ module, row, open, onClose }: Props) {
 
   return (
     <Modal open={open} onClose={onClose} wide
-      title={`${row ? t('form.editTitle') : t('form.addTitle')} — ${ml(module)}`}
+      title={
+        <div className="flex items-center gap-3 w-full pe-6">
+          <span className="truncate">{row ? (editMode ? t('form.editTitle') : String(row[module.titleField] ?? '')) : t('form.addTitle')} — {ml(module)}</span>
+          {row && !editMode && (
+            <Button size="sm" variant="outline" icon="Edit3" onClick={() => setEditMode(true)} className="ms-auto shrink-0 px-2.5 h-7 text-[11px]">
+              {t('common.edit') || 'Edit'}
+            </Button>
+          )}
+        </div>
+      }
       footer={
         <>
-          {row && <Button variant="danger" size="sm" icon="Trash2" onClick={del} className="me-auto">{t('common.delete')}</Button>}
-          <Button variant="ghost" size="sm" onClick={onClose}>{t('common.cancel')}</Button>
-          <Button variant="primary" size="sm" icon="Check" onClick={save}>{t('common.save')}</Button>
+          {row && editMode && <Button variant="danger" size="sm" icon="Trash2" onClick={del} className="me-auto">{t('common.delete')}</Button>}
+          {!editMode && <Button variant="ghost" size="sm" className="me-auto" onClick={onClose}>{t('common.close') || 'Close'}</Button>}
+          {editMode && <Button variant="ghost" size="sm" onClick={() => { if (row) setEditMode(false); else onClose() }}>{t('common.cancel')}</Button>}
+          {editMode && <Button variant="primary" size="sm" icon="Check" onClick={save}>{t('common.save')}</Button>}
         </>
       }>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3.5 max-h-[62vh] overflow-y-auto pe-1">

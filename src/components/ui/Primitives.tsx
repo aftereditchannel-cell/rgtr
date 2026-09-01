@@ -121,7 +121,7 @@ export function Empty({ icon = 'Inbox', title, hint, action }: { icon?: string; 
 
 /* ---------- Modal ---------- */
 export function Modal({ open, onClose, title, children, wide = false, footer }: {
-  open: boolean; onClose: () => void; title: string; children: ReactNode; wide?: boolean; footer?: ReactNode
+  open: boolean; onClose: () => void; title: ReactNode; children: ReactNode; wide?: boolean; footer?: ReactNode
 }) {
   if (!open || typeof document === 'undefined') return null
 
@@ -130,7 +130,7 @@ export function Modal({ open, onClose, title, children, wide = false, footer }: 
   return createPortal(
     <div className="fixed inset-0 z-[100] grid place-items-center overflow-hidden p-3 sm:p-6"
       style={{ background: 'rgba(4,5,8,.72)', backdropFilter: 'blur(4px)' }}
-      role="dialog" aria-modal="true" aria-label={title} onClick={onClose}>
+      role="dialog" aria-modal="true" aria-label={typeof title === "string" ? title : "Dialog"} onClick={onClose}>
       <div className={`anim flex w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)] flex-col overflow-hidden rounded-2xl border border-[var(--color-line2)] bg-[var(--color-bg2)] shadow-2xl`}
         onClick={e => e.stopPropagation()}>
         <div className="flex shrink-0 items-center justify-between px-4 py-3 sm:px-5 sm:py-3.5 border-b border-[var(--color-line)]">
