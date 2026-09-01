@@ -1218,24 +1218,33 @@ function ModuleEditor({ module, onClose, onSave }: { module: ModuleDef; onClose:
       </div>
       <div className="space-y-1.5 max-h-[38vh] overflow-y-auto pe-1">
         {fields.map((f, i) => (
-          <div key={i} className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-[var(--color-line)]">
-            <TextInput value={f.label} className="py-1 text-[12px] flex-1 ltr" onChange={e => upd(i, { label: e.target.value })} />
-            <TextInput value={f.labelFa ?? ''} placeholder={fl(f)} className="py-1 text-[12px] flex-1"
-              onChange={e => upd(i, { labelFa: e.target.value || undefined })} />
-            <Dropdown value={f.type} onChange={v => upd(i, { type: v as FieldType })}
-              className="w-32 shrink-0"
-              options={FIELD_TYPES.map(ty => ({ value: ty, label: ty }))} />
-            {f.type === 'select' && (
-              <TextInput value={(f.options ?? []).join(',')} placeholder="options,csv" className="py-1 text-[11px] w-32 ltr"
-                onChange={e => upd(i, { options: e.target.value.split(',').map(x => x.trim()).filter(Boolean) })} />
-            )}
-            <button onClick={() => upd(i, { col: !f.col })} title={t('set.showInTable')}
-              className={`p-1 rounded ${f.col ? 'text-[var(--color-acc)]' : 'text-[var(--color-dim2)]'}`}>
-              <Icon name="Table2" size={13} />
-            </button>
-            <button onClick={() => setFields(fs => fs.filter((_, j) => j !== i))} className="p-1 text-[var(--color-dim2)] hover:text-red-400">
-              <Icon name="X" size={13} />
-            </button>
+          <div key={i} className="flex flex-col sm:flex-row sm:items-center gap-2.5 px-3 py-2.5 rounded-lg border border-[var(--color-line)] bg-white/[.01]">
+            <div className="flex flex-1 flex-col sm:flex-row gap-2.5">
+              <TextInput value={f.label} className="py-1.5 text-[12px] flex-1 ltr font-medium" placeholder="Label (En)" onChange={e => upd(i, { label: e.target.value })} />
+              <TextInput value={f.labelFa ?? ''} placeholder={fl(f) || 'برچسب فارسی'} className="py-1.5 text-[12px] flex-1"
+                onChange={e => upd(i, { labelFa: e.target.value || undefined })} />
+            </div>
+            
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+              <Dropdown value={f.type} onChange={v => upd(i, { type: v as FieldType })}
+                className="w-full sm:w-32 shrink-0 text-[12px]"
+                options={FIELD_TYPES.map(ty => ({ value: ty, label: ty }))} />
+                
+              {f.type === 'select' && (
+                <TextInput value={(f.options ?? []).join(',')} placeholder="options,csv" className="py-1.5 text-[11.5px] w-full sm:w-32 ltr"
+                  onChange={e => upd(i, { options: e.target.value.split(',').map(x => x.trim()).filter(Boolean) })} />
+              )}
+              
+              <div className="flex items-center gap-1 mt-1 sm:mt-0 w-full sm:w-auto justify-end border-t sm:border-0 border-[var(--color-line)] pt-2 sm:pt-0 shrink-0">
+                <button onClick={() => upd(i, { col: !f.col })} title={t('set.showInTable')}
+                  className={`flex items-center justify-center w-8 h-8 rounded-md transition-colors ${f.col ? 'bg-[var(--color-acc)]/15 text-[var(--color-acc)]' : 'hover:bg-white/[.07] text-[var(--color-dim2)]'}`}>
+                  <Icon name="Table2" size={14} />
+                </button>
+                <button onClick={() => setFields(fs => fs.filter((_, j) => j !== i))} className="flex items-center justify-center w-8 h-8 rounded-md text-[var(--color-dim2)] hover:bg-red-500/15 hover:text-red-400 transition-colors">
+                  <Icon name="X" size={14} />
+                </button>
+              </div>
+            </div>
           </div>
         ))}
         {!fields.length && <Empty icon="Columns3" title={t('module.noFields')} />}

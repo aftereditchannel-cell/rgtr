@@ -3,7 +3,7 @@ import { CORE_MODULES } from '../domain/schema'
 import { DEFAULT_WEIGHTS } from '../domain/scoring'
 import { DEFAULT_PROVIDERS, DEFAULT_AUTOMATIONS } from '../domain/ai'
 
-export const CURRENT_VERSION = 5
+export const CURRENT_VERSION = 6
 
 const EMPTY_CLOUD_META: CloudSyncMeta = { lastSync: '', lastLocalChange: '', pendingSync: false, lastSyncError: '' }
 
@@ -115,6 +115,21 @@ export function migrate(input: unknown): AppData {
     data.settings.cloud.provider = 'googleDrive'
     data.settings.cloud.googleScriptUrl ||= ''
     v = 5
+  }
+
+  // v5 -> v6: Append new fields to existing core modules
+  if (v < 6) {
+    for (const cm of CORE_MODULES) {
+      const existing = data.modules.find(m => m.key === cm.key)
+      if (existing) {
+        for (const cf of cm.fields) {
+          if (!existing.fields.some(ef => ef.key === cf.key)) {
+            existing.fields.push(cf)
+          }
+        }
+      }
+    }
+    v = 6
   }
 
   data.settings.cloud.autoPull = false
