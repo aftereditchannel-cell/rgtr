@@ -3,7 +3,7 @@ import { CORE_MODULES } from '../domain/schema'
 import { DEFAULT_WEIGHTS } from '../domain/scoring'
 import { DEFAULT_PROVIDERS, DEFAULT_AUTOMATIONS } from '../domain/ai'
 
-export const CURRENT_VERSION = 6
+export const CURRENT_VERSION = 7
 
 const EMPTY_CLOUD_META: CloudSyncMeta = { lastSync: '', lastLocalChange: '', pendingSync: false, lastSyncError: '' }
 
@@ -130,6 +130,21 @@ export function migrate(input: unknown): AppData {
       }
     }
     v = 6
+  }
+
+  // v6 -> v7: Rename releases to labels
+  if (v < 7) {
+    const rIdx = data.modules.findIndex(m => m.key === 'releases')
+    const cmLabels = CORE_MODULES.find(m => m.key === 'labels')
+    if (rIdx >= 0 && cmLabels) {
+      data.modules[rIdx] = { ...cmLabels }
+      data.records['labels'] = data.records['releases'] || []
+      delete data.records['releases']
+    } else if (cmLabels && !data.modules.some(m => m.key === 'labels')) {
+      data.modules.push({ ...cmLabels })
+      data.records['labels'] = []
+    }
+    v = 7
   }
 
   data.settings.cloud.autoPull = false
