@@ -431,7 +431,7 @@ export const UI: Record<string, Pair> = {
   'help.next': { fa: 'بعدی', en: 'Next' },
   'form.autoFill': { fa: 'پر کردن خودکار', en: 'Auto-fill' },
   'form.fetching': { fa: 'در حال خواندن…', en: 'Fetching…' },
-  'form.noProfile': { fa: 'پروفایلی خوانده نشد (برای اینستاگرام واسط لازم است)', en: 'No profile read (a proxy is needed for Instagram)' },
+  'form.noProfile': { fa: 'پروفایل به‌صورت عمومی در دسترس نبود یا آدرس نامعتبر است', en: 'Profile not publicly accessible or URL is invalid' },
   'agent.run': { fa: 'اجرای ایجنت', en: 'Run agent' },
   'agent.select': { fa: 'انتخاب ایجنت', en: 'Select an agent' },
   'agent.input': { fa: 'درخواست شما', en: 'Your request' },

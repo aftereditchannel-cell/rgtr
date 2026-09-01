@@ -301,7 +301,7 @@ export function RecordForm({ module, row, open, onClose }: Props) {
     setEnriching(f.key)
     const p = await fetchSocialProfile(raw, data.settings.social?.proxyUrl ?? '')
     setEnriching(null)
-    if (!p) { alert(t('form.noProfile')); return }
+    if (!p) { useApp.getState().setToast(t('form.noProfile')); return }
     const patch: Record<string, unknown> = {}
     // فالوور → فیلد followers (یا subscriber)
     const followersKey = ['followers', 'subscribers', 'followerCount'].find(k => module.fields.some(fd => fd.key === k))
