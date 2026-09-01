@@ -3,7 +3,7 @@ import { CORE_MODULES } from '../domain/schema'
 import { DEFAULT_WEIGHTS } from '../domain/scoring'
 import { DEFAULT_PROVIDERS, DEFAULT_AUTOMATIONS } from '../domain/ai'
 
-export const CURRENT_VERSION = 7
+export const CURRENT_VERSION = 8
 
 const EMPTY_CLOUD_META: CloudSyncMeta = { lastSync: '', lastLocalChange: '', pendingSync: false, lastSyncError: '' }
 
@@ -145,6 +145,19 @@ export function migrate(input: unknown): AppData {
       data.records['labels'] = []
     }
     v = 7
+  }
+
+  // v7 -> v8: Update artists.label to be a ref field instead of text
+  if (v < 8) {
+    const artistsMod = data.modules.find(m => m.key === 'artists')
+    if (artistsMod) {
+      const labelField = artistsMod.fields.find(f => f.key === 'label')
+      if (labelField && labelField.type !== 'ref') {
+        labelField.type = 'ref'
+        labelField.refModule = 'labels'
+      }
+    }
+    v = 8
   }
 
   data.settings.cloud.autoPull = false

@@ -262,7 +262,33 @@ export function RecordForm({ module, row, open, onClose }: Props) {
       }
       default: {
         const isPhone = f.key.toLowerCase().includes('phone') || f.label.toLowerCase().includes('phone')
-        return <TextInput type={isPhone ? 'tel' : 'text'} inputMode={isPhone ? 'tel' : undefined} value={String(val ?? '')} placeholder={f.placeholder} onChange={e => set(f.key, e.target.value)} />
+        
+        const handlePickContact = async () => {
+          try {
+            const nav = navigator as any
+            if ('contacts' in nav && 'ContactsManager' in window) {
+               const contacts = await nav.contacts.select(['tel'], { multiple: false })
+               if (contacts && contacts.length > 0 && contacts[0].tel && contacts[0].tel.length > 0) {
+                 set(f.key, contacts[0].tel[0])
+               }
+            } else {
+               alert(t('common.error') + ': مرورگر/دستگاه شما از دفترچه تلفن پشتیبانی نمی‌کند.')
+            }
+          } catch (e) {
+            console.error(e)
+          }
+        }
+        
+        if (isPhone) {
+          return (
+            <div className="flex items-center gap-2">
+              <TextInput type="tel" inputMode="tel" className="ltr flex-1" value={String(val ?? '')} placeholder={f.placeholder} onChange={e => set(f.key, e.target.value)} />
+              <Button size="sm" variant="outline" icon="Users" title="انتخاب از مخاطبین" onClick={() => void handlePickContact()} />
+            </div>
+          )
+        }
+        
+        return <TextInput type="text" value={String(val ?? '')} placeholder={f.placeholder} onChange={e => set(f.key, e.target.value)} />
       }
     }
   }

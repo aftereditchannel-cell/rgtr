@@ -49,23 +49,33 @@ export function Settings() {
   const doImport = async (f: File) => {
     try {
       const d = await importJSON(f)
-      if (!confirm(t('set.confirmImport'))) return
-      await replaceAll(d)
-      setToast(t('toast.backupRestored'))
+      setConfirmAsk({
+        msg: t('set.confirmImport'),
+        onYes: async () => {
+          await replaceAll(d)
+          setToast(t('toast.backupRestored'))
+        }
+      })
     } catch (e) {
-      alert(t('common.error') + ': ' + (e as Error).message)
+      setConfirmAsk({ msg: t('common.error') + ': ' + (e as Error).message, onYes: () => {} })
     }
   }
 
   const restore = async (id: number) => {
     const snap = await getSnapshot(id)
-    if (snap && confirm(t('set.confirmRestore', { d: fmt.relTime(snap.at) }))) {
-      await replaceAll(snap.data)
-      setToast(t('common.restore'))
+    if (snap) {
+      setConfirmAsk({
+        msg: t('set.confirmRestore', { d: fmt.relTime(snap.at) }),
+        onYes: async () => {
+          await replaceAll(snap.data)
+          setToast(t('common.restore'))
+        }
+      })
     }
   }
 
   const missingCore = CORE_MODULES.filter(c => !data.modules.some(m => m.key === c.key)).length
+  const [confirmAsk, setConfirmAsk] = useState<{ msg: string; onYes: () => void } | null>(null)
 
   return (
     <div className="anim space-y-5 max-w-4xl">
@@ -93,6 +103,17 @@ export function Settings() {
           ))}
         </div>
       </nav>
+
+      {confirmAsk && (
+        <Modal open onClose={() => setConfirmAsk(null)} title={t('common.confirm') || 'Confirm'} footer={
+          <>
+            <Button variant="ghost" size="sm" onClick={() => setConfirmAsk(null)} className="me-auto">{t('common.cancel') || 'Cancel'}</Button>
+            <Button variant="primary" size="sm" onClick={() => { confirmAsk.onYes(); setConfirmAsk(null) }}>{t('common.yes') || 'Yes'}</Button>
+          </>
+        }>
+          <div className="text-[12.5px] leading-relaxed text-[var(--color-tx)] py-2 whitespace-pre-wrap">{confirmAsk.msg}</div>
+        </Modal>
+      )}
 
       {/* همگام‌سازی همیشه اولین دسته است */}
       <div className={section === 'sync' ? '' : 'hidden'}><CloudCard /></div>
@@ -493,8 +514,9 @@ function GoogleDriveCloudCard() {
         const updatedAt = await cloud.pushCloudData(useApp.getState().data)
         await markSynced(updatedAt)
       } else {
-        // طبق انتخاب کاربر، ورود هیچ pull خودکاری انجام نمی‌دهد؛ Refresh دستی است.
         await cloud.signInWithEmail(email, password)
+        const changed = await refreshCloudNow()
+        if (changed) setToast(t('set.cloudPulled'))
       }
       setPassword('')
       setToast(t(create ? 'set.driveAccountCreated' : 'set.driveSignedIn'))

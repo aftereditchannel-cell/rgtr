@@ -169,7 +169,7 @@ export const CORE_MODULES: ModuleDef[] = [
       f('genre', 'Genre', 'select', { col: true, options: ['Rap', 'Trap', 'Drill', 'Hip-Hop', 'R&B', 'Pop', 'Other'] }),
       f('location', 'Location', 'text', { col: true }),
       f('status', 'Status', 'select', { col: true, options: ['Prospect', 'In Touch', 'Collaborating', 'Signed', 'Inactive'] }),
-      f('label', 'Label', 'text'),
+      f('label', 'Label', 'ref', { refModule: 'labels' }),
       f('manager', 'Manager', 'ref', { refModule: 'team' }),
       f('contact', 'Contact', 'text'),
       f('lastContact', 'Last Contact', 'date', { col: true }),
