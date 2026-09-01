@@ -21,7 +21,7 @@ const isDev = !app.isPackaged && process.env.NEXUS_PROD !== '1'
 const DEV_URL = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173'
 
 /* ---------------- مسیرهای داده ---------------- */
-const DATA_DIR = path.join(app.getPath('userData'), 'data')
+const DATA_DIR = path.join(app.getPath('documents'), 'NexusHQ')
 const DOC_FILE = path.join(DATA_DIR, 'nexus-hq.json')
 const TMP_FILE = path.join(DATA_DIR, 'nexus-hq.json.tmp')
 const SNAP_DIR = path.join(DATA_DIR, 'snapshots')
@@ -278,13 +278,11 @@ ipcMain.handle('snap:get', async (_e, id) => {
 
 /* ---------------- IPC: بکاپ و بازیابی با دیالوگ ویندوز ---------------- */
 ipcMain.handle('backup:export', async (_e, data) => {
-  const stamp = new Date().toISOString().slice(0, 10)
-  const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
-    title: 'ذخیره‌ی بکاپ',
-    defaultPath: path.join(app.getPath('documents'), `nexus-hq-backup-${stamp}.json`),
-    filters: [{ name: 'NEXUS HQ Backup', extensions: ['json'] }],
-  })
-  if (canceled || !filePath) return { ok: false }
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+  const backupDir = path.join(app.getPath('documents'), 'NexusHQ', 'Backups')
+  fs.mkdirSync(backupDir, { recursive: true })
+  
+  const filePath = path.join(backupDir, `nexus-hq-backup-${stamp}.json`)
   await fsp.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8')
   return { ok: true, path: filePath }
 })
@@ -301,11 +299,10 @@ ipcMain.handle('backup:import', async () => {
 })
 
 ipcMain.handle('file:saveText', async (_e, { name, text, filters }) => {
-  const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
-    defaultPath: path.join(app.getPath('documents'), name),
-    filters: filters || [{ name: 'File', extensions: ['*'] }],
-  })
-  if (canceled || !filePath) return { ok: false }
+  const exportDir = path.join(app.getPath('documents'), 'NexusHQ', 'Exports')
+  fs.mkdirSync(exportDir, { recursive: true })
+  
+  const filePath = path.join(exportDir, name.replace(/[:\/*?"<>|]/g, '-'))
   await fsp.writeFile(filePath, text, 'utf8')
   return { ok: true, path: filePath }
 })

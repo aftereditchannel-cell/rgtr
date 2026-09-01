@@ -49,8 +49,8 @@ export function isNativeAndroid(): boolean {
 
 /* ---------- ذخیره‌سازی روی حافظه‌ی داخلی گوشی ---------- */
 
-const DATA_FILE = 'nexus-hq.json'
-const SNAP_DIR = 'snapshots'
+const DATA_FILE = 'NexusHQ/nexus-hq.json'
+const SNAP_DIR = 'NexusHQ/snapshots'
 const MAX_SNAPS = 20
 
 /** Directory.Data = فضای خصوصی برنامه؛ با حذف برنامه پاک می‌شود ولی نیاز به مجوز ندارد */
@@ -65,7 +65,7 @@ export async function mobileLoad(): Promise<AppData | null> {
     const { Filesystem, Directory, Encoding } = await fs()
     const res = await Filesystem.readFile({
       path: DATA_FILE,
-      directory: Directory.Data,
+      directory: Directory.Documents,
       encoding: Encoding.UTF8,
     })
     return JSON.parse(String(res.data)) as AppData
@@ -79,9 +79,10 @@ export async function mobileSave(data: AppData): Promise<void> {
   const { Filesystem, Directory, Encoding } = await fs()
   await Filesystem.writeFile({
     path: DATA_FILE,
-    directory: Directory.Data,
+    directory: Directory.Documents,
     encoding: Encoding.UTF8,
     data: JSON.stringify(data),
+    recursive: true,
   })
 }
 
@@ -92,20 +93,21 @@ export async function mobileSnapPush(data: AppData): Promise<void> {
   const { Filesystem, Directory, Encoding } = await fs()
   const id = new Date().toISOString().replace(/[:.]/g, '-')
   try {
-    await Filesystem.mkdir({ path: SNAP_DIR, directory: Directory.Data, recursive: true })
+    await Filesystem.mkdir({ path: SNAP_DIR, directory: Directory.Documents, recursive: true })
   } catch { /* از قبل هست */ }
   await Filesystem.writeFile({
     path: `${SNAP_DIR}/${id}.json`,
-    directory: Directory.Data,
+    directory: Directory.Documents,
     encoding: Encoding.UTF8,
     data: JSON.stringify(data),
+    recursive: true,
   })
   // هرس نگه‌داشتن ۲۰ تای آخر
   try {
-    const list = await Filesystem.readdir({ path: SNAP_DIR, directory: Directory.Data })
+    const list = await Filesystem.readdir({ path: SNAP_DIR, directory: Directory.Documents })
     const files = list.files.map(f => (typeof f === 'string' ? f : f.name)).sort()
     for (const old of files.slice(0, Math.max(0, files.length - MAX_SNAPS))) {
-      await Filesystem.deleteFile({ path: `${SNAP_DIR}/${old}`, directory: Directory.Data })
+      await Filesystem.deleteFile({ path: `${SNAP_DIR}/${old}`, directory: Directory.Documents })
     }
   } catch { /* بی‌اهمیت */ }
 }
@@ -114,7 +116,7 @@ export async function mobileSnapList(): Promise<SnapMeta[]> {
   if (!isMobile) return []
   try {
     const { Filesystem, Directory } = await fs()
-    const list = await Filesystem.readdir({ path: SNAP_DIR, directory: Directory.Data })
+    const list = await Filesystem.readdir({ path: SNAP_DIR, directory: Directory.Documents })
     return list.files
       .map(f => (typeof f === 'string' ? { name: f, size: 0, mtime: 0 } : f))
       .filter(f => f.name.endsWith('.json'))
@@ -135,13 +137,46 @@ export async function mobileSnapGet(id: string): Promise<AppData | null> {
     const { Filesystem, Directory, Encoding } = await fs()
     const res = await Filesystem.readFile({
       path: `${SNAP_DIR}/${id}.json`,
-      directory: Directory.Data,
+      directory: Directory.Documents,
       encoding: Encoding.UTF8,
     })
     return JSON.parse(String(res.data)) as AppData
   } catch {
     return null
   }
+}
+
+export async function mobileExportCSV(filename: string, text: string): Promise<string | null> {
+  if (!isMobile) return null
+  const { Filesystem, Directory, Encoding } = await fs()
+  const safeName = filename.replace(/[:\\/*?"<>|]/g, '-')
+  const exportPath = `NexusHQ/Exports/${safeName}`
+  
+  const res = await Filesystem.writeFile({
+    path: exportPath,
+    directory: Directory.Documents,
+    encoding: Encoding.UTF8,
+    data: text,
+    recursive: true,
+  })
+  
+  return res.uri
+}
+
+export async function mobileExportBackup(filename: string, text: string): Promise<string | null> {
+  if (!isMobile) return null
+  const { Filesystem, Directory, Encoding } = await fs()
+  const backupPath = `NexusHQ/Backups/${filename}`
+  
+  const res = await Filesystem.writeFile({
+    path: backupPath,
+    directory: Directory.Documents,
+    encoding: Encoding.UTF8,
+    data: text,
+    recursive: true,
+  })
+  
+  return res.uri
 }
 
 /* ---------- خروجی/اشتراک فایل ---------- */
@@ -222,7 +257,7 @@ export async function mobileExit(): Promise<void> {
 
 /** مسیر پوشه‌ی داده برای نمایش در تنظیمات */
 export function mobileDataPath(): string {
-  return `Android/data/app.nexushq.mobile/files/${DATA_FILE}`
+  return `Documents/${DATA_FILE}`
 }
 
 /* ---------- ظاهر بومی ---------- */
