@@ -8,7 +8,7 @@ import { refLabel } from '../../store/useApp'
 function LinkifyText({ text, className = '' }: { text: string; className?: string }) {
   if (text === '—' || !text) return <span className={className}>{text}</span>
   // تشخیص آدرس‌ها و شماره تلفن‌ها (مثل 0912... یا +98912...)
-  const regex = /(https?:\/\/[^\s()]+?(?=[.,!?:;]*(?:[\s()\[\]]|$))|09\d{9}|\+\d{10,14})/g
+  const regex = /(https?:\/\/[^\s()]+?(?=[.,!?:;]*(?:[\s()[\]]|$))|09\d{9}|\+\d{10,14})/g
   const parts = text.split(regex)
   const matches = text.match(regex) || []
   

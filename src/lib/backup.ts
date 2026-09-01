@@ -1,7 +1,7 @@
 import type { AppData } from '../store/types'
 import { migrate, validateBackup } from './migrate'
 import { desktop } from './desktop'
-import { isMobile, mobileSaveAndShare, mobilePickFile, mobileExportBackup, mobileExportCSV } from './mobile'
+import { isMobile, mobilePickFile, mobileExportBackup, mobileExportCSV } from './mobile'
 
 export function download(filename: string, text: string, mime = 'application/json') {
   const blob = new Blob([text], { type: mime })

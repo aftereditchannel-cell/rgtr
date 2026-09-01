@@ -298,7 +298,7 @@ ipcMain.handle('backup:import', async () => {
   return { ok: true, data: JSON.parse(txt), path: filePaths[0] }
 })
 
-ipcMain.handle('file:saveText', async (_e, { name, text, filters }) => {
+ipcMain.handle('file:saveText', async (_e, { name, text }) => {
   const exportDir = path.join(app.getPath('documents'), 'NexusHQ', 'Exports')
   fs.mkdirSync(exportDir, { recursive: true })
   
