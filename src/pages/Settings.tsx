@@ -21,10 +21,6 @@ import {
   biometricAuth, getBiometricStatus, cryptoAvailable,
   type BiometricStatus,
 } from '../lib/lock'
-import { getAiKey, setAiKey as storeAiKey, chat as aiChat, AiError } from '../lib/ai'
-import { getKey, setKey as setKeySecret } from '../lib/secrets'
-import { aiProviderById, AI_PROVIDERS, testAIConnection } from '../ai/providers'
-import type { Lang } from '../store/types'
 
 const ACCENTS = ['#6366f1', '#8b5cf6', '#06b6d4', '#22c55e', '#f59e0b', '#ef4444', '#ec4899', '#f97316']
 const FIELD_TYPES: FieldType[] = ['text', 'textarea', 'number', 'money', 'date', 'select', 'ref', 'url', 'progress', 'checklist', 'tags']
@@ -158,7 +154,7 @@ export function Settings() {
             <Toggle
               value={s.lang}
               options={[{ v: 'fa', l: 'فارسی' }, { v: 'en', l: 'English' }]}
-              onChange={v => setSettings({ lang: v as Lang })}
+              onChange={v => setSettings({ lang: v as any })}
             />
           </Field>
           <Field label={t('set.calendar')} help={t('set.calendarHint')}>
@@ -210,7 +206,7 @@ export function Settings() {
 
       <div className={section === 'api' ? '' : 'hidden'}>
       {/* ---------- ai ---------- */}
-      <AiCard />
+      
 
       {/* ---------- social ---------- */}
       <SocialCard />
@@ -893,126 +889,6 @@ function SecurityCard() {
 }
 
 /* ---------- کارت هوش مصنوعی ---------- */
-function AiCard() {
-  const { t } = useT()
-  const { data, setSettings, setToast } = useApp()
-  const ai = data.settings.ai
-  const [key, setKey] = useState(getAiKey())
-  const [showKey, setShowKey] = useState(false)
-  const [baseUrl, setBaseUrl] = useState(ai.baseUrl)
-  const [model, setModel] = useState(ai.model)
-  const [state, setState] = useState<'idle' | 'busy'>('idle')
-
-  /* کلید سرویس‌های جریان‌های کاری (OpenAI / Gemini / Claude) — در مخزن امن */
-  const [wfProvider, setWfProvider] = useState(ai.provider || 'openai')
-  const [wfModel, setWfModel] = useState(ai.model || 'gpt-4o-mini')
-  const [wfKey, setWfKey] = useState(getKey(aiProviderById(wfProvider as never)?.keyName ?? 'ai_openai') ?? '')
-  const [wfShow, setWfShow] = useState(false)
-  const [wfState, setWfState] = useState<'idle' | 'busy'>('idle')
-
-  const save = async () => {
-    if (!key.trim()) { alert(t('set.aiNeedKey')); return }
-    storeAiKey(key.trim())
-    setSettings({ ai: { ...ai, baseUrl: baseUrl.trim() || 'https://api.openai.com/v1', model: model.trim() || 'gpt-4o-mini' } })
-    setState('busy')
-    try {
-      await aiChat([{ role: 'user', content: 'Reply with exactly: OK' }], { baseUrl: baseUrl.trim(), model: model.trim() })
-      setToast(t('set.aiOk'))
-    } catch (e) {
-      alert(t('common.error') + ': ' + ((e as Error).message || (e as AiError).code))
-    } finally {
-      setState('idle')
-    }
-  }
-
-  const saveWf = async () => {
-    const prov = aiProviderById(wfProvider as never)
-    if (!wfKey.trim()) { alert(t('set.aiNeedKey')); return }
-    setKeySecret(prov?.keyName ?? 'ai_openai', wfKey.trim())
-    setSettings({ ai: { ...ai, provider: wfProvider, model: wfModel, enabled: true } })
-    setWfState('busy')
-    try {
-      const r = await testAIConnection(wfProvider as never, wfModel, wfKey.trim())
-      if (r.ok) setToast(t('set.aiOk'))
-      else alert(t('common.error') + ': ' + r.detail)
-    } finally {
-      setWfState('idle')
-    }
-  }
-
-  return (
-    <Card id="ai">
-      <SectionTitle icon="Bot"
-        right={<span className={`text-[10.5px] ${getAiKey() ? 'text-emerald-400' : 'text-[var(--color-dim2)]'}`}>{getAiKey() ? t('set.cloudOn') : t('set.cloudOff')}</span>}>
-        {t('set.ai')}
-      </SectionTitle>
-      <p className="text-[12px] text-[var(--color-dim)] leading-relaxed mb-3">{t('set.aiNote')}</p>
-
-      {/* Agent Runner — OpenAI-compatible */}
-      <div className="grid sm:grid-cols-2 gap-4">
-        <Field label={t('set.aiKey')} help={t('set.aiKeyHint')}>
-          <div className="relative">
-            <TextInput type={showKey ? 'text' : 'password'} value={key} placeholder="sk-..." className="ltr pe-9"
-              onChange={e => setKey(e.target.value)} />
-            <button type="button" onClick={() => setShowKey(v => !v)}
-              className="absolute end-2 top-1/2 -translate-y-1/2 text-[var(--color-dim2)] hover:text-[var(--color-tx)]">
-              <Icon name={showKey ? 'EyeOff' : 'Eye'} size={14} />
-            </button>
-          </div>
-        </Field>
-        <Field label={t('set.aiModel')}>
-          <TextInput value={model} className="ltr" placeholder="gpt-4o-mini" onChange={e => setModel(e.target.value)} />
-        </Field>
-      </div>
-      <div className="mt-3">
-        <Field label={t('set.aiBaseUrl')} help={t('set.aiBaseUrlHint')}>
-          <TextInput value={baseUrl} className="ltr" onChange={e => setBaseUrl(e.target.value)} />
-        </Field>
-      </div>
-      <div className="mt-4">
-        <Button size="sm" variant="primary" icon={state === 'busy' ? 'Loader' : 'Check'} disabled={state === 'busy'} onClick={save}>
-          {t('set.aiSave')}
-        </Button>
-      </div>
-
-      {/* جریان‌های کاری و تحلیل — OpenAI / Gemini / Claude */}
-      <div className="mt-5 pt-4 border-t border-[var(--color-line)]">
-        <div className="text-[12px] font-semibold mb-2 flex items-center gap-1.5">
-          <Icon name="Workflow" size={13} className="text-[var(--color-acc)]" />
-          {t('set.aiWorkflow')}
-        </div>
-        <div className="grid sm:grid-cols-3 gap-4">
-          <Field label={t('set.aiProvider')}>
-            <Dropdown value={wfProvider}
-              options={AI_PROVIDERS.map(p => ({ value: p.id, label: p.label }))}
-              onChange={v => { setWfProvider(v); setWfModel(aiProviderById(v as never)?.defaultModel ?? wfModel); setWfKey(getKey(aiProviderById(v as never)?.keyName ?? '') ?? '') }} />
-          </Field>
-          <Field label={t('set.aiModel')}>
-            <Dropdown value={wfModel}
-              options={aiProviderById(wfProvider as never)?.models.map(m => ({ value: m, label: m })) ?? []}
-              onChange={v => setWfModel(v)} />
-          </Field>
-          <Field label={t('set.aiKey')}>
-            <div className="relative">
-              <TextInput type={wfShow ? 'text' : 'password'} value={wfKey} placeholder="sk-..." className="ltr pe-9"
-                onChange={e => setWfKey(e.target.value)} />
-              <button type="button" onClick={() => setWfShow(v => !v)}
-                className="absolute end-2 top-1/2 -translate-y-1/2 text-[var(--color-dim2)] hover:text-[var(--color-tx)]">
-                <Icon name={wfShow ? 'EyeOff' : 'Eye'} size={14} />
-              </button>
-            </div>
-          </Field>
-        </div>
-        <div className="mt-3">
-          <Button size="sm" variant="outline" icon={wfState === 'busy' ? 'Loader' : 'Plug'} disabled={wfState === 'busy'} onClick={saveWf}>
-            {t('set.aiTestSave')}
-          </Button>
-        </div>
-      </div>
-    </Card>
-  )
-}
-
 /* ---------- کارت شبکه‌های اجتماعی ---------- */
 function SocialCard() {
   const { t } = useT()

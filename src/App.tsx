@@ -12,6 +12,7 @@ import { ModulePage } from './pages/ModulePage'
 import { Help } from './pages/Help'
 import { SocialHub } from './pages/SocialHub'
 import { Automation } from './pages/Automation'
+import { Assistant } from './pages/Assistant'
 import { Button, Icon, Modal } from './components/ui/Primitives'
 import { BrandMark } from './components/ui/BrandMark'
 import { desktop } from './lib/desktop'
@@ -163,6 +164,7 @@ function Shell() {
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/social" element={<SocialHub />} />
               <Route path="/automation" element={<Automation />} />
+              <Route path="/assistant" element={<Assistant />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/help" element={<Help />} />
               <Route path="/m/:key" element={<ModulePage />} />
