@@ -25,6 +25,8 @@ contextBridge.exposeInMainWorld('hq', {
   info: () => ipcRenderer.invoke('app:info'),
   openDataDir: () => ipcRenderer.invoke('app:openDataDir'),
   confirm: (opts) => ipcRenderer.invoke('app:confirm', opts),
+  // فقط Google Apps Script رسمی؛ اعتبارسنجی نهایی URL در main process انجام می‌شود.
+  driveRequest: (opts) => ipcRenderer.invoke('drive:request', opts),
 
   // بروزرسانی خودکار
   updateCheck: () => ipcRenderer.invoke('update:check'),

@@ -10,6 +10,7 @@ import { loadDoc, saveDoc, pushSnapshot } from '../lib/db'
 import { migrate } from '../lib/migrate'
 import { uid, nowISO } from '../lib/id'
 import * as cloud from '../lib/cloud'
+import { cloudError, tr } from '../i18n'
 
 interface Store {
   data: AppData
@@ -56,6 +57,10 @@ interface Store {
   getLogs: () => RunLog[]
 
   setSettings: (patch: Partial<Settings>) => void
+  pendingCloudPrompt: boolean
+  setPendingCloudPrompt: (val: boolean) => void
+  triggerCloudPush: () => Promise<void>
+
   replaceAll: (d: AppData) => Promise<void>
   loadSeed: () => Promise<void>
   clearAll: () => Promise<void>
@@ -63,32 +68,55 @@ interface Store {
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let syncTimer: ReturnType<typeof setTimeout> | null = null
+let pushInFlight = false
+let pushQueued = false
+let stopLiveSync: (() => void) | null = null
+let didAutoPullThisSession = false
+
+export function resetCloudPullSession(): void {
+  didAutoPullThisSession = false
+}
 
 export const useApp = create<Store>((set, get) => {
-  /** ذخیره‌ی خودکار روی ابر (Gist) بعد از هر تغییر — اگر autoSync روشن و توکن موجود باشد */
+  /** ذخیره خودکار سرویس فعال؛ فایل محلی همیشه قبل از شبکه نوشته می‌شود. */
   const scheduleCloudPush = () => {
-    const c = get().data.settings.cloud
-    if (!c.autoSync || !cloud.hasToken()) return
+    if (!cloud.isCloudReady()) return
     if (syncTimer) clearTimeout(syncTimer)
-    syncTimer = setTimeout(() => { void autoPush() }, 3000)
+    // نمایش پرسش برای ارسال به درایو پس از پایان تغییرات پیوسته
+    syncTimer = setTimeout(() => { set({ pendingCloudPrompt: true }) }, 800)
   }
 
   const autoPush = async () => {
-    const st = get()
-    await st.persist()
-    const fresh = get().data
+    if (pushInFlight) { pushQueued = true; return }
+    pushInFlight = true
+    await get().persist()
+    const lang = get().data.settings.lang ?? 'fa'
     try {
-      const { id } = await cloud.ensureGist(fresh.settings.cloud.gistId, fresh)
-      await cloud.pushGist(id, fresh)
-      // مستقیم با set (نه setSettings) تا دوباره touch نشود و حلقه‌ی بی‌پایان نسازد
-      set(s => ({
-        data: { ...s.data, settings: { ...s.data.settings, cloud: { ...s.data.settings.cloud, gistId: id, lastSync: new Date().toISOString() } } },
-      }))
-    } catch { /* بی‌صدا — دفعه‌ی بعد دوباره تلاش می‌شود */ }
+      const updatedAt = await cloud.pushCloudData(get().data)
+      // مستقیم با set تا sync دوباره زمان‌بندی و حلقه ایجاد نکند.
+      set(s => ({ data: { ...s.data, settings: { ...s.data.settings, cloud: { ...s.data.settings.cloud, lastSync: updatedAt, pendingSync: false, lastSyncError: '' } } } }))
+      await get().persist()
+      get().setToast(tr(lang, 'set.cloudPushed'))
+    } catch (error) {
+      const cloudErr = cloud.mapCloudError(error)
+      // هیچ‌وقت داده‌ی محلی را حذف نمی‌کنیم: وضعیت pending در خود فایل/دیتابیس محلی می‌ماند.
+      set(s => ({ data: { ...s.data, settings: { ...s.data.settings, cloud: { ...s.data.settings.cloud, pendingSync: true, lastSyncError: cloudErr.detail || cloudErr.code } } } }))
+      await get().persist()
+      const detail = cloudErr.detail ? ` — ${tr(lang, 'sync.errorCode')}: ${cloudErr.detail}` : ''
+      get().setToast(`${tr(lang, 'sync.failed')}: ${cloudError(lang, cloudErr.code)}${detail}`)
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('nexus:cloud-sync-failed', { detail: cloudErr }))
+    } finally {
+      pushInFlight = false
+      // اگر هنگام ارسال قبلی تغییری رخ داد، آخرین نسخه محلی حتماً یک بار دیگر ارسال شود.
+      if (pushQueued) { pushQueued = false; void autoPush() }
+    }
   }
 
   const touch = () => {
-    set({ dirty: true })
+    // زمان تغییر محلی جدا از lastSync است؛ auto-pull فقط داده‌ای را جایگزین می‌کند
+    // که واقعاً از آخرین ویرایش این دستگاه جدیدتر باشد.
+    const changedAt = new Date().toISOString()
+    set(s => ({ dirty: true, data: { ...s.data, settings: { ...s.data.settings, cloud: { ...s.data.settings.cloud, lastLocalChange: changedAt } } } }))
     if (saveTimer) clearTimeout(saveTimer)
     saveTimer = setTimeout(() => { void get().persist() }, 400)
     scheduleCloudPush()
@@ -99,12 +127,18 @@ export const useApp = create<Store>((set, get) => {
     ready: false,
     dirty: false,
     toast: null,
+    pendingCloudPrompt: false,
+
+    setPendingCloudPrompt: (val) => set({ pendingCloudPrompt: val }),
+    triggerCloudPush: autoPush,
 
     async init() {
       const stored = await loadDoc()
       // seededAt تضمین می‌کند داده‌ی نمونه فقط یک‌بار در عمر نصب ساخته شود؛
       // اگر کاربر همه‌چیز را پاک کند، دوباره برنمی‌گردد.
       const data = stored ? migrate(stored) : seedData()
+      cloud.configureCloudProvider(data.settings.cloud.provider, data.settings.cloud.googleScriptUrl)
+      void cloud.initCloudAuth()
       set({ data, ready: true })
       if (!stored) await saveDoc(data)
     },
@@ -366,8 +400,13 @@ export const useApp = create<Store>((set, get) => {
     },
 
     async replaceAll(d) {
+      // هر داده‌ی ورودی (بکاپ، نقطه‌ی بازیابی یا Gist) باید قبل از ورود به state
+      // migrate شود. در غیر این صورت یک Gist ساخته‌شده با نسخه‌ی قدیمی‌تر ممکن
+      // است تنظیمات یا آرایه‌های جدید را نداشته باشد و WebView اندروید هنگام render
+      // با صفحه‌ی خالی/کرش مواجه شود.
+      const restored = migrate(d)
       await pushSnapshot(get().data)
-      set({ data: d })
+      set({ data: restored })
       await get().persist()
     },
 
@@ -376,24 +415,63 @@ export const useApp = create<Store>((set, get) => {
   }
 })
 
-/**
- * دریافت خودکار از ابر هنگام باز شدن/بازگشت برنامه — فقط اگر remote جدیدتر باشد
- * (last-write-wins بر اساس updated_at گیت‌هاب).
- */
-export async function autoPullIfEnabled(): Promise<void> {
+/** داده‌ی ابری را فقط وقتی اعمال می‌کند که از آخرین تغییر محلی جدیدتر باشد. */
+async function applyRemote(res: cloud.RemoteData): Promise<boolean> {
+  if (!res || pushInFlight) return false
   const st = useApp.getState()
   const c = st.data.settings.cloud
-  if (!c.autoPull || !c.gistId || !cloud.hasToken()) return
-  try {
-    const res = await cloud.pullGist(c.gistId)
-    if (!res) return
-    const remoteT = new Date(res.updatedAt).getTime()
-    const localT = c.lastSync ? new Date(c.lastSync).getTime() : 0
-    if (Number.isFinite(remoteT) && remoteT > localT) {
-      await st.replaceAll(res.data as never)
-      useApp.getState().setSettings({ cloud: { ...useApp.getState().data.settings.cloud, lastSync: res.updatedAt } })
-    }
-  } catch { /* بی‌صدا */ }
+  // تا وقتی ارسال محلیِ قبلی تأیید نشده، pull خودکار حق overwrite کردن دستگاه را ندارد.
+  if (c.pendingSync) return false
+  const remoteT = Date.parse(res.updatedAt) || 0
+  const localT = Math.max(Date.parse(c.lastSync) || 0, Date.parse(c.lastLocalChange) || 0)
+  if (remoteT <= localT) return false
+  await st.replaceAll(migrate(res.data))
+  useApp.setState(s => ({ data: { ...s.data, settings: { ...s.data.settings, cloud: { ...s.data.settings.cloud, lastSync: res.updatedAt } } } }))
+  return true
+}
+
+/** دریافت دستی یا pull-to-refresh. */
+export async function refreshCloudNow(): Promise<boolean> {
+  if (!cloud.isCloudReady()) throw new cloud.CloudError('not_signed_in')
+  return applyRemote(await cloud.pullCloudData())
+}
+
+/** تلاش دستی برای ارسال داده‌ای که قبلاً فقط محلی ذخیره شده است. */
+export async function retryPendingCloudSync(): Promise<void> {
+  const st = useApp.getState()
+  if (!cloud.isCloudReady()) throw new cloud.CloudError('not_signed_in')
+  const updatedAt = await cloud.pushCloudData(st.data)
+  useApp.setState(s => ({ data: { ...s.data, settings: { ...s.data.settings, cloud: { ...s.data.settings.cloud, lastSync: updatedAt, pendingSync: false, lastSyncError: '' } } } }))
+  await useApp.getState().persist()
+}
+
+/** شنونده‌ی لحظه‌ای Firestore؛ تغییر دستگاه دیگر بدون polling به‌طور خودکار اعمال می‌شود. */
+export function startLiveSync(): void {
+  stopLiveSync?.()
+  if (!cloud.isCloudReady() || !useApp.getState().data.settings.cloud.autoPull) return
+  stopLiveSync = cloud.watchCloudData(res => {
+    void applyRemote(res).then(changed => {
+      if (changed) {
+        const st = useApp.getState()
+        st.setToast(tr(st.data.settings.lang ?? 'fa', 'set.cloudPulled'))
+      }
+    })
+  }, error => {
+    const st = useApp.getState()
+    st.setToast(`${tr(st.data.settings.lang ?? 'fa', 'sync.failed')}: ${cloudError(st.data.settings.lang ?? 'fa', error.code)}`)
+  })
+}
+
+export function stopLiveCloudSync(): void {
+  stopLiveSync?.(); stopLiveSync = null
+}
+
+/** دریافت خودکار فقط برای سرویسی که autoPull دارد؛ Drive همیشه دستی است. */
+export async function autoPullIfEnabled(): Promise<void> {
+  const st = useApp.getState()
+  if (didAutoPullThisSession || !st.data.settings.cloud.autoPull || !cloud.isCloudReady()) return
+  didAutoPullThisSession = true
+  try { await refreshCloudNow() } catch { /* آفلاین بودن نباید برنامه را متوقف کند */ }
 }
 
 /* ---------- selectors ---------- */

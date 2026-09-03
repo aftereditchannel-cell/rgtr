@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useApp } from '../store/useApp'
+import { useApp, refreshCloudNow, resetCloudPullSession } from '../store/useApp'
 import { exportJSON, importJSON } from '../lib/backup'
 import { listSnapshots, getSnapshot, storageBackend, saveDoc } from '../lib/db'
 import type { Snapshot } from '../store/types'
@@ -11,14 +11,15 @@ import { ICON_NAMES } from '../components/ui/icons.tsx'
 import { useT, cloudError } from '../i18n'
 import { useFmt } from '../lib/useFmt'
 import { desktop, isDesktop } from '../lib/desktop'
-import { isMobile, mobilePlatform, mobileDataPath } from '../lib/mobile'
+import { isMobile, isNativeAndroid, mobilePlatform, mobileDataPath, onMobileResume } from '../lib/mobile'
 import type { AppInfo } from '../lib/desktop'
 import { checkForUpdates, cmpVersion, fmtDate, APP_VERSION } from '../lib/updater'
 import type { UpdateRelease, UpdateCheckResult, DownloadProgress } from '../lib/desktop'
 import * as cloud from '../lib/cloud'
 import {
   readLock, setPasscode, disableLock, setAutoLockMin, setBiometric,
-  biometricAvailable, cryptoAvailable,
+  biometricAuth, getBiometricStatus, cryptoAvailable,
+  type BiometricStatus,
 } from '../lib/lock'
 import { getAiKey, setAiKey as storeAiKey, chat as aiChat, AiError } from '../lib/ai'
 import { getKey, setKey as setKeySecret } from '../lib/secrets'
@@ -38,6 +39,7 @@ export function Settings() {
   const [newMod, setNewMod] = useState('')
   const [editMod, setEditMod] = useState<ModuleDef | null>(null)
   const [showTpl, setShowTpl] = useState(false)
+  const [section, setSection] = useState<'sync' | 'appearance' | 'api' | 'data' | 'system'>('sync')
 
   useEffect(() => { void listSnapshots().then(setSnaps) }, [data])
 
@@ -47,23 +49,33 @@ export function Settings() {
   const doImport = async (f: File) => {
     try {
       const d = await importJSON(f)
-      if (!confirm(t('set.confirmImport'))) return
-      await replaceAll(d)
-      setToast(t('toast.backupRestored'))
+      setConfirmAsk({
+        msg: t('set.confirmImport'),
+        onYes: async () => {
+          await replaceAll(d)
+          setToast(t('toast.backupRestored'))
+        }
+      })
     } catch (e) {
-      alert(t('common.error') + ': ' + (e as Error).message)
+      setConfirmAsk({ msg: t('common.error') + ': ' + (e as Error).message, onYes: () => {} })
     }
   }
 
   const restore = async (id: number) => {
     const snap = await getSnapshot(id)
-    if (snap && confirm(t('set.confirmRestore', { d: fmt.relTime(snap.at) }))) {
-      await replaceAll(snap.data)
-      setToast(t('common.restore'))
+    if (snap) {
+      setConfirmAsk({
+        msg: t('set.confirmRestore', { d: fmt.relTime(snap.at) }),
+        onYes: async () => {
+          await replaceAll(snap.data)
+          setToast(t('common.restore'))
+        }
+      })
     }
   }
 
   const missingCore = CORE_MODULES.filter(c => !data.modules.some(m => m.key === c.key)).length
+  const [confirmAsk, setConfirmAsk] = useState<{ msg: string; onYes: () => void } | null>(null)
 
   return (
     <div className="anim space-y-5 max-w-4xl">
@@ -76,6 +88,37 @@ export function Settings() {
         </p>
       </div>
 
+      <nav className="sticky top-0 z-20 -mx-1 px-1 py-2 bg-[var(--color-bg)]/90 backdrop-blur border-y border-[var(--color-line)] overflow-x-auto">
+        <div className="flex gap-1 min-w-max">
+          {([
+            ['sync', 'Cloud', 'set.sectionSync'],
+            ['appearance', 'Palette', 'set.sectionAppearance'],
+            ['api', 'Plug', 'set.sectionApi'],
+            ['data', 'DatabaseBackup', 'set.sectionData'],
+            ['system', 'Monitor', 'set.sectionSystem'],
+          ] as const).map(([id, icon, label]) => (
+            <button key={id} onClick={() => setSection(id)} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-[11.5px] transition-colors ${section === id ? 'bg-[var(--color-acc)] text-white font-medium' : 'text-[var(--color-dim)] hover:bg-[var(--hover)] hover:text-[var(--color-tx)]'}`}>
+              <Icon name={icon} size={13} />{t(label)}
+            </button>
+          ))}
+        </div>
+      </nav>
+
+      {confirmAsk && (
+        <Modal open onClose={() => setConfirmAsk(null)} title={t('common.confirm') || 'Confirm'} footer={
+          <>
+            <Button variant="ghost" size="sm" onClick={() => setConfirmAsk(null)} className="me-auto">{t('common.cancel') || 'Cancel'}</Button>
+            <Button variant="primary" size="sm" onClick={() => { confirmAsk.onYes(); setConfirmAsk(null) }}>{t('common.yes') || 'Yes'}</Button>
+          </>
+        }>
+          <div className="text-[12.5px] leading-relaxed text-[var(--color-tx)] py-2 whitespace-pre-wrap">{confirmAsk.msg}</div>
+        </Modal>
+      )}
+
+      {/* همگام‌سازی همیشه اولین دسته است */}
+      <div className={section === 'sync' ? '' : 'hidden'}><CloudCard /></div>
+
+      <div className={section === 'appearance' ? '' : 'hidden'}>
       {/* ---------- general ---------- */}
       <Card>
         <SectionTitle icon="User">{t('set.general')}</SectionTitle>
@@ -163,15 +206,17 @@ export function Settings() {
       {/* ---------- security ---------- */}
       <SecurityCard />
 
+      </div>
+
+      <div className={section === 'api' ? '' : 'hidden'}>
       {/* ---------- ai ---------- */}
       <AiCard />
 
       {/* ---------- social ---------- */}
       <SocialCard />
+      </div>
 
-      {/* ---------- cloud ---------- */}
-      <CloudCard />
-
+      <div className={section === 'data' ? '' : 'hidden'}>
       {/* ---------- backup ---------- */}
       <Card>
         <SectionTitle icon="DatabaseBackup">{t('set.backup')}</SectionTitle>
@@ -203,10 +248,15 @@ export function Settings() {
         )}
       </Card>
 
+      </div>
+
+      <div className={section === 'system' ? '' : 'hidden'}>
       {/* ---------- desktop ---------- */}
       <DesktopCard onSaved={async () => { await persist(); await saveDoc(useApp.getState().data); setToast(t('set.savedNow')) }} />
       <UpdateCard />
+      </div>
 
+      <div className={section === 'data' ? '' : 'hidden'}>
       {/* ---------- modules ---------- */}
       <Card id="modules">
         <SectionTitle icon="Blocks" right={<span className="text-[10.5px] text-[var(--color-dim2)] nums">{t('set.moduleCount', { n: fmt.dg(data.modules.length) })}</span>}>
@@ -263,6 +313,9 @@ export function Settings() {
         </div>
       </Card>
 
+      </div>
+
+      <div className={section === 'api' ? '' : 'hidden'}>
       {/* ---------- future integrations ---------- */}
       <Card>
         <SectionTitle icon="Plug">{t('set.integrations')}</SectionTitle>
@@ -287,6 +340,9 @@ export function Settings() {
         </div>
       </Card>
 
+      </div>
+
+      <div className={section === 'data' ? '' : 'hidden'}>
       {/* ---------- danger ---------- */}
       <Card className="border-red-500/20">
         <SectionTitle icon="AlertTriangle">{t('set.danger')}</SectionTitle>
@@ -301,6 +357,8 @@ export function Settings() {
           </Button>
         </div>
       </Card>
+
+      </div>
 
       {editMod && <ModuleEditor module={editMod} onClose={() => setEditMod(null)} onSave={p => { updateModule(editMod.key, p); setEditMod(null) }} />}
       {showTpl && <NewModuleModal open={showTpl} onClose={() => setShowTpl(false)}
@@ -389,208 +447,161 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
   )
 }
 
-/* ---------- راهنمای ساخت توکن ---------- */
-const TOKENS_URL = 'https://github.com/settings/tokens'
-
-function TokenHowTo() {
-  const { t } = useT()
-  const fmt = useFmt()
-  const [open, setOpen] = useState(false)
-  const steps = ['set.cloudHow1', 'set.cloudHow2', 'set.cloudHow3', 'set.cloudHow4', 'set.cloudHow5', 'set.cloudHow6'] as const
-
-  return (
-    <div className="mb-4 rounded-xl border border-[var(--color-line)] bg-[var(--color-bg2)]/50 overflow-hidden">
-      <button type="button" onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center gap-2 px-3 py-2.5 text-start hover:bg-white/[.03] transition-colors">
-        <Icon name="HelpCircle" size={14} className="text-[var(--color-acc)] shrink-0" />
-        <span className="text-[12px] flex-1">{t('set.cloudHowTo')}</span>
-        <Icon name={open ? 'ChevronUp' : 'ChevronDown'} size={14} className="text-[var(--color-dim2)]" />
-      </button>
-
-      {open && (
-        <div className="px-3 pb-3 pt-1 border-t border-[var(--color-line)]">
-          <ol className="space-y-2 mt-2">
-            {steps.map((k, i) => (
-              <li key={k} className="flex gap-2.5">
-                <span className="mt-0.5 shrink-0 w-5 h-5 rounded-md bg-[var(--color-acc)]/15 text-[var(--color-acc)] text-[10.5px] font-semibold flex items-center justify-center nums">
-                  {fmt.dg(i + 1)}
-                </span>
-                <span className="text-[11.5px] text-[var(--color-dim)] leading-relaxed">{t(k)}</span>
-              </li>
-            ))}
-          </ol>
-          <a href={TOKENS_URL} target="_blank" rel="noreferrer"
-            className="mt-3 inline-flex items-center gap-1.5 text-[11.5px] text-[var(--color-acc)] hover:underline">
-            <Icon name="ExternalLink" size={12} />
-            {t('set.cloudHowOpen')}
-          </a>
-        </div>
-      )}
-    </div>
-  )
-}
-
-/* ---------- کارت همگام‌سازی ابری ---------- */
+/* ---------- انتخاب Firebase یا Google Drive ---------- */
 type CloudState = 'idle' | 'busy'
 
 function CloudCard() {
+  return <GoogleDriveCloudCard />
+}
+
+
+/* ---------- فایل JSON روی Google Drive از طریق Apps Script ---------- */
+function GoogleDriveCloudCard() {
   const { t, lang } = useT()
   const fmt = useFmt()
-  const { data, setSettings, replaceAll, setToast, persist } = useApp()
+  const { data, setSettings, setToast, persist } = useApp()
   const c = data.settings.cloud
-  const [token, setTokenInput] = useState(cloud.getToken())
-  const [showToken, setShowToken] = useState(false)
-  const [gistId, setGistId] = useState(c.gistId)
+  const [user, setUser] = useState<cloud.CloudUser | null>(() => cloud.getCurrentUser())
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [url, setUrl] = useState(c.googleScriptUrl)
   const [state, setState] = useState<CloudState>('idle')
+  const [urlState, setUrlState] = useState<'idle' | 'busy' | 'ok' | 'error'>('idle')
   const [err, setErr] = useState('')
-
-  useEffect(() => { setGistId(c.gistId) }, [c.gistId])
-
-  const connected = !!cloud.getToken() && !!c.gistId
+  const configured = !!cloud.normalizeGoogleScriptUrl(c.googleScriptUrl)
   const size = cloud.payloadSize(data)
 
-  const fail = (e: unknown) => {
-    const code = (e as { code?: string }).code
-    setErr(code ? cloudError(lang, code) : (e as Error).message)
+  useEffect(() => {
+    cloud.configureCloudProvider('googleDrive', c.googleScriptUrl)
+    void cloud.initCloudAuth().finally(() => setUser(cloud.getCurrentUser()))
+    return cloud.watchCloudUser(setUser)
+  }, [c.googleScriptUrl])
+
+  const fail = (error: unknown) => {
+    const cloudErr = cloud.mapCloudError(error)
+    const diagnostic = cloudErr.detail ? ` — ${t('sync.errorCode')}: ${cloudErr.detail}` : ''
+    setErr(cloudError(lang, cloudErr.code) + diagnostic)
     setState('idle')
   }
 
-  const connect = async () => {
-    if (!token.trim()) { setErr(t('set.cloudNeedToken')); return }
-    setErr(''); setState('busy')
-    try {
-      cloud.setToken(token.trim())
-      await cloud.verifyToken()
-      const { id, created } = await cloud.ensureGist(gistId.trim(), data)
-      setSettings({ cloud: { ...c, gistId: id, lastSync: created ? new Date().toISOString() : c.lastSync } })
-      setToast(created ? t('set.cloudOkNew') : t('set.cloudOkExisting'))
-      setState('idle')
-    } catch (e) { fail(e) }
+  const saveUrl = async () => {
+    const normalized = cloud.normalizeGoogleScriptUrl(url)
+    if (!normalized) {
+      setUrlState('error'); setToast(t('set.driveBadUrl')); return
+    }
+    setUrlState('busy')
+    if (!(await cloud.testGoogleScriptEndpoint(normalized))) {
+      setUrlState('error'); setToast(t('set.driveTestFailed')); return
+    }
+    cloud.configureCloudProvider('googleDrive', normalized)
+    setUrl(normalized)
+    setSettings({ cloud: { ...c, googleScriptUrl: normalized, autoPull: false } })
+    setUrlState('ok')
+    setToast(t('set.driveConnected'))
   }
 
-  const push = async () => {
+  const markSynced = async (updatedAt: string) => {
+    useApp.setState(s => ({ data: { ...s.data, settings: { ...s.data.settings, cloud: { ...s.data.settings.cloud, lastSync: updatedAt, pendingSync: false, lastSyncError: '' } } } }))
+    await persist()
+  }
+
+  const signIn = async (create = false) => {
     setErr(''); setState('busy')
     try {
-      await persist()
-      const fresh = useApp.getState().data
-      const { id } = await cloud.ensureGist(c.gistId, fresh)
-      await cloud.pushGist(id, fresh)
-      setSettings({ cloud: { ...c, gistId: id, lastSync: new Date().toISOString() } })
+      resetCloudPullSession()
+      if (create) {
+        await cloud.createEmailAccount(email, password)
+        const updatedAt = await cloud.pushCloudData(useApp.getState().data)
+        await markSynced(updatedAt)
+      } else {
+        await cloud.signInWithEmail(email, password)
+        const changed = await refreshCloudNow()
+        if (changed) setToast(t('set.cloudPulled'))
+      }
+      setPassword('')
+      setToast(t(create ? 'set.driveAccountCreated' : 'set.driveSignedIn'))
+      setState('idle')
+    } catch (error) { fail(error) }
+  }
+
+  const upload = async () => {
+    setErr(''); setState('busy')
+    try {
+      const updatedAt = await cloud.pushCloudData(useApp.getState().data)
+      await markSynced(updatedAt)
       setToast(t('set.cloudPushed'))
       setState('idle')
-    } catch (e) { fail(e) }
+    } catch (error) { fail(error) }
   }
 
-  const pull = async () => {
+  const refresh = async () => {
     setErr(''); setState('busy')
     try {
-      const res = await cloud.pullGist(c.gistId)
-      if (!res) { setErr(t('set.cloudNoRemote')); setState('idle'); return }
-      if (!confirm(t('set.cloudConfirmPull'))) { setState('idle'); return }
-      await replaceAll(res.data as never)
-      useApp.getState().setSettings({ cloud: { ...useApp.getState().data.settings.cloud, gistId: c.gistId, lastSync: new Date().toISOString() } })
-      setToast(t('set.cloudPulled'))
+      const changed = await refreshCloudNow()
+      setToast(t(changed ? 'set.cloudPulled' : 'set.cloudUpToDate'))
       setState('idle')
-    } catch (e) { fail(e) }
+    } catch (error) { fail(error) }
   }
 
-  const disconnect = () => {
-    if (!confirm(t('set.cloudConfirmDisconnect'))) return
-    cloud.setToken('')
-    setTokenInput('')
-    setSettings({ cloud: { ...c, gistId: '', lastSync: '' } })
-    setToast(t('set.cloudDisconnected'))
+  const signOut = async () => {
+    setErr(''); setState('busy')
+    try { await cloud.signOutCloud(); setToast(t('set.driveSignedOut')); setState('idle') }
+    catch (error) { fail(error) }
   }
 
-  return (
-    <Card>
-      <SectionTitle icon={connected ? 'CloudCheck' : 'CloudOff'}
-        right={
-          <span className={`text-[10.5px] ${connected ? 'text-emerald-400' : 'text-[var(--color-dim2)]'}`}>
-            {connected ? t('set.cloudOn') : t('set.cloudOff')}
-          </span>
-        }>
-        {t('set.cloud')}
-      </SectionTitle>
+  return <Card>
+    <SectionTitle icon={user ? 'CloudCheck' : 'CloudOff'} right={<span className={`text-[10.5px] ${user ? 'text-emerald-400' : 'text-[var(--color-dim2)]'}`}>{user ? t('set.cloudOn') : t('set.cloudOff')}</span>}>
+      {t('set.driveTitle')}
+    </SectionTitle>
+    <p className="text-[12px] text-[var(--color-dim)] leading-relaxed mb-3">{t('set.driveIntro')}</p>
 
-      <p className="text-[12px] text-[var(--color-dim)] leading-relaxed mb-3">{t('set.cloudIntro')}</p>
-
-      <TokenHowTo />
-
-      <div className="grid sm:grid-cols-2 gap-4">
-        <Field label={t('set.cloudToken')} help={t('set.cloudTokenHint')}>
-          <div className="relative">
-            <TextInput type={showToken ? 'text' : 'password'} value={token} placeholder="ghp_..." className="ltr pe-9"
-              onChange={e => setTokenInput(e.target.value)} />
-            <button type="button" onClick={() => setShowToken(v => !v)}
-              className="absolute end-2 top-1/2 -translate-y-1/2 text-[var(--color-dim2)] hover:text-[var(--color-tx)]">
-              <Icon name={showToken ? 'EyeOff' : 'Eye'} size={14} />
-            </button>
-          </div>
-        </Field>
-        <Field label={t('set.cloudGistId')} help={t('set.cloudGistHint')}>
-          <div className="flex gap-2">
-            <TextInput value={gistId} placeholder={t('common.optional')} className="ltr flex-1"
-              onChange={e => setGistId(e.target.value)} />
-            {c.gistId && (
-              <Button size="sm" variant="ghost" icon="Copy" title={t('set.cloudCopyId')}
-                onClick={() => { void navigator.clipboard?.writeText(c.gistId); setToast(t('set.copied')) }} />
-            )}
-          </div>
-        </Field>
-      </div>
-
-      <div className="flex gap-2 flex-wrap mt-4">
-        <Button size="sm" variant="primary" icon={state === 'busy' ? 'Loader' : 'KeyRound'} disabled={state === 'busy'} onClick={() => void connect()}>
-          {state === 'busy' ? t('set.cloudTesting') : t('set.cloudConnect')}
-        </Button>
-        <Button size="sm" variant="outline" icon="CloudUpload" disabled={!connected || state === 'busy'} onClick={() => void push()}>
-          {t('set.cloudPush')}
-        </Button>
-        <Button size="sm" variant="outline" icon="CloudDownload" disabled={!connected || state === 'busy'} onClick={() => void pull()}>
-          {t('set.cloudPull')}
-        </Button>
-        {connected && <Button size="sm" variant="ghost" icon="X" onClick={disconnect}>{t('set.cloudDisconnect')}</Button>}
-      </div>
-
-      {err && (
-        <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/25 bg-red-500/[.07] px-3 py-2 text-[11.5px] text-red-300">
-          <Icon name="AlertTriangle" size={13} className="mt-0.5 shrink-0" />
-          <span>{err}</span>
+    <div className="rounded-xl border border-[var(--color-line)] bg-[var(--color-bg)]/60 p-3 mb-4">
+      <Field label={t('set.driveUrl')} help={t('set.driveUrlHint')}>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <TextInput type="url" value={url} className="ltr flex-1" placeholder="https://script.google.com/macros/s/.../exec"
+            onChange={e => { setUrl(e.target.value); setUrlState('idle') }} />
+          <Button size="sm" variant="outline" icon={urlState === 'busy' ? 'Loader' : 'Plug'} disabled={urlState === 'busy'} onClick={() => void saveUrl()}>{t('set.driveTestSave')}</Button>
         </div>
-      )}
+      </Field>
+      {urlState === 'ok' && <p className="text-[10.5px] text-emerald-400 mt-2">{t('set.driveConnected')}</p>}
+      {urlState === 'error' && <p className="text-[10.5px] text-red-400 mt-2">{t('set.driveTestFailed')}</p>}
+    </div>
 
-      <div className="mt-4 pt-3 border-t border-[var(--color-line)] grid sm:grid-cols-2 gap-2 text-[11.5px]">
-        <Row label={t('set.cloudLastSync')} value={c.lastSync ? fmt.relTime(c.lastSync) : t('common.never')} />
-        <Row label={t('set.cloudSize')} value={`${fmt.dg((size / 1024).toFixed(1))} KB`} />
+    {!configured ? (
+      <div className="rounded-lg border border-amber-500/25 bg-amber-500/[.07] px-3 py-2 text-[11.5px] text-amber-300">
+        <p>{t('set.driveNotConfigured')}</p>
+        <a href="https://github.com/aftereditchannel-cell/rgtr/tree/arena/01a03263-rgtr/google-apps-script" target="_blank" rel="noreferrer"
+          className="inline-flex items-center gap-1 mt-2 text-[var(--color-acc)] hover:underline"><Icon name="ExternalLink" size={12} />{t('set.driveGuide')}</a>
       </div>
-
-      <label className="mt-3 flex items-center gap-2 cursor-pointer">
-        <input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={c.askOnExit}
-          onChange={e => setSettings({ cloud: { ...c, askOnExit: e.target.checked } })} />
-        <span className="text-[12px]">{t('set.cloudAuto')}</span>
-        <span className="text-[10.5px] text-[var(--color-dim2)]">— {t('set.cloudAutoHint')}</span>
-      </label>
-
-      <label className="mt-2.5 flex items-center gap-2 cursor-pointer">
-        <input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={c.autoSync}
-          onChange={e => setSettings({ cloud: { ...c, autoSync: e.target.checked } })} />
-        <span className="text-[12px]">{t('set.cloudAutoSync')}</span>
-        <span className="text-[10.5px] text-[var(--color-dim2)]">— {t('set.cloudAutoSyncHint')}</span>
-      </label>
-
-      <label className="mt-2.5 flex items-center gap-2 cursor-pointer">
-        <input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={c.autoPull}
-          onChange={e => setSettings({ cloud: { ...c, autoPull: e.target.checked } })} />
-        <span className="text-[12px]">{t('set.cloudAutoPull')}</span>
-        <span className="text-[10.5px] text-[var(--color-dim2)]">— {t('set.cloudAutoPullHint')}</span>
-      </label>
-
-      <p className="text-[10.5px] text-[var(--color-dim2)] mt-3 leading-relaxed">
-        {t('set.cloudPrivacy')} {t('set.cloudLimits')}
-      </p>
-    </Card>
-  )
+    ) : !user ? (
+      <div className="space-y-3 max-w-md">
+        <Field label={t('set.firebaseEmail')}><TextInput type="email" value={email} className="ltr" placeholder="name@example.com" onChange={e => setEmail(e.target.value)} /></Field>
+        <Field label={t('set.firebasePassword')} help={t('set.drivePasswordHint')}><TextInput type="password" value={password} maxLength={128} className="ltr" onChange={e => setPassword(e.target.value)} /></Field>
+        <p className="text-[10.5px] text-[var(--color-dim2)]">{t('set.driveNotGooglePassword')}</p>
+        <div className="flex gap-2 flex-wrap">
+          <Button size="sm" variant="primary" icon={state === 'busy' ? 'Loader' : 'LogIn'} disabled={state === 'busy' || !email || password.length < 8} onClick={() => void signIn()}>{t('set.firebaseSignIn')}</Button>
+          <Button size="sm" variant="outline" icon="UserPlus" disabled={state === 'busy' || !email || password.length < 8} onClick={() => void signIn(true)}>{t('set.firebaseCreateAccount')}</Button>
+        </div>
+      </div>
+    ) : (
+      <>
+        <div className="flex items-center gap-3 rounded-xl border border-[var(--color-line)] px-3 py-2.5">
+          <div className="w-9 h-9 rounded-full grid place-items-center bg-[var(--color-acc)]/15 text-[var(--color-acc)]"><Icon name="FileJson" size={16} /></div>
+          <div className="min-w-0 flex-1"><div className="text-[12.5px] font-medium truncate">NEXUS-HQ-backup.json</div><div className="text-[11px] text-[var(--color-dim2)] truncate ltr">{user.email || '—'}</div></div>
+        </div>
+        <div className="flex gap-2 flex-wrap mt-4">
+          <Button size="sm" variant="primary" icon="RefreshCw" disabled={state === 'busy'} onClick={() => void refresh()}>{t('set.driveRefresh')}</Button>
+          <Button size="sm" variant="outline" icon="CloudUpload" disabled={state === 'busy'} onClick={() => void upload()}>{t('set.driveUploadNow')}</Button>
+          <Button size="sm" variant="ghost" icon="LogOut" disabled={state === 'busy'} onClick={() => void signOut()}>{t('set.firebaseSignOut')}</Button>
+        </div>
+      </>
+    )}
+    {err && <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/25 bg-red-500/[.07] px-3 py-2 text-[11.5px] text-red-300"><Icon name="AlertTriangle" size={13} className="mt-0.5 shrink-0" /><span>{err}</span></div>}
+    <div className="mt-4 pt-3 border-t border-[var(--color-line)] grid sm:grid-cols-2 gap-2 text-[11.5px]"><Row label={t('set.cloudLastSync')} value={c.lastSync ? fmt.relTime(c.lastSync) : t('common.never')} /><Row label={t('set.cloudSize')} value={`${fmt.dg((size / 1024).toFixed(1))} KB`} /></div>
+    <label className="mt-3 flex items-center gap-2 cursor-pointer"><input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={c.autoSync} onChange={e => setSettings({ cloud: { ...c, autoSync: e.target.checked, autoPull: false } })} /><span className="text-[12px]">{t('set.cloudAutoSync')}</span><span className="text-[10.5px] text-[var(--color-dim2)]">— {t('set.driveAutoSyncHint')}</span></label>
+    <div className="mt-2.5 flex items-center gap-2 text-[10.5px] text-[var(--color-dim2)]"><Icon name="RefreshCw" size={12} />{t('set.driveManualPullHint')}</div>
+    {c.pendingSync && <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/25 bg-amber-500/[.07] px-3 py-2 text-[11.5px] text-amber-300"><Icon name="Clock3" size={13} className="mt-0.5 shrink-0" /><span>{t('set.cloudPending')}{c.lastSyncError ? ` — ${t('sync.errorCode')}: ${c.lastSyncError}` : ''}</span></div>}
+  </Card>
 }
 
 /* ---------- برند (نام، لوگو، آیکون) ---------- */
@@ -684,20 +695,69 @@ function SecurityCard() {
   const [hint, setHintInput] = useState(cfg.hint)
   const [autoMin, setAutoMin] = useState(cfg.autoLockMin)
   const [bio, setBio] = useState(cfg.biometric)
-  const [bioAvail, setBioAvail] = useState(false)
+  const [bioStatus, setBioStatus] = useState<BiometricStatus | null>(null)
+  const [bioBusy, setBioBusy] = useState(false)
+  // تشخیص لحظه‌ای برای دستگاه‌هایی که پل Capacitor کمی بعد از load آماده می‌شود.
+  const androidRuntime = isMobile || isNativeAndroid()
+  const bioAvail = !!bioStatus?.available
 
   const refresh = () => setCfg(readLock())
 
   useEffect(() => {
-    if (!isMobile) return
-    void biometricAvailable().then(setBioAvail)
-  }, [])
+    if (!androidRuntime) return
+    let alive = true
+    const check = async () => {
+      const status = await getBiometricStatus()
+      if (alive) setBioStatus(status)
+    }
+    void check()
+    // ممکن است کاربر برای ثبت اثر انگشت به تنظیمات گوشی برود؛ در بازگشت دوباره چک کن.
+    const offResume = onMobileResume(() => { void check() })
+    return () => { alive = false; offResume() }
+  }, [androidRuntime])
+
+  const biometricStatusText = (status: BiometricStatus | null = bioStatus) => {
+    if (!status) return t('set.biometricChecking')
+    if (status.available) return t('set.biometricReady')
+    if (status.code === 'biometryNotEnrolled') return t('set.biometricNotEnrolled')
+    if (status.code === 'noDeviceCredential' || status.code === 'passcodeNotSet') return t('set.biometricNeedDeviceLock')
+    if (status.code === 'biometryNotAvailable' || status.code === 'plugin_unavailable') return t('set.biometricUnavailable')
+    if (!status.deviceSecure) return t('set.biometricNeedDeviceLock')
+    return t('set.biometricUnavailable')
+  }
+
+  /** قبل از روشن‌کردن، پنجره‌ی واقعی Android را نشان می‌دهد؛ تیک صوری پذیرفته نمی‌شود. */
+  const verifyBiometric = async () => {
+    setBioBusy(true)
+    const status = await getBiometricStatus()
+    setBioStatus(status)
+    if (!status.available) {
+      setBioBusy(false)
+      setToast(biometricStatusText(status))
+      return false
+    }
+    const ok = await biometricAuth(t('lock.bioReason'))
+    setBioBusy(false)
+    if (!ok) setToast(t('set.biometricFailed'))
+    return ok
+  }
+
+  const toggleBiometric = async (on: boolean) => {
+    if (!on) {
+      setBiometric(false); setBio(false); refresh(); setToast(t('set.biometricOff'))
+      return
+    }
+    if (!(await verifyBiometric())) return
+    setBiometric(true); setBio(true); refresh(); setToast(t('set.biometricOn'))
+  }
 
   const save = async () => {
     const clean = code.replace(/[^\d]/g, '')
     if (clean.length < 4) { alert(t('set.passcodeShort')); return }
     if (clean !== confirmCode.replace(/[^\d]/g, '')) { alert(t('set.passcodeMismatch')); return }
     try {
+      // بار اولی که اثر انگشت روشن می‌شود، همان لحظه واقعاً آن را امتحان می‌کنیم.
+      if (bio && !cfg.biometric && !(await verifyBiometric())) return
       const res = await setPasscode(clean, { hint: hint.trim(), biometric: bio && bioAvail, current: currentCode })
       if (!res.ok) {
         if (res.error === 'current') alert(lang === 'fa' ? 'رمز فعلی اشتباه است.' : 'Current passcode is wrong.')
@@ -707,7 +767,7 @@ function SecurityCard() {
       setAutoLockMin(autoMin)
       setBiometric(bio && bioAvail)
       refresh(); setEdit(false); setCode(''); setCurrentCode(''); setConfirmCode('')
-      setToast(t('set.passcodeSet'))
+      setToast(bio && bioAvail ? t('set.biometricOn') : t('set.passcodeSet'))
     } catch (e) {
       alert(t('common.error') + ': ' + (e as Error).message)
     }
@@ -734,6 +794,19 @@ function SecurityCard() {
       </SectionTitle>
       <p className="text-[12px] text-[var(--color-dim)] leading-relaxed mb-3">{t('set.securityNote')}</p>
 
+      {androidRuntime && (
+        <div className={`mb-3 flex items-start gap-2.5 rounded-lg border px-3 py-2.5 ${bioAvail ? 'border-emerald-500/25 bg-emerald-500/[.07]' : 'border-amber-500/25 bg-amber-500/[.07]'}`}>
+          <Icon name="Fingerprint" size={16} className={`mt-0.5 shrink-0 ${bioAvail ? 'text-emerald-400' : 'text-amber-400'}`} />
+          <div className="min-w-0 flex-1">
+            <div className="text-[12px] font-medium">{biometricStatusText()}</div>
+            <div className="mt-0.5 text-[10.5px] text-[var(--color-dim2)]">{t('set.biometricSetupHint')}</div>
+            {!bioAvail && bioStatus?.code && <div className="mt-1 text-[9.5px] text-[var(--color-dim2)] ltr">{bioStatus.code}</div>}
+          </div>
+          <Button size="sm" variant="ghost" icon="RefreshCw" disabled={bioBusy}
+            onClick={() => void getBiometricStatus().then(setBioStatus)}>{t('set.cloudRefresh')}</Button>
+        </div>
+      )}
+
       {!cfg.enabled ? (
         <Button variant="primary" size="sm" icon="KeyRound" onClick={() => setEdit(true)} disabled={!cryptoAvailable()}>
           {t('set.setPasscode')}
@@ -757,10 +830,11 @@ function SecurityCard() {
                 onChange={nv => { setAutoLockMin(Number(nv)); refresh() }}
                 options={autoOpts.map(o => ({ value: o.v, label: o.l }))} />
             </div>
-            {isMobile && bioAvail && (
-              <label className="flex items-center gap-2 cursor-pointer">
+            {androidRuntime && (
+              <label className={`flex items-center gap-2 ${bioAvail || cfg.biometric ? 'cursor-pointer' : 'opacity-60'}`}>
                 <input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={cfg.biometric}
-                  onChange={e => { setBiometric(e.target.checked); refresh(); if (e.target.checked) setToast(t('set.biometricOn')) }} />
+                  disabled={bioBusy || (!bioAvail && !cfg.biometric)}
+                  onChange={e => void toggleBiometric(e.target.checked)} />
                 <span className="text-[12px]">{t('set.biometric')}</span>
                 <span className="text-[10.5px] text-[var(--color-dim2)]">— {t('set.biometricHint')}</span>
               </label>
@@ -779,7 +853,7 @@ function SecurityCard() {
         <Modal open onClose={() => setEdit(false)} title={cfg.enabled ? t('set.changePasscode') : t('set.setPasscode')}
           footer={<>
             <Button variant="ghost" size="sm" onClick={() => setEdit(false)}>{t('common.cancel')}</Button>
-            <Button variant="primary" size="sm" icon="Check" onClick={save}>{t('common.save')}</Button>
+            <Button variant="primary" size="sm" icon={bioBusy ? 'Loader' : 'Check'} disabled={bioBusy} onClick={save}>{t('common.save')}</Button>
           </>}>
           <div className="grid sm:grid-cols-2 gap-3">
             {cfg.enabled && (
@@ -803,10 +877,12 @@ function SecurityCard() {
               <Dropdown value={String(autoMin)} onChange={nv => setAutoMin(Number(nv))}
                 options={autoOpts.map(o => ({ value: o.v, label: o.l }))} />
             </Field>
-            {isMobile && bioAvail && (
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={bio} onChange={e => setBio(e.target.checked)} />
+            {androidRuntime && (
+              <label className={`flex items-center gap-2 ${bioAvail ? 'cursor-pointer' : 'opacity-60'}`}>
+                <input type="checkbox" className="accent-[var(--color-acc)] w-3.5 h-3.5" checked={bio}
+                  disabled={!bioAvail || bioBusy} onChange={e => setBio(e.target.checked)} />
                 <span className="text-[12px]">{t('set.biometric')}</span>
+                <span className="text-[10.5px] text-[var(--color-dim2)]">— {biometricStatusText()}</span>
               </label>
             )}
           </div>
@@ -1164,24 +1240,33 @@ function ModuleEditor({ module, onClose, onSave }: { module: ModuleDef; onClose:
       </div>
       <div className="space-y-1.5 max-h-[38vh] overflow-y-auto pe-1">
         {fields.map((f, i) => (
-          <div key={i} className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-[var(--color-line)]">
-            <TextInput value={f.label} className="py-1 text-[12px] flex-1 ltr" onChange={e => upd(i, { label: e.target.value })} />
-            <TextInput value={f.labelFa ?? ''} placeholder={fl(f)} className="py-1 text-[12px] flex-1"
-              onChange={e => upd(i, { labelFa: e.target.value || undefined })} />
-            <Dropdown value={f.type} onChange={v => upd(i, { type: v as FieldType })}
-              className="w-32 shrink-0"
-              options={FIELD_TYPES.map(ty => ({ value: ty, label: ty }))} />
-            {f.type === 'select' && (
-              <TextInput value={(f.options ?? []).join(',')} placeholder="options,csv" className="py-1 text-[11px] w-32 ltr"
-                onChange={e => upd(i, { options: e.target.value.split(',').map(x => x.trim()).filter(Boolean) })} />
-            )}
-            <button onClick={() => upd(i, { col: !f.col })} title={t('set.showInTable')}
-              className={`p-1 rounded ${f.col ? 'text-[var(--color-acc)]' : 'text-[var(--color-dim2)]'}`}>
-              <Icon name="Table2" size={13} />
-            </button>
-            <button onClick={() => setFields(fs => fs.filter((_, j) => j !== i))} className="p-1 text-[var(--color-dim2)] hover:text-red-400">
-              <Icon name="X" size={13} />
-            </button>
+          <div key={i} className="flex flex-col sm:flex-row sm:items-center gap-2.5 px-3 py-2.5 rounded-lg border border-[var(--color-line)] bg-white/[.01]">
+            <div className="flex flex-1 flex-col sm:flex-row gap-2.5">
+              <TextInput value={f.label} className="py-1.5 text-[12px] flex-1 ltr font-medium" placeholder="Label (En)" onChange={e => upd(i, { label: e.target.value })} />
+              <TextInput value={f.labelFa ?? ''} placeholder={fl(f) || 'برچسب فارسی'} className="py-1.5 text-[12px] flex-1"
+                onChange={e => upd(i, { labelFa: e.target.value || undefined })} />
+            </div>
+            
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+              <Dropdown value={f.type} onChange={v => upd(i, { type: v as FieldType })}
+                className="w-full sm:w-32 shrink-0 text-[12px]"
+                options={FIELD_TYPES.map(ty => ({ value: ty, label: ty }))} />
+                
+              {f.type === 'select' && (
+                <TextInput value={(f.options ?? []).join(',')} placeholder="options,csv" className="py-1.5 text-[11.5px] w-full sm:w-32 ltr"
+                  onChange={e => upd(i, { options: e.target.value.split(',').map(x => x.trim()).filter(Boolean) })} />
+              )}
+              
+              <div className="flex items-center gap-1 mt-1 sm:mt-0 w-full sm:w-auto justify-end border-t sm:border-0 border-[var(--color-line)] pt-2 sm:pt-0 shrink-0">
+                <button onClick={() => upd(i, { col: !f.col })} title={t('set.showInTable')}
+                  className={`flex items-center justify-center w-8 h-8 rounded-md transition-colors ${f.col ? 'bg-[var(--color-acc)]/15 text-[var(--color-acc)]' : 'hover:bg-white/[.07] text-[var(--color-dim2)]'}`}>
+                  <Icon name="Table2" size={14} />
+                </button>
+                <button onClick={() => setFields(fs => fs.filter((_, j) => j !== i))} className="flex items-center justify-center w-8 h-8 rounded-md text-[var(--color-dim2)] hover:bg-red-500/15 hover:text-red-400 transition-colors">
+                  <Icon name="X" size={14} />
+                </button>
+              </div>
+            </div>
           </div>
         ))}
         {!fields.length && <Empty icon="Columns3" title={t('module.noFields')} />}

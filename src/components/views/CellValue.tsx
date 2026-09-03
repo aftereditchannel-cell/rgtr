@@ -5,6 +5,31 @@ import { daysUntil } from '../../lib/format'
 import { useFmt } from '../../lib/useFmt'
 import { refLabel } from '../../store/useApp'
 
+function LinkifyText({ text, className = '' }: { text: string; className?: string }) {
+  if (text === '—' || !text) return <span className={className}>{text}</span>
+  // تشخیص آدرس‌ها و شماره تلفن‌ها (مثل 0912... یا +98912...)
+  const regex = /(https?:\/\/[^\s()]+?(?=[.,!?:;]*(?:[\s()[\]]|$))|09\d{9}|\+\d{10,14})/g
+  const parts = text.split(regex)
+  const matches = text.match(regex) || []
+  
+  if (matches.length === 0) return <span className={className}>{text}</span>
+
+  const result = []
+  for (let i = 0; i < parts.length; i++) {
+    if (parts[i]) result.push(<span key={`t-${i}`}>{parts[i]}</span>)
+    if (matches[i]) {
+       const m = matches[i]
+       if (m.startsWith('http')) {
+         result.push(<a key={`m-${i}`} href={m} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className="text-[var(--color-acc)] hover:underline ltr inline-block">{m}</a>)
+       } else {
+         const norm = m.replace(/[\s-]/g, '')
+         result.push(<a key={`m-${i}`} href={`tel:${norm}`} onClick={e => e.stopPropagation()} className="text-[var(--color-acc)] hover:underline ltr inline-block" dir="ltr">{m}</a>)
+       }
+    }
+  }
+  return <span className={className}>{result}</span>
+}
+
 export function CellValue({ f, row, data, currency }: { f: FieldDef; row: Entity; data: AppData; currency: string }) {
   const fmt = useFmt()
   const v = row[f.key]
@@ -62,8 +87,11 @@ export function CellValue({ f, row, data, currency }: { f: FieldDef; row: Entity
         : <span className="text-[12px] text-[var(--color-dim)]">{s}</span>
     }
     case 'textarea':
-      return <span className="text-[12px] text-[var(--color-dim)] line-clamp-1">{String(v ?? '') || '—'}</span>
-    default:
-      return <span className="truncate">{String(v ?? '') || <span className="text-[var(--color-dim2)]">—</span>}</span>
+      return <LinkifyText text={String(v ?? '') || '—'} className="text-[12px] text-[var(--color-dim)] line-clamp-1" />
+    default: {
+      const text = String(v ?? '')
+      if (!text) return <span className="text-[var(--color-dim2)]">—</span>
+      return <LinkifyText text={text} className="truncate" />
+    }
   }
 }

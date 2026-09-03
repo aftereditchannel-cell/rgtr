@@ -17,37 +17,34 @@ export function SocialHub() {
   const [detail, setDetail] = useState<SocialProfile | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // رفرش خودکار هنگام ورود به صفحه و هر بار که صفحه دوباره visible می‌شود
+  const profileIds = soc.profiles.map(p => p.id).join('|')
+
+  // رفرش خودکار هنگام ورود به صفحه و هر بار که برنامه دوباره foreground می‌شود.
+  // فقط پروفایل‌های پشتیبانی‌شده/قابل‌دسترسی آپدیت می‌شوند؛ هر منبع خطای خودش را روی کارت نشان می‌دهد.
   useEffect(() => {
-    if (!soc.autoRefresh) return
+    if (!soc.autoRefresh || !profileIds) return
     let cancelled = false
-    const run = async (ids: string[]) => {
-      for (const id of ids) {
+    const run = async () => {
+      const profiles = useApp.getState().data.settings.social.profiles
+      for (const profile of profiles) {
         if (cancelled) return
-        setRefreshing(s => new Set(s).add(id))
+        setRefreshing(s => new Set(s).add(profile.id))
         try {
-          const p = await fetchProfileCached(id, { keys: soc.keys })
+          const p = await fetchProfileCached(profile.url, { keys: useApp.getState().data.settings.social.keys })
           if (!cancelled) upsertProfile(p)
         } finally {
-          if (!cancelled) setRefreshing(s => { const n = new Set(s); n.delete(id); return n })
+          if (!cancelled) setRefreshing(s => { const n = new Set(s); n.delete(profile.id); return n })
         }
       }
     }
-    const ids = soc.profiles.map(p => p.id)
-    if (ids.length) void run(ids)
-
-    // رفرش با هر بار فعال شدن تب/برنامه — «با هر رفرش نرخ تازه شود»
-    const onVis = () => { if (document.visibilityState === 'visible' && ids.length) void run(ids) }
+    void run()
+    const onVis = () => { if (document.visibilityState === 'visible') void run() }
+    const onRefresh = () => { void run() }
     document.addEventListener('visibilitychange', onVis)
-
-    // بازه‌ی دوره‌ای (اگر کاربر > 0 گذاشته)
-    let timer: ReturnType<typeof setInterval> | undefined
-    if (soc.intervalMin > 0) {
-      timer = setInterval(() => { if (ids.length) void run(ids) }, soc.intervalMin * 60_000)
-    }
-    return () => { cancelled = true; document.removeEventListener('visibilitychange', onVis); if (timer) clearInterval(timer) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [soc.autoRefresh, soc.intervalMin])
+    window.addEventListener('nexus:refresh-social', onRefresh)
+    const timer = soc.intervalMin > 0 ? setInterval(() => { void run() }, soc.intervalMin * 60_000) : undefined
+    return () => { cancelled = true; document.removeEventListener('visibilitychange', onVis); window.removeEventListener('nexus:refresh-social', onRefresh); if (timer) clearInterval(timer) }
+  }, [soc.autoRefresh, soc.intervalMin, profileIds, upsertProfile])
 
   const add = async () => {
     const v = input.trim()
@@ -252,8 +249,9 @@ function ProfileDetail({ p, onClose, fmt, t }: { p: SocialProfile; onClose: () =
               {p.bio && <p className="text-[12px] text-[var(--color-dim)] mt-1 line-clamp-3">{p.bio}</p>}
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-center">
             <Metric label={t('social.followers')} value={p.followers} fmt={fmt} />
+            {p.platform === 'Instagram' && <Metric label={t('social.following')} value={p.following} fmt={fmt} />}
             {p.platform === 'Instagram' && <Metric label={t('social.posts')} value={p.posts} fmt={fmt} />}
             {p.platform === 'YouTube' && <Metric label={t('social.videos')} value={p.posts} fmt={fmt} />}
             {p.platform === 'YouTube' && <Metric label={t('social.views')} value={p.views} fmt={fmt} />}

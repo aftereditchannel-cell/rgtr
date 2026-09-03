@@ -155,8 +155,8 @@ html[data-theme='light'] .glass-sheen::after {
 /* ناحیه‌ی امن: نوار وضعیت بالا و نوار ناوبری پایین گوشی */
 body.is-mobile {
   overscroll-behavior: none;
-  -webkit-user-select: none;
-  user-select: none;
+  -webkit-user-select: auto;
+  user-select: auto;
   -webkit-tap-highlight-color: transparent;
 }
 /* ورودی‌ها باید قابل انتخاب بمانند */

@@ -94,6 +94,91 @@ async function viaProxy(url: string, proxyUrl: string): Promise<SocialProfile | 
   }
 }
 
+async function viaPublicProxy(url: string): Promise<SocialProfile | null> {
+  // A list of public CORS proxies to try one by one until success
+  const proxies = [
+    (u: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`,
+    (u: string) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+    (u: string) => `https://cors-anywhere.herokuapp.com/${u}` // Note: this requires temporary opt-in but might work in some network setups
+  ]
+
+  let html = ''
+  
+  for (const p of proxies) {
+    try {
+      const res = await fetch(p(url))
+      if (!res.ok) continue
+      
+      // allorigins returns JSON with contents field, others return raw text
+      const contentType = res.headers.get('content-type') || ''
+      if (contentType.includes('application/json')) {
+        const json = await res.json()
+        html = json.contents || ''
+      } else {
+        html = await res.text()
+      }
+      
+      if (html) break
+    } catch {
+      continue
+    }
+  }
+
+  if (!html) return null
+
+  const extract = (pattern: RegExp) => (html.match(pattern) || [])[1]?.trim() || ''
+  const num = (pattern: RegExp) => {
+    const match = (html.match(pattern) || [])[1]
+    if (!match) return null
+    // Instagram uses formats like "12.5M", "10K", we need to handle multipliers
+    let nStr = match.replace(/,/g, '').trim().toLowerCase()
+    let multiplier = 1
+    if (nStr.endsWith('k')) { multiplier = 1000; nStr = nStr.replace('k', '') }
+    else if (nStr.endsWith('m')) { multiplier = 1000000; nStr = nStr.replace('m', '') }
+    else if (nStr.endsWith('b')) { multiplier = 1000000000; nStr = nStr.replace('b', '') }
+    
+    const n = Number(nStr)
+    return Number.isFinite(n) ? Math.round(n * multiplier) : null
+  }
+
+  const title = extract(/<meta\s+property="og:title"\s+content="([^"]+)"/i)
+  const desc = extract(/<meta\s+property="og:description"\s+content="([^"]+)"/i)
+
+  let followers = null
+  let name = title
+  
+  if (url.includes('t.me')) {
+    followers = num(/class="tgme_page_extra"[^>]*>([0-9\sA-Za-z.,kmb]+)(?:subscribers|members)/i)
+    name = title || extract(/<div class="tgme_page_title".*?>\s*<span[^>]*>(.*?)<\/span>/i)
+  }
+  else if (url.includes('youtube.com') || url.includes('youtu.be')) {
+    followers = num(/"subscriberCountText":\{"accessibility":\{"accessibilityData":\{"label":"([^"]+) subscribers"/i) 
+                || num(/"subscriberCountText":\{"simpleText":"([^"]+) subscribers"/i)
+                || num(/"subscriberCountText":\s*"([0-9.,KMBkmb]+)/i)
+  }
+  else if (url.includes('instagram.com')) {
+    followers = num(/content="([0-9.,KMBkmb]+)\s+Followers/i)
+    name = extract(/content=".*?See Instagram photos and videos from\s+([^"]+)\s+\(@/i) || title
+  }
+  else if (url.includes('soundcloud.com')) {
+    followers = num(/"followers_count":\s*(\d+)/i)
+  }
+  else if (url.includes('spotify.com')) {
+    followers = num(/"followers":\s*(?:\{[^\}]*"total":\s*)?(\d+)/i) || num(/followerCount":\s*(\d+)/i)
+    name = title || extract(/<meta property="og:title" content="([^"]+)"/i)
+  }
+
+  return {
+    name: name.replace(/\s*-.*$/, ''), 
+    bio: desc,
+    followers,
+    following: null,
+    posts: null,
+    url,
+    source: 'public proxy',
+  }
+}
+
 /**
  * تلاش برای خواندن پروفایل. هرگز throw نمی‌کند؛ در صورت شکست، null.
  */
@@ -108,7 +193,15 @@ export async function fetchSocialProfile(
     if (p) return p
   }
   const o = await viaOembed(url)
-  return o
+  if (o) {
+    // try to augment oEmbed with follower count using public proxy
+    const aug = await viaPublicProxy(url)
+    if (aug && aug.followers) o.followers = aug.followers
+    return o
+  }
+  // fallback to public proxy
+  const p = await viaPublicProxy(url)
+  return p
 }
 
 /** قالب Worker واسط برای راهنمای کاربر — به‌صورت رشته */

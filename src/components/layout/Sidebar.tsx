@@ -8,6 +8,7 @@ import { useT } from '../../i18n'
 
 const FIXED_TOP = [
   { to: '/', icon: 'LayoutDashboard', k: 'nav.dashboard' },
+  { to: '/m/planner', icon: 'CalendarDays', k: 'nav.planner' },
   { to: '/decision', icon: 'Target', k: 'nav.decision' },
   { to: '/analytics', icon: 'BarChart3', k: 'nav.analytics' },
   { to: '/social', icon: 'Share2', k: 'nav.social' },

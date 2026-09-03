@@ -64,17 +64,23 @@ export interface AIState {
   enabled: boolean
 }
 
-/** تنظیمات همگام‌سازی ابری — توکن اینجا ذخیره نمی‌شود (جدا و خارج از بکاپ) */
-export interface CloudSettings {
-  provider: 'gist'
-  gistId: string
-  /** آخرین همگام‌سازی موفق (ISO) */
+export interface CloudSyncMeta {
   lastSync: string
-  /** هنگام خروج از برنامه بپرسد */
-  askOnExit: boolean
-  /** ذخیره‌ی خودکار روی ابر بعد از هر تغییر (debounced) */
+  lastLocalChange: string
+  pendingSync: boolean
+  lastSyncError: string
+}
+
+/** Firebase حفظ شده و Google Drive یک انتخاب مستقل است. */
+export interface CloudSettings extends CloudSyncMeta {
+  provider: 'googleDrive'
+  /** URL عمومی Web App متعلق به Google Apps Script خود کاربر؛ secret نیست. */
+  googleScriptUrl: string
+  /** وضعیت هر سرویس جدا می‌ماند تا تعویض سرویس باعث overwrite اشتباه نشود. */
+  providerState: Record<'googleDrive', CloudSyncMeta>
+  /** ذخیره محلی همیشه اول است؛ سپس در سرویس فعال ارسال می‌شود. */
   autoSync: boolean
-  /** دریافت خودکار از ابر هنگام باز شدن/بازگشت برنامه */
+  /** دریافت Drive همیشه دستی است (یا وابسته به درخواست کاربر). */
   autoPull: boolean
 }
 

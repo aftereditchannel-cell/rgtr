@@ -1,7 +1,7 @@
 import type { AppData } from '../store/types'
 import { migrate, validateBackup } from './migrate'
 import { desktop } from './desktop'
-import { isMobile, mobileSaveAndShare, mobilePickFile } from './mobile'
+import { isMobile, mobilePickFile, mobileExportBackup, mobileExportCSV } from './mobile'
 
 export function download(filename: string, text: string, mime = 'application/json') {
   const blob = new Blob([text], { type: mime })
@@ -28,7 +28,8 @@ export async function exportJSON(data: AppData): Promise<string | null> {
     return res.ok && res.path ? res.path : null
   }
   if (isMobile) {
-    return await mobileSaveAndShare(name, JSON.stringify(data, null, 2), 'NEXUS HQ backup')
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+    return await mobileExportBackup(`nexus-hq-backup-${stamp}.json`, JSON.stringify(data, null, 2))
   }
   download(name, JSON.stringify(data, null, 2))
   return null
@@ -53,7 +54,7 @@ export async function exportModuleCSV(
     return res.ok && res.path ? res.path : null
   }
   if (isMobile) {
-    return await mobileSaveAndShare(file, text, name)
+    return await mobileExportCSV(file, text)
   }
   download(file, text, 'text/csv;charset=utf-8')
   return null

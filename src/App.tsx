@@ -12,17 +12,19 @@ import { ModulePage } from './pages/ModulePage'
 import { Help } from './pages/Help'
 import { SocialHub } from './pages/SocialHub'
 import { Automation } from './pages/Automation'
-import { Icon } from './components/ui/Primitives'
+import { Button, Icon, Modal } from './components/ui/Primitives'
 import { BrandMark } from './components/ui/BrandMark'
 import { desktop } from './lib/desktop'
 import { exportJSON, importViaDialog } from './lib/backup'
-import { useT, tr } from './i18n'
+import { useT, tr, cloudError } from './i18n'
 import { ExitSavePrompt } from './components/layout/ExitSavePrompt'
 import { LockScreen } from './components/layout/LockScreen'
 import { applyTheme, applyGlass, watchSystemTheme } from './lib/theme'
 import { isLockEnabled, readLock, LOCK_EVENT } from './lib/lock'
 import { isMobile, syncMobileChrome, onMobileResume } from './lib/mobile'
-import { autoPullIfEnabled } from './store/useApp'
+import { autoPullIfEnabled, refreshCloudNow, retryPendingCloudSync } from './store/useApp'
+import { configureCloudProvider, initCloudAuth, mapCloudError, watchCloudUser } from './lib/cloud'
+import { fetchProfileCached } from './domain/social'
 
 /** پل منوی بومی ویندوز → روتر و اکشن‌های برنامه */
 function DesktopMenuBridge() {
@@ -72,10 +74,49 @@ function DesktopMenuBridge() {
 
 function Shell() {
   const [navOpen, setNavOpen] = useState(false)
+  const [syncFailure, setSyncFailure] = useState<{ code: string; detail?: string } | null>(null)
   const toast = useApp(s => s.toast)
   const accent = useApp(s => s.data.settings.accent)
   const appName = useApp(s => s.data.settings.branding?.appName ?? 'NEXUS HQ')
-  const { lang, rtl } = useT()
+  const { lang, rtl, t } = useT()
+  const pullStart = useRef<number | null>(null)
+  const refresh = () => {
+    // یک Refresh دستی، پروفایل‌های اجتماعی صفحه‌ی فعلی را هم تازه می‌کند.
+    window.dispatchEvent(new Event('nexus:refresh-social'))
+    void refreshCloudNow().then(changed => {
+      useApp.getState().setToast(t(changed ? 'set.cloudPulled' : 'set.cloudUpToDate'))
+    }).catch(error => {
+      const cloudErr = mapCloudError(error)
+      const detail = cloudErr.detail ? ` — ${t('sync.errorCode')}: ${cloudErr.detail}` : ''
+      useApp.getState().setToast(`${t('sync.failed')}: ${cloudError(lang, cloudErr.code)}${detail}`)
+    })
+  }
+
+  useEffect(() => {
+    const onFailure = (event: Event) => setSyncFailure((event as CustomEvent<{ code: string; detail?: string }>).detail)
+    window.addEventListener('nexus:cloud-sync-failed', onFailure)
+    return () => window.removeEventListener('nexus:cloud-sync-failed', onFailure)
+  }, [])
+
+  // وقتی اینترنت برگردد، فقط داده‌ای که قبلاً با وضعیت «فقط محلی» مانده دوباره ارسال می‌شود.
+  useEffect(() => {
+    const retryWhenOnline = () => {
+      if (!useApp.getState().data.settings.cloud.pendingSync) return
+      void retryPendingCloudSync().then(() => useApp.getState().setToast(t('set.cloudPushed'))).catch(() => { /* دیالوگ pending هنوز در تنظیمات باقی می‌ماند */ })
+    }
+    window.addEventListener('online', retryWhenOnline)
+    return () => window.removeEventListener('online', retryWhenOnline)
+  }, [t])
+
+  const retryPending = () => {
+    void retryPendingCloudSync().then(() => {
+      setSyncFailure(null)
+      useApp.getState().setToast(t('set.cloudPushed'))
+    }).catch(error => {
+      const cloudErr = mapCloudError(error)
+      setSyncFailure(cloudErr)
+    })
+  }
 
   useEffect(() => {
     document.documentElement.style.setProperty('--color-acc', accent)
@@ -106,9 +147,15 @@ function Shell() {
             <Icon name="Menu" size={19} />
           </button>
           <span className="text-[13px] font-semibold flex-1 truncate">{appName}</span>
+          <button onClick={refresh} className="text-[var(--color-dim)] p-1.5 -m-1 rounded-lg active:bg-[var(--hover)]" aria-label={t('set.cloudRefresh')} title={t('set.cloudRefresh')}>
+            <Icon name="RefreshCw" size={17} />
+          </button>
         </div>
 
-        <main className="flex-1 scroll-y">
+        <main className="flex-1 scroll-y" onTouchStart={e => { if (e.currentTarget.scrollTop <= 0) pullStart.current = e.touches[0]?.clientY ?? null }} onTouchEnd={e => {
+          const start = pullStart.current; pullStart.current = null
+          if (start !== null && e.currentTarget.scrollTop <= 0 && (e.changedTouches[0]?.clientY ?? start) - start > 70) refresh()
+        }}>
           <div className="max-w-[1400px] mx-auto px-3 sm:px-5 lg:px-6 py-4 sm:py-6">
             <Routes>
               <Route path="/" element={<Dashboard />} />
@@ -131,6 +178,17 @@ function Shell() {
       <DesktopMenuBridge />
       <CommandPalette />
       <ExitSavePrompt />
+
+      {syncFailure && <Modal open onClose={() => setSyncFailure(null)} title={t('sync.localSavedTitle')}
+        footer={<><Button size="sm" variant="ghost" onClick={() => setSyncFailure(null)}>{t('sync.keepLocal')}</Button><Button size="sm" variant="primary" icon="RefreshCw" onClick={retryPending}>{t('sync.retry')}</Button></>}>
+        <div className="space-y-2 text-[12.5px] leading-relaxed">
+          <p>{t('sync.localSavedBody')}</p>
+          <p className="text-red-400">{cloudError(lang, syncFailure.code)}{syncFailure.detail ? ` — ${t('sync.errorCode')}: ${syncFailure.detail}` : ''}</p>
+          <p className="text-[11px] text-[var(--color-dim2)]">{t('sync.localSavedHint')}</p>
+        </div>
+      </Modal>}
+
+
 
       {toast && (
         <div className="fixed left-1/2 -translate-x-1/2 z-[70] anim px-3 w-full max-w-sm"
@@ -165,14 +223,8 @@ function Root() {
 
   useEffect(() => { applyGlass(glass) }, [glass])
 
-  // دریافت خودکار از ابر هنگام باز شدن/بازگشت برنامه (اگر autoPull روشن باشد)
-  useEffect(() => {
-    void autoPullIfEnabled()
-    const onVis = () => { if (document.visibilityState === 'visible') void autoPullIfEnabled() }
-    document.addEventListener('visibilitychange', onVis)
-    const offResume = onMobileResume(() => void autoPullIfEnabled())
-    return () => { document.removeEventListener('visibilitychange', onVis); offResume() }
-  }, [])
+  // فقط یک‌بار در شروع برنامه از ابر بررسی می‌کنیم؛ بعد از آن Refresh دستی است.
+  useEffect(() => { void autoPullIfEnabled() }, [])
 
   // قفل خودکار: پس از بی‌کاری، یا وقتی برنامه از پس‌زمینه برمی‌گردد
   useEffect(() => {
@@ -231,8 +283,33 @@ export default function App() {
   const init = useApp(s => s.init)
   const ready = useApp(s => s.ready)
   const lang = useApp(s => s.data.settings.lang) ?? 'fa'
+  const cloudProvider = useApp(s => s.data.settings.cloud.provider)
+  const googleScriptUrl = useApp(s => s.data.settings.cloud.googleScriptUrl)
 
   useEffect(() => { void init() }, [init])
+  useEffect(() => {
+    if (ready) configureCloudProvider(cloudProvider, googleScriptUrl)
+  }, [cloudProvider, googleScriptUrl, ready])
+
+  // آمار شبکه‌های اجتماعیِ قابل‌دسترسی هنگام ورود به اپ تازه می‌شود؛ خطای هر پلتفرم
+  // فقط روی همان کارت ثبت می‌شود و هرگز مانع بازشدن برنامه نیست.
+  useEffect(() => {
+    if (!ready) return
+    const social = useApp.getState().data.settings.social
+    if (!social.autoRefresh || !social.profiles.length) return
+    void Promise.all(social.profiles.map(async profile => {
+      try {
+        const fresh = await fetchProfileCached(profile.url, { keys: useApp.getState().data.settings.social.keys })
+        useApp.getState().upsertProfile(fresh)
+      } catch { /* provider خودش خطای قابل‌نمایش ذخیره می‌کند */ }
+    }))
+  }, [ready])
+
+  // Firebase و Drive نشست جدا دارند؛ دریافت خودکار فقط طبق تنظیم سرویس فعال است.
+  useEffect(() => {
+    void initCloudAuth()
+    return watchCloudUser(user => { if (user) void autoPullIfEnabled() })
+  }, [])
 
   // پوسته را پیش از آماده شدن داده هم اعمال می‌کنیم تا صفحه‌ی بارگذاری سفید/سیاه نپرد
   useEffect(() => { applyTheme(useApp.getState().data.settings.theme ?? 'dark') }, [])

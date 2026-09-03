@@ -37,19 +37,38 @@ export function ModulePage() {
   const [runner, setRunner] = useState(false)
 
   // آیا این ماژول فالوور دارد که از لینک قابل تازه‌سازی باشد؟
-  const hasFollowers = module?.fields.some(f => f.key === 'followers') ?? false
   const urlKey = module?.fields.find(f => f.type === 'url' || f.key === 'handle' || f.key === 'instagram')?.key
-  const refreshable = hasFollowers && !!urlKey
+  const refreshable = !!urlKey
   const socialCfg = data.settings.social
 
   const refreshSocial = async () => {
     if (!module || !urlKey) return
     setRefreshing(true)
-    for (const r of rows.slice(0, 12)) {
+    const hasFollowers = module.fields.some(f => f.key === 'followers' || f.key === 'subscribers')
+    const hasName = module.fields.some(f => f.key === 'name' || f.key === 'title')
+    const hasBio = module.fields.some(f => f.key === 'bio' || f.key === 'description')
+    
+    // Refresh only the first 20 records to avoid rate limiting
+    for (const r of rows.slice(0, 20)) {
       const raw = String(r[urlKey] ?? '')
       if (!raw.trim()) continue
       const p = await fetchSocialProfile(raw, socialCfg?.proxyUrl ?? '')
-      if (p && p.followers != null) update(module.key, r.id, { followers: p.followers })
+      if (p) {
+        const patch: Record<string, unknown> = {}
+        if (hasFollowers && p.followers != null) {
+          const fk = module.fields.find(f => f.key === 'followers' || f.key === 'subscribers')?.key
+          if (fk) patch[fk] = p.followers
+        }
+        if (hasName && p.name && !r.name && !r.title) {
+          const nk = module.fields.find(f => f.key === 'name' || f.key === 'title')?.key
+          if (nk) patch[nk] = p.name
+        }
+        if (hasBio && p.bio && !r.bio && !r.description) {
+          const bk = module.fields.find(f => f.key === 'bio' || f.key === 'description')?.key
+          if (bk) patch[bk] = p.bio
+        }
+        if (Object.keys(patch).length > 0) update(module.key, r.id, patch)
+      }
     }
     setRefreshing(false)
   }
@@ -60,7 +79,7 @@ export function ModulePage() {
   }, [module?.key])
 
   const filterable = useMemo(
-    () => module?.fields.filter(f => f.type === 'select' && (f.options?.length ?? 0) > 1).slice(0, 3) ?? [],
+    () => module?.fields.filter(f => (f.type === 'select' && (f.options?.length ?? 0) > 1) || f.type === 'ref').slice(0, 4) ?? [],
     [module],
   )
 
@@ -114,15 +133,25 @@ export function ModulePage() {
           <TextInput value={q} onChange={e => setQ(e.target.value)} placeholder={t('common.search')} className="ps-8 py-1.5 text-[12.5px]" />
         </div>
 
-        {filterable.map(f => (
-          <Dropdown key={f.key} className="w-auto min-w-[140px]"
-            value={filters[f.key] ?? ''}
-            onChange={nv => setFilters(p => ({ ...p, [f.key]: nv }))}
-            options={[
-              { value: '', label: t('module.filterAll', { f: fl(f) }) },
-              ...(f.options ?? []).map(o => ({ value: o, label: ol(o) })),
-            ]} />
-        ))}
+        {filterable.map(f => {
+          let opts: {value: string, label: string}[] = []
+          if (f.type === 'select') {
+            opts = (f.options ?? []).map(o => ({ value: o, label: ol(o) }))
+          } else if (f.type === 'ref' && f.refModule) {
+            const rm = data.modules.find(m => m.key === f.refModule)
+            const refRows = data.records[f.refModule] ?? []
+            opts = refRows.map(r => ({ value: String(r.id), label: String(r[rm?.titleField ?? 'name'] ?? r.id) }))
+          }
+          return (
+            <Dropdown key={f.key} className="w-auto min-w-[140px]"
+              value={filters[f.key] ?? ''}
+              onChange={nv => setFilters(p => ({ ...p, [f.key]: nv }))}
+              options={[
+                { value: '', label: t('module.filterAll', { f: fl(f) }) },
+                ...opts,
+              ]} />
+          )
+        })}
 
         {refreshable && (
           <Button size="sm" variant="ghost" icon={refreshing ? 'Loader' : 'RefreshCw'} title="refresh"

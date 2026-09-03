@@ -28,7 +28,7 @@ const TOPICS: Topic[] = [
   { icon: 'Bot', to: '/m/agents', fa: 'ایجنت‌های هوش مصنوعی', en: 'AI Agents', dFa: 'نیروهای مجازی. با وارد کردن کلید OpenAI واقعاً اجرا می‌شوند (چت هر ایجنت).', dEn: 'Virtual staff. Add an OpenAI key to actually run them (chat per agent).' },
   { icon: 'Workflow', to: '/m/automations', fa: 'اتوماسیون', en: 'Automations', dFa: 'اتوماسیون‌ها و اتصال به n8n/Make.', dEn: 'Automations and n8n/Make connections.' },
   { icon: 'Settings', to: '/settings', fa: 'تنظیمات', en: 'Settings', dFa: 'زبان، پوسته (تیره/روشن/شیشه‌ای)، همگام‌سازی ابری، قفل و امنیت، هوش مصنوعی و دپارتمان‌ها.', dEn: 'Language, theme (dark/light/glass), cloud sync, lock & security, AI and departments.' },
-  { icon: 'Cloud', to: '/settings#cloud', fa: 'همگام‌سازی ابری', en: 'Cloud sync', dFa: 'داده را در یک Gist خصوصی گیت‌هاب نگه می‌دارد و بین ویندوز و گوشی همگام می‌کند. با auto-sync، هر تغییر خودکار ذخیره می‌شود.', dEn: 'Keeps data in a private GitHub gist and syncs Windows ↔ phone. Auto-sync saves every change.' },
+  { icon: 'Cloud', to: '/settings#cloud', fa: 'همگام‌سازی ابری', en: 'Cloud sync', dFa: 'داده را در حساب Google و Firebase نگه می‌دارد و بین ویندوز و گوشی همگام می‌کند. با ذخیرهٔ خودکار، هر تغییر چند ثانیه بعد ارسال می‌شود.', dEn: 'Keeps data in your Google/Firebase account and syncs Windows ↔ phone. Auto-save sends changes after a short delay.' },
   { icon: 'Shield', to: '/settings#security', fa: 'قفل و امنیت', en: 'Lock & security', dFa: 'رمز عبور + اثر انگشت/چهره روی گوشی، با قفل خودکار.', dEn: 'Passcode + fingerprint/face on mobile, with auto-lock.' },
 ]
 
@@ -43,7 +43,7 @@ const GITMAP: GitMap[] = [
   { fa: 'دپارتمان‌ها و ماژول‌های پیش‌فرض + فیلدهایشان', en: 'Default departments/modules and their fields', files: ['src/domain/schema.ts'] },
   { fa: 'رنگ‌ها، پوسته و افکت شیشه‌ای', en: 'Colors, theme and glass effect', files: ['src/index.css'] },
   { fa: 'متن‌ها و ترجمه‌ها', en: 'Text and translations', files: ['src/i18n/dict.ts', 'src/i18n/domain.ts'] },
-  { fa: 'همگام‌سازی ابری (گیت‌هاب)', en: 'Cloud sync (GitHub)', files: ['src/lib/cloud.ts', 'src/store/useApp.ts'] },
+  { fa: 'همگام‌سازی ابری (Google / Firebase)', en: 'Cloud sync (Google / Firebase)', files: ['src/lib/firebase.ts', 'src/lib/cloud.ts', 'src/store/useApp.ts'] },
   { fa: 'قفل و اثر انگشت', en: 'Lock & fingerprint', files: ['src/lib/lock.ts', 'src/components/layout/LockScreen.tsx'] },
   { fa: 'هوش مصنوعی / ایجنت‌ها', en: 'AI / agents', files: ['src/lib/ai.ts'] },
   { fa: 'تشخیص خودکار فالوور/بیو', en: 'Social auto-fetch', files: ['src/lib/social.ts'] },

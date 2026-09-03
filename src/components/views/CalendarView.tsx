@@ -19,6 +19,7 @@ export function CalendarView({ module, rows, onOpen }: {
   const [cur, setCur] = useState(() => fmt.currentYearMonth())
   const [dragId, setDragId] = useState<string | null>(null)
   const [overDay, setOverDay] = useState<string | null>(null)
+  const [zoom, setZoom] = useState(0)
 
   // با تعویض تقویم/زبان، ماه جاری را در واحد جدید بازتنظیم کن
   useEffect(() => { setCur(fmt.currentYearMonth()) }, [lang, cal]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -59,6 +60,11 @@ export function CalendarView({ module, rows, onOpen }: {
           <span className="text-[13px] font-medium min-w-[140px] text-center">{fmt.monthTitle(cur.year, cur.month)}</span>
           <Button size="sm" variant="ghost" icon="ChevronLeft" onClick={() => move(1)} className="flip-rtl" />
           <Button size="sm" variant="ghost" onClick={() => setCur(fmt.currentYearMonth())}>{t('cal.today')}</Button>
+          <div className="flex items-center gap-1 bg-white/[.05] rounded-lg p-0.5 ms-2 border border-[var(--color-line)]">
+            <button onClick={() => setZoom(z => Math.max(0, z - 1))} className="p-1 hover:bg-white/[.1] rounded text-[var(--color-dim2)] hover:text-[var(--color-tx)]"><Icon name="ZoomOut" size={14}/></button>
+            <span className="text-[10px] w-5 text-center nums">{zoom}</span>
+            <button onClick={() => setZoom(z => Math.min(3, z + 1))} className="p-1 hover:bg-white/[.1] rounded text-[var(--color-dim2)] hover:text-[var(--color-tx)]"><Icon name="ZoomIn" size={14}/></button>
+          </div>
         </div>
         <span className="text-[11px] text-[var(--color-dim2)] hidden sm:block">{t('cal.dragHint')}</span>
       </div>
@@ -76,14 +82,15 @@ export function CalendarView({ module, rows, onOpen }: {
               onDragLeave={() => setOverDay(d => (d === day ? null : d))}
               onDrop={() => { if (day && dragId) update(module.key, dragId, { [df]: day }); setDragId(null); setOverDay(null) }}
               onDoubleClick={() => day && add(module.key, { [df]: day })}
-              className={`min-h-[92px] p-1.5 bg-[var(--color-panel)] ${!day ? 'opacity-30' : ''} ${overDay === day ? 'drag-over' : ''} ${isToday ? 'bg-[var(--color-acc)]/[.07]' : ''}`}>
+              className={`p-1.5 bg-[var(--color-panel)] ${!day ? 'opacity-30' : ''} ${overDay === day ? 'drag-over' : ''} ${isToday ? 'bg-[var(--color-acc)]/[.07]' : ''}`}
+              style={{ minHeight: `${92 + (zoom * 40)}px` }}>
               {day && (
                 <div className={`text-[10.5px] mb-1 nums ${isToday ? 'text-[var(--color-acc)] font-semibold' : 'text-[var(--color-dim2)]'}`}>
                   {dayNum(day, i, wi)}
                 </div>
               )}
               <div className="space-y-1">
-                {items.slice(0, 3).map(r => {
+                {items.slice(0, 3 + (zoom * 5)).map(r => {
                   const c = badgeColor(String(r.status ?? ''))
                   return (
                     <div key={r.id} draggable
@@ -97,9 +104,9 @@ export function CalendarView({ module, rows, onOpen }: {
                     </div>
                   )
                 })}
-                {items.length > 3 && (
+                {items.length > (3 + (zoom * 5)) && (
                   <div className="text-[9.5px] text-[var(--color-dim2)] ps-1">
-                    {t('cal.more', { n: fmt.dg(items.length - 3) })}
+                    {t('cal.more', { n: fmt.dg(items.length - (3 + (zoom * 5))) })}
                   </div>
                 )}
               </div>

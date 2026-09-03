@@ -206,10 +206,12 @@ async function fetchInstagram(handle: string, url: string, _opt: FetchOptions): 
   const title = (ogTitle ?? handle).replace(/\s*\u2022.*$/, '').replace(/\s*\(@.+\).*$/, '').trim() || handle
   // توضیحات اینستاگرام معمولاً شامل «N Followers, ...» است
   const followers = num((ogDesc ?? '').match(/([\d.,]+\s*[KMB]?)\s+Followers/i)?.[1])
+  const following = num((ogDesc ?? '').match(/([\d.,]+\s*[KMB]?)\s+Following/i)?.[1])
+  const posts = num((ogDesc ?? '').match(/([\d.,]+\s*[KMB]?)\s+Posts/i)?.[1])
   const bio = ogDesc ? ogDesc.replace(/\s*-\s*See.*photos.*/i, '').trim() : undefined
   return {
-    handle, title, bio, avatar: ogImg, followers, url,
-    source: 'instagram.com (public)',
+    handle, title, bio, avatar: ogImg, followers, following, posts, url,
+    source: 'instagram.com (public metadata)',
   }
 }
 

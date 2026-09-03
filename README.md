@@ -426,3 +426,56 @@ Build command: `npm run build` · Output directory: `dist`
 ---
 
 MIT · ساخته‌شده برای یک نفر: شما.
+
+## Cloud sync providers
+
+NEXUS HQ has two independent choices. **Firebase remains available and is still the default.** Google Drive is an optional second provider that stores one complete `NEXUS-HQ-backup.json` file through an owner-deployed Google Apps Script.
+
+Both modes are local-first: every change is written to the device before a network request. Firebase and Drive keep separate sessions and sync timestamps. Google/Gmail passwords are never requested or stored by NEXUS HQ.
+
+### Firebase Setup (existing option)
+
+1. In Firebase Console, open **Authentication → Sign-in method → Email/Password** and enable **Email/Password**.
+2. Create a Cloud Firestore database and publish the rules below in **Firestore Database → Rules**.
+3. In the app, go to Settings → Firebase Cloud Sync, enter an email and a password of at least six characters, then choose **Create account**. Use the same email and password on another device to receive the same data.
+
+The Firebase client configuration is embedded in `src/lib/firebase.ts`. It is a public client configuration, not a service account. Never add a service-account JSON, private key, Firebase Admin SDK credential, or a user password to this repository.
+
+### Google Drive JSON Setup (optional)
+
+1. Create a project at Google Apps Script and paste `google-apps-script/Code.gs`.
+2. Deploy it as a Web App: **Execute as Me**, access **Anyone**.
+3. Approve Drive access once and copy the public URL ending in `/exec`.
+4. In NEXUS HQ choose **Settings → Sync → Google Drive**, enter that URL, and test it.
+5. Create a NEXUS-specific email/password account. Never enter the Google account password in NEXUS.
+6. Use the same Script URL and NEXUS credentials on the other device.
+
+On account creation, current local AppData is uploaded to `NEXUS-HQ-backup.json`. Later local saves update that file automatically after a short 250 ms coalescing window. Downloads never poll and happen only when the user presses **Refresh from Drive**. The client sends a PBKDF2-derived verifier rather than the plain NEXUS password; the Script stores only its SHA-256 hash and hashed session tokens. See `google-apps-script/README.fa.md` for Persian steps.
+
+### Firestore Rules
+
+In **Firestore Database → Rules**, replace the rules with the following and click **Publish**:
+
+```rules
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null
+                         && request.auth.uid == userId;
+    }
+  }
+}
+```
+
+### Live sync behaviour
+
+- Changes are stored locally immediately.
+- Automatic sending groups rapid edits: about 900 ms for Firebase and 250 ms for Drive.
+- Firebase can use Firestore `onSnapshot`; Google Drive does not poll and downloads only after manual refresh.
+- Pull down at the top of any page, or use the refresh icon in the mobile header, to refresh the selected provider manually.
+- The newest timestamp wins. The app never replaces a newer local unsent change with an older cloud document.
+- A success toast confirms auto-send; failures show a specific Firebase error such as bad password, permission denied, network unavailable, or document too large.
+
+Firestore documents have a 1 MiB limit. NEXUS HQ stops a cloud write before roughly 900 KiB. Large file/image data should not be stored in the AppData document.

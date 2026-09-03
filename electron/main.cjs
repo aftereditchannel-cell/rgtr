@@ -21,7 +21,7 @@ const isDev = !app.isPackaged && process.env.NEXUS_PROD !== '1'
 const DEV_URL = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173'
 
 /* ---------------- مسیرهای داده ---------------- */
-const DATA_DIR = path.join(app.getPath('userData'), 'data')
+const DATA_DIR = path.join(app.getPath('documents'), 'NexusHQ')
 const DOC_FILE = path.join(DATA_DIR, 'nexus-hq.json')
 const TMP_FILE = path.join(DATA_DIR, 'nexus-hq.json.tmp')
 const SNAP_DIR = path.join(DATA_DIR, 'snapshots')
@@ -278,13 +278,11 @@ ipcMain.handle('snap:get', async (_e, id) => {
 
 /* ---------------- IPC: بکاپ و بازیابی با دیالوگ ویندوز ---------------- */
 ipcMain.handle('backup:export', async (_e, data) => {
-  const stamp = new Date().toISOString().slice(0, 10)
-  const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
-    title: 'ذخیره‌ی بکاپ',
-    defaultPath: path.join(app.getPath('documents'), `nexus-hq-backup-${stamp}.json`),
-    filters: [{ name: 'NEXUS HQ Backup', extensions: ['json'] }],
-  })
-  if (canceled || !filePath) return { ok: false }
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+  const backupDir = path.join(app.getPath('documents'), 'NexusHQ', 'Backups')
+  fs.mkdirSync(backupDir, { recursive: true })
+  
+  const filePath = path.join(backupDir, `nexus-hq-backup-${stamp}.json`)
   await fsp.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8')
   return { ok: true, path: filePath }
 })
@@ -300,14 +298,34 @@ ipcMain.handle('backup:import', async () => {
   return { ok: true, data: JSON.parse(txt), path: filePaths[0] }
 })
 
-ipcMain.handle('file:saveText', async (_e, { name, text, filters }) => {
-  const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
-    defaultPath: path.join(app.getPath('documents'), name),
-    filters: filters || [{ name: 'File', extensions: ['*'] }],
-  })
-  if (canceled || !filePath) return { ok: false }
+ipcMain.handle('file:saveText', async (_e, { name, text }) => {
+  const exportDir = path.join(app.getPath('documents'), 'NexusHQ', 'Exports')
+  fs.mkdirSync(exportDir, { recursive: true })
+  
+  const filePath = path.join(exportDir, name.replace(/[:\/*?"<>|]/g, '-'))
   await fsp.writeFile(filePath, text, 'utf8')
   return { ok: true, path: filePath }
+})
+
+/** Google Apps Script در ContentService redirect و محدودیت CORS دارد. این پل فقط
+ * URL رسمی /exec را می‌پذیرد و اجازه تبدیل‌شدن به پراکسی عمومی/SSRF نمی‌دهد. */
+ipcMain.handle('drive:request', async (_e, { url, method, body }) => {
+  let target
+  try { target = new URL(String(url || '')) } catch { throw new Error('bad Google Script URL') }
+  if (target.protocol !== 'https:' || target.hostname !== 'script.google.com' ||
+      !/^\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(target.pathname)) {
+    throw new Error('forbidden Google Script URL')
+  }
+  const verb = method === 'GET' ? 'GET' : 'POST'
+  const textBody = typeof body === 'string' ? body : ''
+  if (Buffer.byteLength(textBody, 'utf8') > 1024 * 1024) throw new Error('Drive request too large')
+  const response = await net.fetch(target.toString(), {
+    method: verb,
+    redirect: 'follow',
+    headers: verb === 'POST' ? { 'Content-Type': 'text/plain;charset=utf-8' } : undefined,
+    body: verb === 'POST' ? textBody : undefined,
+  })
+  return { ok: response.ok, status: response.status, text: await response.text() }
 })
 
 /* ---------------- IPC: اطلاعات و ابزار ---------------- */

@@ -34,6 +34,7 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
   const [cooldown, setCooldown] = useState(cooldownRemaining())
   const [shake, setShake] = useState(0)
   const [bioOk, setBioOk] = useState(false)
+  const [autoBioTried, setAutoBioTried] = useState(false)
   const [clock, setClock] = useState(() => new Date())
 
   // ساعت زنده
@@ -110,6 +111,16 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
     setBusy(false)
     if (ok) onUnlock()
   }, [busy, onUnlock, t])
+
+  // وقتی کاربر اثر انگشت را فعال کرده، با بازشدن صفحه قفل منتظر کلیک اضافه
+  // نمی‌مانیم و پنجره بومی Android را خودکار نشان می‌دهیم. در صورت لغو، دکمه
+  // اثر انگشت و رمز عددی همچنان در دسترس می‌مانند.
+  useEffect(() => {
+    if (!bioOk || autoBioTried) return
+    setAutoBioTried(true)
+    const timer = setTimeout(() => { void bio() }, 250)
+    return () => clearTimeout(timer)
+  }, [autoBioTried, bio, bioOk])
 
   const timeStr = useMemo(() => {
     const h = String(clock.getHours()).padStart(2, '0')
