@@ -79,7 +79,7 @@ export function ModulePage() {
   }, [module?.key])
 
   const filterable = useMemo(
-    () => module?.fields.filter(f => f.type === 'select' && (f.options?.length ?? 0) > 1).slice(0, 3) ?? [],
+    () => module?.fields.filter(f => (f.type === 'select' && (f.options?.length ?? 0) > 1) || f.type === 'ref').slice(0, 4) ?? [],
     [module],
   )
 
@@ -133,15 +133,25 @@ export function ModulePage() {
           <TextInput value={q} onChange={e => setQ(e.target.value)} placeholder={t('common.search')} className="ps-8 py-1.5 text-[12.5px]" />
         </div>
 
-        {filterable.map(f => (
-          <Dropdown key={f.key} className="w-auto min-w-[140px]"
-            value={filters[f.key] ?? ''}
-            onChange={nv => setFilters(p => ({ ...p, [f.key]: nv }))}
-            options={[
-              { value: '', label: t('module.filterAll', { f: fl(f) }) },
-              ...(f.options ?? []).map(o => ({ value: o, label: ol(o) })),
-            ]} />
-        ))}
+        {filterable.map(f => {
+          let opts: {value: string, label: string}[] = []
+          if (f.type === 'select') {
+            opts = (f.options ?? []).map(o => ({ value: o, label: ol(o) }))
+          } else if (f.type === 'ref' && f.refModule) {
+            const rm = data.modules.find(m => m.key === f.refModule)
+            const refRows = data.records[f.refModule] ?? []
+            opts = refRows.map(r => ({ value: String(r.id), label: String(r[rm?.titleField ?? 'name'] ?? r.id) }))
+          }
+          return (
+            <Dropdown key={f.key} className="w-auto min-w-[140px]"
+              value={filters[f.key] ?? ''}
+              onChange={nv => setFilters(p => ({ ...p, [f.key]: nv }))}
+              options={[
+                { value: '', label: t('module.filterAll', { f: fl(f) }) },
+                ...opts,
+              ]} />
+          )
+        })}
 
         {refreshable && (
           <Button size="sm" variant="ghost" icon={refreshing ? 'Loader' : 'RefreshCw'} title="refresh"
