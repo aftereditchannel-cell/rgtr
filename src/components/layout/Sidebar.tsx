@@ -12,7 +12,7 @@ const FIXED_TOP = [
   { to: '/decision', icon: 'Target', k: 'nav.decision' },
   { to: '/analytics', icon: 'BarChart3', k: 'nav.analytics' },
   { to: '/social', icon: 'Share2', k: 'nav.social' },
-  { to: '/automation', icon: 'Bot', k: 'nav.automation' },
+  { to: '/assistant', icon: 'Sparkles', k: 'nav.assistant' },
 ]
 
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
