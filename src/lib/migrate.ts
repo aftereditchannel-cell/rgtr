@@ -3,7 +3,7 @@ import { CORE_MODULES } from '../domain/schema'
 import { DEFAULT_WEIGHTS } from '../domain/scoring'
 import { DEFAULT_PROVIDERS, DEFAULT_AUTOMATIONS } from '../domain/ai'
 
-export const CURRENT_VERSION = 8
+export const CURRENT_VERSION = 9
 
 const EMPTY_CLOUD_META: CloudSyncMeta = { lastSync: '', lastLocalChange: '', pendingSync: false, lastSyncError: '' }
 
@@ -158,6 +158,16 @@ export function migrate(input: unknown): AppData {
       }
     }
     v = 8
+  }
+
+  // v8 -> v9: Add planner module
+  if (v < 9) {
+    const cmPlanner = CORE_MODULES.find(m => m.key === 'planner')
+    if (cmPlanner && !data.modules.some(m => m.key === 'planner')) {
+      data.modules.push({ ...cmPlanner })
+      data.records['planner'] = []
+    }
+    v = 9
   }
 
   data.settings.cloud.autoPull = false

@@ -36,6 +36,7 @@ export const UI: Record<string, Pair> = {
   'common.default': { fa: 'پیش‌فرض', en: 'default' },
   'common.untitled': { fa: 'بدون عنوان', en: 'Untitled' },
   'nav.dashboard': { fa: 'داشبورد', en: 'Dashboard' },
+  'nav.planner': { fa: 'برنامه‌ریزی شخصی', en: 'My Planner' },
   'nav.decision': { fa: 'مرکز تصمیم', en: 'Decision Center' },
   'nav.analytics': { fa: 'تحلیل و آمار', en: 'Analytics' },
   'nav.settings': { fa: 'تنظیمات', en: 'Settings' },
